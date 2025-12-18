@@ -1,0 +1,74 @@
+# ============================================================
+# DataSens — Requirements (E1 Complete)
+# Python 3.10+
+# 
+# Modules utilisés:
+# - tagger.py, analyzer.py, repository.py: sqlite3 (built-in)
+# - aggregator.py: pandas, sqlite3
+# - exporter.py: pandas, pyarrow (pour parquet)
+# ============================================================
+
+# Core Data Processing
+# Required for: aggregator.py (DataAggregator), exporter.py (GoldExporter)
+pandas==2.3.3
+numpy==1.26.4
+pyarrow==22.0.0  # Required for parquet export in exporter.py
+fastparquet==2024.11.0
+
+# Web Scraping & Data Sources
+feedparser==6.0.11
+requests==2.32.3
+beautifulsoup4==4.12.3
+lxml==5.2.2
+httpx==0.27.0
+kagglehub==0.2.5
+
+# Database & ORM
+sqlalchemy==2.0.30
+sqlmodel==0.0.21
+
+# Data Validation & Typing
+pydantic==2.7.4
+python-dotenv==1.0.1
+
+# Code Quality & Linting
+ruff==0.1.13
+
+# Logging & Output
+loguru==0.7.2
+rich==13.7.1
+
+# Development & Notebooks
+jupyter>=1.0.0
+ipython>=8.0.0
+
+# ML & NLP (E2-ready, optional for E1)
+scikit-learn==1.5.0
+transformers==4.41.2
+torch==2.3.1
+
+# Visualization (E2+)
+matplotlib==3.9.0
+seaborn==0.13.2
+plotly==5.18.0
+kaleido==0.2.1
+
+# Experiment Tracking (E3)
+mlflow==3.7.0
+
+# API Framework (E3)
+fastapi==0.111.0
+uvicorn==0.30.1
+
+# Testing
+pytest==8.2.2
+
+# Monitoring
+prometheus-client==0.20.0
+
+# Scheduling (Dashboard & Aggregation)
+apscheduler==3.10.4
+
+# Optional: PySpark (E1 V3+)
+# pyspark==3.5.1
+# delta-spark==3.0.0

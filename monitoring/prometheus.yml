@@ -1,0 +1,33 @@
+# Prometheus Configuration - DataSens E1
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'datasens-e1'
+    environment: 'production'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
+
+# Load rules
+rule_files:
+  - 'prometheus_rules.yml'
+
+# Scrape configurations
+scrape_configs:
+  # DataSens E1 Pipeline Metrics
+  - job_name: 'datasens-e1'
+    static_configs:
+      - targets: ['datasens-e1:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
