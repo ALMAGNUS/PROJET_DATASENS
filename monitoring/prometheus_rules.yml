@@ -1,0 +1,56 @@
+# Prometheus Alerting Rules - DataSens E1
+
+groups:
+  - name: datasens_alerts
+    interval: 30s
+    rules:
+      # Pipeline Errors
+      - alert: PipelineHighErrorRate
+        expr: rate(datasens_pipeline_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High pipeline error rate detected"
+          description: "Pipeline error rate is {{ $value }} errors/sec"
+
+      # Source Extraction Failures
+      - alert: SourceExtractionFailure
+        expr: rate(datasens_source_errors_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Source extraction failing"
+          description: "Source {{ $labels.source }} has error rate {{ $value }} errors/sec"
+
+      # Low Enrichment Rate
+      - alert: LowEnrichmentRate
+        expr: datasens_enrichment_rate < 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low enrichment rate"
+          description: "Enrichment rate is {{ $value | humanizePercentage }}"
+
+      # No Articles Collected
+      - alert: NoArticlesCollected
+        expr: rate(datasens_articles_extracted_total[1h]) == 0
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "No articles collected in the last hour"
+          description: "Pipeline has not collected any articles for 1 hour"
+
+      # Database Growth
+      - alert: DatabaseGrowthStalled
+        expr: rate(datasens_articles_in_database[1h]) < 1
+        for: 2h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database growth stalled"
+          description: "Database is not growing at expected rate"
+

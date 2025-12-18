@@ -1,0 +1,213 @@
+{
+  "sources": [
+    {
+      "source_name": "rss_french_news",
+      "description": "French RSS news articles",
+      "acquisition_type": "rss",
+      "theme": "news",
+      "url": "https://www.france24.com/fr/rss",
+      "partition_path": "/data/raw/rss_french_news/date=YYYY-MM-DD/",
+      "file_naming": "rss_french_news_france_YYYYMMDD_HHMMSS.parquet",
+      "refresh_frequency": "Daily",
+      "active": true
+    },
+    {
+      "source_name": "gdelt_events",
+      "description": "Global Events from GDELT",
+      "acquisition_type": "bigdata",
+      "theme": "events",
+      "url": "https://blog.gdeltproject.org/",
+      "partition_path": "/data/raw/gdelt_events/date=YYYY-MM-DD/",
+      "file_naming": "gdelt_events_global_YYYYMMDD_HHMMSS.parquet",
+      "refresh_frequency": "Daily",
+      "active": true
+    },
+    {
+      "source_name": "reddit_france",
+      "description": "Posts and comments from r/france",
+      "acquisition_type": "api_scraping",
+      "theme": "society",
+      "url": "https://www.reddit.com/r/france",
+      "partition_path": "/data/raw/reddit_france/date=YYYY-MM-DD/",
+      "file_naming": "reddit_france_users_YYYYMMDD_HHMMSS.parquet",
+      "refresh_frequency": "Hourly",
+      "active": true
+    },
+    {
+      "source_name": "trustpilot_reviews",
+      "description": "Consumer sentiment reviews",
+      "acquisition_type": "scraping",
+      "theme": "economy",
+      "url": "https://fr.trustpilot.com",
+      "partition_path": "/data/raw/trustpilot_reviews/date=YYYY-MM-DD/",
+      "file_naming": "trustpilot_reviews_fr_YYYYMMDD_HHMMSS.parquet",
+      "refresh_frequency": "Daily",
+      "active": true
+    },
+    {
+      "source_name": "openweather_api",
+      "description": "Weather context for France",
+      "acquisition_type": "api",
+      "theme": "weather",
+      "url": "https://openweathermap.org/api",
+      "partition_path": "/data/raw/openweather_api/date=YYYY-MM-DD/",
+      "file_naming": "openweather_api_france_YYYYMMDD_HHMMSS.parquet",
+      "refresh_frequency": "Hourly",
+      "active": true
+    },
+    {
+      "source_name": "insee_indicators",
+      "description": "French economic indicators",
+      "acquisition_type": "api",
+      "theme": "economy",
+      "url": "https://api.insee.fr",
+      "partition_path": "/data/raw/insee_indicators/date=YYYY-MM-DD/",
+      "file_naming": "insee_indicators_france_YYYYMMDD_HHMMSS.parquet",
+      "refresh_frequency": "Monthly",
+      "active": true
+    },
+    {
+      "source_name": "datagouv_datasets",
+      "description": "Open government datasets",
+      "acquisition_type": "dataset",
+      "theme": "politics",
+      "url": "https://www.data.gouv.fr",
+      "partition_path": "/data/raw/datagouv_datasets/date=YYYY-MM-DD/",
+      "file_naming": "datagouv_datasets_france_YYYYMMDD_HHMMSS.parquet",
+      "refresh_frequency": "Variable",
+      "active": true
+    },
+    {
+      "source_name": "Kaggle_StopWords_28Lang",
+      "description": "Stop words in 28 languages",
+      "acquisition_type": "dataset",
+      "theme": "nlp",
+      "url": "https://www.kaggle.com/datasets/heeraldedhia/stop-words-in-28-languages",
+      "partition_path": "/data/raw/Kaggle_StopWords_28Lang/date=YYYY-MM-DD/",
+      "file_naming": "kaggle_stopwords_28_languages_YYYYMMDD_HHMMSS.json",
+      "refresh_frequency": "Static",
+      "active": true
+    },
+    {
+      "source_name": "Kaggle_StopWords",
+      "description": "Stop words dataset",
+      "acquisition_type": "dataset",
+      "theme": "nlp",
+      "url": "https://www.kaggle.com/datasets/dliciuc/stop-words",
+      "partition_path": "/data/raw/Kaggle_StopWords/date=YYYY-MM-DD/",
+      "file_naming": "kaggle_stopwords_YYYYMMDD_HHMMSS.json",
+      "refresh_frequency": "Static",
+      "active": true
+    },
+    {
+      "source_name": "Kaggle_FrenchFinNews",
+      "description": "French financial news dataset",
+      "acquisition_type": "dataset",
+      "theme": "finance",
+      "url": "https://www.kaggle.com/datasets/arcticgiant/french-financial-news",
+      "partition_path": "/data/raw/Kaggle_FrenchFinNews/date=YYYY-MM-DD/",
+      "file_naming": "kaggle_french_financial_news_YYYYMMDD_HHMMSS.csv",
+      "refresh_frequency": "Static",
+      "active": true
+    },
+    {
+      "source_name": "Kaggle_SentimentLexicons",
+      "description": "Sentiment lexicons for 81 languages",
+      "acquisition_type": "dataset",
+      "theme": "nlp",
+      "url": "https://www.kaggle.com/datasets/rtatman/sentiment-lexicons-for-81-languages",
+      "partition_path": "/data/raw/Kaggle_SentimentLexicons/date=YYYY-MM-DD/",
+      "file_naming": "kaggle_sentiment_lexicons_YYYYMMDD_HHMMSS.json",
+      "refresh_frequency": "Static",
+      "active": true
+    },
+    {
+      "source_name": "Kaggle_InsuranceReviews",
+      "description": "French insurance reviews dataset",
+      "acquisition_type": "dataset",
+      "theme": "economy",
+      "url": "https://www.kaggle.com/datasets/fedi1996/insurance-reviews-france",
+      "partition_path": "/data/raw/Kaggle_InsuranceReviews/date=YYYY-MM-DD/",
+      "file_naming": "kaggle_insurance_reviews_YYYYMMDD_HHMMSS.csv",
+      "refresh_frequency": "Static",
+      "active": true
+    },
+    {
+      "source_name": "kaggle_french_opinions",
+      "description": "Opinion datasets",
+      "acquisition_type": "dataset",
+      "theme": "society",
+      "url": "https://www.kaggle.com",
+      "partition_path": "/data/raw/kaggle_french_opinions/date=YYYY-MM-DD/",
+      "file_naming": "kaggle_french_opinions_france_YYYYMMDD_HHMMSS.parquet",
+      "refresh_frequency": "Static",
+      "active": true
+    },
+    {
+      "source_name": "google_news_rss",
+      "description": "Aggregated news sentiment",
+      "acquisition_type": "rss",
+      "theme": "news",
+      "url": "https://news.google.com/rss",
+      "partition_path": "/data/raw/google_news_rss/date=YYYY-MM-DD/",
+      "file_naming": "google_news_rss_france_YYYYMMDD_HHMMSS.parquet",
+      "refresh_frequency": "Daily",
+      "active": true
+    },
+    {
+      "source_name": "yahoo_finance",
+      "description": "Yahoo Finance - Economic & financial insights",
+      "acquisition_type": "rss",
+      "theme": "finance",
+      "url": "https://finance.yahoo.com/news/rss",
+      "partition_path": "/data/raw/yahoo_finance/date=YYYY-MM-DD/",
+      "file_naming": "yahoo_finance_france_YYYYMMDD_HHMMSS.parquet",
+      "refresh_frequency": "Hourly",
+      "active": true
+    },
+    {
+      "source_name": "ifop_barometers",
+      "description": "French political barometers",
+      "acquisition_type": "scraping",
+      "theme": "politics",
+      "url": "https://www.ifop.com/publications/",
+      "partition_path": "/data/raw/ifop_barometers/date=YYYY-MM-DD/",
+      "file_naming": "ifop_barometers_france_YYYYMMDD_HHMMSS.parquet",
+      "refresh_frequency": "Monthly",
+      "active": true
+    },
+    {
+      "source_name": "GDELT_Last15_English",
+      "description": "GDELT Last 15 minutes events (English)",
+      "acquisition_type": "bigdata",
+      "theme": "events",
+      "url": "http://data.gdeltproject.org/events/",
+      "partition_path": "/data/raw/GDELT_Last15_English/date=YYYY-MM-DD/",
+      "file_naming": "gdelt_events_last15_YYYYMMDD_HHMMSS.json",
+      "refresh_frequency": "Real-time",
+      "active": true
+    },
+    {
+      "source_name": "GDELT_Master_List",
+      "description": "GDELT Master Event List",
+      "acquisition_type": "bigdata",
+      "theme": "events",
+      "url": "http://data.gdeltproject.org/events/",
+      "partition_path": "/data/raw/GDELT_Master_List/date=YYYY-MM-DD/",
+      "file_naming": "gdelt_events_master_YYYYMMDD_HHMMSS.json",
+      "refresh_frequency": "Daily",
+      "active": true
+    },
+    {
+      "source_name": "Kaggle_FrenchTweets",
+      "description": "French tweets dataset",
+      "acquisition_type": "dataset",
+      "theme": "society",
+      "url": "https://www.kaggle.com/datasets/",
+      "partition_path": "/data/raw/Kaggle_FrenchTweets/date=YYYY-MM-DD/",
+      "file_naming": "french_tweets_YYYYMMDD_HHMMSS.csv",
+      "refresh_frequency": "Daily",
+      "active": true
+    }
+  ]
+}

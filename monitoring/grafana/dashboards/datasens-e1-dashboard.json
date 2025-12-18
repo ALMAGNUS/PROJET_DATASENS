@@ -1,0 +1,113 @@
+{
+  "dashboard": {
+    "title": "DataSens E1 Pipeline Monitoring",
+    "tags": ["datasens", "pipeline", "e1"],
+    "timezone": "browser",
+    "schemaVersion": 27,
+    "version": 1,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Pipeline Runs",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "datasens_pipeline_runs_total",
+            "legendFormat": "Total Runs"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Articles in Database",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "datasens_articles_in_database",
+            "legendFormat": "Articles"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Enrichment Rate",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "datasens_enrichment_rate",
+            "legendFormat": "Rate"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "Articles Extracted by Source",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "sum by (source) (rate(datasens_articles_extracted_total[5m]))",
+            "legendFormat": "{{source}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4}
+      },
+      {
+        "id": 5,
+        "title": "Pipeline Duration",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(datasens_pipeline_duration_seconds_bucket[5m]))",
+            "legendFormat": "95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(datasens_pipeline_duration_seconds_bucket[5m]))",
+            "legendFormat": "50th percentile"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4}
+      },
+      {
+        "id": 6,
+        "title": "Articles by Sentiment",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (sentiment) (datasens_articles_analyzed_total)",
+            "legendFormat": "{{sentiment}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12}
+      },
+      {
+        "id": 7,
+        "title": "Articles by Topic",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "sum by (topic) (datasens_articles_tagged_total)",
+            "legendFormat": "{{topic}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12}
+      },
+      {
+        "id": 8,
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(datasens_pipeline_errors_total[5m]))",
+            "legendFormat": "Errors/sec"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 20}
+      }
+    ]
+  }
+}
+

@@ -1,0 +1,8 @@
+{
+  "include": ["src", "main.py", "*.py"],
+  "exclude": ["**/node_modules", "**/__pycache__", "**/.*"],
+  "pythonVersion": "3.13",
+  "pythonPlatform": "Windows",
+  "typeCheckingMode": "basic",
+  "extraPaths": ["${workspaceFolder}/src"]
+}

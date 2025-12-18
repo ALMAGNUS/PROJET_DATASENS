@@ -1,0 +1,14 @@
+apiVersion: 1
+
+providers:
+  - name: 'DataSens E1'
+    orgId: 1
+    folder: 'DataSens'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: true
+
