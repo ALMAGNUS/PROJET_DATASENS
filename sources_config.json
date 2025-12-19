@@ -86,7 +86,7 @@
       "partition_path": "/data/raw/Kaggle_StopWords_28Lang/date=YYYY-MM-DD/",
       "file_naming": "kaggle_stopwords_28_languages_YYYYMMDD_HHMMSS.json",
       "refresh_frequency": "Static",
-      "active": true
+      "active": false
     },
     {
       "source_name": "Kaggle_StopWords",
@@ -97,7 +97,7 @@
       "partition_path": "/data/raw/Kaggle_StopWords/date=YYYY-MM-DD/",
       "file_naming": "kaggle_stopwords_YYYYMMDD_HHMMSS.json",
       "refresh_frequency": "Static",
-      "active": true
+      "active": false
     },
     {
       "source_name": "Kaggle_FrenchFinNews",
@@ -108,7 +108,7 @@
       "partition_path": "/data/raw/Kaggle_FrenchFinNews/date=YYYY-MM-DD/",
       "file_naming": "kaggle_french_financial_news_YYYYMMDD_HHMMSS.csv",
       "refresh_frequency": "Static",
-      "active": true
+      "active": false
     },
     {
       "source_name": "Kaggle_SentimentLexicons",
@@ -119,7 +119,7 @@
       "partition_path": "/data/raw/Kaggle_SentimentLexicons/date=YYYY-MM-DD/",
       "file_naming": "kaggle_sentiment_lexicons_YYYYMMDD_HHMMSS.json",
       "refresh_frequency": "Static",
-      "active": true
+      "active": false
     },
     {
       "source_name": "Kaggle_InsuranceReviews",
@@ -130,7 +130,7 @@
       "partition_path": "/data/raw/Kaggle_InsuranceReviews/date=YYYY-MM-DD/",
       "file_naming": "kaggle_insurance_reviews_YYYYMMDD_HHMMSS.csv",
       "refresh_frequency": "Static",
-      "active": true
+      "active": false
     },
     {
       "source_name": "kaggle_french_opinions",
@@ -207,7 +207,7 @@
       "partition_path": "/data/raw/Kaggle_FrenchTweets/date=YYYY-MM-DD/",
       "file_naming": "french_tweets_YYYYMMDD_HHMMSS.csv",
       "refresh_frequency": "Daily",
-      "active": true
+      "active": false
     },
     {
       "source_name": "zzdb_synthetic",

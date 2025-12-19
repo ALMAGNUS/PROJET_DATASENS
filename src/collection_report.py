@@ -10,11 +10,52 @@ class CollectionReport:
         self.session_start = session_start_time or datetime.now().isoformat()
         self.stats = {}
     
+    def _is_foundation_source(self, source_name: str) -> bool:
+        """Détermine si une source est statique (fondation) : Kaggle, GDELT_events, ZZDB (toutes)
+        Ces sources sont en local et intégrées UNE SEULE FOIS, puis exclues des rapports quotidiens
+        
+        ZZDB (synthetic + CSV) : Jeu de données synthétiques créé avec Faker pour le projet
+        → TOUTES les sources ZZDB sont statiques (fondation), pas dynamiques"""
+        source_lower = source_name.lower()
+        # Sources fondation : Kaggle (tous), GDELT_events (seulement celui-ci), ZZDB (toutes)
+        return ('kaggle' in source_lower or 
+                (source_lower == 'gdelt_events') or  # Seulement gdelt_events (local), pas GDELT_Last15_English (dynamique)
+                ('zzdb' in source_lower))  # TOUTES les sources ZZDB (synthetic + CSV) sont fondation
+    
+    def _is_foundation_integrated(self, source_name: str) -> bool:
+        """Vérifie si une source fondation est déjà intégrée (via sync_log ou articles existants)"""
+        c = self.conn.cursor()
+        try:
+            # Vérifier sync_log avec status FOUNDATION_INTEGRATED
+            c.execute("""
+                SELECT COUNT(*) 
+                FROM sync_log sl
+                JOIN source s ON sl.source_id = s.source_id
+                WHERE s.name = ? AND sl.status = 'FOUNDATION_INTEGRATED'
+            """, (source_name,))
+            if c.fetchone()[0] > 0:
+                return True
+        except:
+            pass
+        
+        # Fallback: vérifier si des articles existent déjà pour cette source
+        try:
+            c.execute("""
+                SELECT COUNT(*) 
+                FROM raw_data r
+                JOIN source s ON r.source_id = s.source_id
+                WHERE s.name = ?
+            """, (source_name,))
+            return c.fetchone()[0] > 0
+        except:
+            return False
+    
     def collect_session_stats(self):
-        """Collecte les stats de la session actuelle"""
+        """Collecte les stats de la session actuelle (EXCLUT les sources fondation déjà intégrées)"""
         c = self.conn.cursor()
         
         # Articles collectés dans cette session (après session_start)
+        # EXCLURE les sources fondation déjà intégrées (Kaggle, GDELT_events, ZZDB CSV)
         c.execute("""
             SELECT s.name, COUNT(r.raw_data_id) as count,
                    COUNT(DISTINCT CASE WHEN dt.raw_data_id IS NOT NULL THEN r.raw_data_id END) as tagged,
@@ -32,8 +73,14 @@ class CollectionReport:
         
         self.stats['by_source'] = []
         for r in c.fetchall():
+            source_name = r[0]
+            
+            # EXCLURE les sources fondation déjà intégrées (ne plus les afficher dans les rapports quotidiens)
+            if self._is_foundation_source(source_name) and self._is_foundation_integrated(source_name):
+                continue  # Skip cette source (déjà intégrée, ne plus l'afficher)
+            
             self.stats['by_source'].append({
-                'source': r[0],
+                'source': source_name,
                 'collected': r[1],
                 'tagged': r[2] or 0,
                 'analyzed': r[3] or 0
@@ -139,8 +186,13 @@ class CollectionReport:
             
             # Notes explicatives
             print(f"\n   [CLASSIFICATION DES SOURCES]")
+            print(f"   • Sources FONDATION (statiques, locales) : Intégrées UNE SEULE FOIS, puis EXCLUES des rapports quotidiens")
+            print(f"     - Kaggle : Fichiers plats (CSV/JSON) - Datasets locaux")
+            print(f"     - GDELT_events : Événements globaux - Fichiers locaux")
+            print(f"     - ZZDB (toutes) : Données synthétiques académiques créées avec Faker pour le projet")
+            print(f"       → zzdb_synthetic (SQLite DB) + zzdb_csv (CSV export) = TOUTES statiques (fondation)")
             if kaggle_found:
-                print(f"   • Kaggle : Fichiers plats (CSV/JSON) - Datasets locaux")
+                print(f"   • Kaggle : Fichiers plats (CSV/JSON) - Datasets locaux (intégration unique)")
             if zzdb_found:
                 print(f"   • ZZDB : Base de données non relationnelle (SQLite) + CSV export - DONNÉES DE SYNTHÈSE [LAB IA]")
                 print(f"   • ZZDB permet d'enrichir l'analyse des sentiments français dans un contexte de recherche.")
@@ -150,6 +202,8 @@ class CollectionReport:
                 print(f"     - zzdb_csv (CSV export) : ACTIF (source principale, intégration unique comme fondation)")
                 print(f"   • Total ZZDB dans datasens.db : {self.zzdb_total} articles (données de synthèse)")
                 print(f"   • Les données de synthèse ZZDB sont intégrées comme fondation statique pour structurer le dataset.")
+                print(f"   • NOTE : Les sources fondation (Kaggle, GDELT_events, ZZDB CSV) n'apparaissent plus dans les rapports")
+                print(f"     quotidiens une fois intégrées (elles sont dans la DB mais ne sont plus collectées).")
         
         # Distribution topics
         if self.stats['topics']:

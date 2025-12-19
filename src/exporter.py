@@ -52,12 +52,6 @@ class GoldExporter:
                 zzdb_csv_path.mkdir(exist_ok=True)
                 zzdb_csv_parquet = zzdb_csv_path / 'zzdb_csv_articles.parquet'
                 zzdb_csv_df.to_parquet(zzdb_csv_parquet, index=False, engine='pyarrow')
-            
-            # Export CSV global ZZDB (tous les ZZDB)
-            zzdb_all_df = df[df['source'].str.contains('zzdb', case=False, na=False)].copy()
-            if len(zzdb_all_df) > 0:
-                zzdb_csv_file = self.export_dir / 'gold_zzdb.csv'
-                zzdb_all_df.to_csv(zzdb_csv_file, index=False, encoding='utf-8')
         
         return {'parquet': parquet, 'csv': csv, 'rows': len(df), 'columns': list(df.columns)}
 
