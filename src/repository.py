@@ -20,11 +20,11 @@ class Repository(DatabaseLoader):
         try:
             # Check if tables exist
             self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='source'")
-            if self.cursor.fetchone():
-                return  # Schema already exists
+            schema_exists = self.cursor.fetchone()
             
-            # Create 6 core tables E1
-            sql_tables = """
+            if not schema_exists:
+                # Create 6 core tables E1
+                sql_tables = """
             -- 1. SOURCE
             CREATE TABLE IF NOT EXISTS source (
                 source_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -97,8 +97,12 @@ class Repository(DatabaseLoader):
             CREATE INDEX IF NOT EXISTS idx_model_output_raw ON model_output(raw_data_id);
             """
             
-            self.cursor.executescript(sql_tables)
-            self.conn.commit()
+                self.cursor.executescript(sql_tables)
+                self.conn.commit()
+            
+            # Migration : Ajouter table PROFILS si elle n'existe pas (compatible avec schéma existant)
+            self._ensure_profils_table()
+            
         except Exception as e:
             print(f"   ⚠️  Schema initialization error: {str(e)[:60]}")
     
@@ -151,7 +155,7 @@ class Repository(DatabaseLoader):
             self.cursor.execute("SELECT raw_data_id FROM raw_data WHERE fingerprint = ?", (fp,))
             existing = self.cursor.fetchone()
             if existing:
-                return None  # Duplicate
+                return None  # Duplicate (déduplication normale)
             
             # GARDE-FOU ZZDB: Qualité réduite pour données synthétiques (0.3 au lieu de 0.5)
             quality_score = 0.3 if article.source_name and 'zzdb' in article.source_name.lower() else 0.5
@@ -167,7 +171,16 @@ class Repository(DatabaseLoader):
             self.cursor.execute("SELECT raw_data_id FROM raw_data WHERE fingerprint = ?", (fp,))
             row = self.cursor.fetchone()
             return row[0] if row else None
+        except sqlite3.IntegrityError as e:
+            # UNIQUE constraint failed sur fingerprint = déduplication normale (race condition)
+            # Ne pas afficher l'erreur, c'est attendu
+            if 'fingerprint' in str(e).lower() or 'unique' in str(e).lower():
+                return None  # Duplicate (silencieux)
+            # Autre erreur d'intégrité : afficher
+            print(f"   ⚠️  DB integrity error: {str(e)[:40]}")
+            return None
         except Exception as e:
+            # Autre erreur : afficher
             print(f"   ⚠️  DB error: {str(e)[:40]}")
             return None
     
@@ -214,4 +227,69 @@ class Repository(DatabaseLoader):
                 return count > 0
             except:
                 return False
+    
+    def _ensure_profils_table(self):
+        """Create PROFILS table if it doesn't exist (migration-safe, isolated from E1 tables)"""
+        try:
+            # Check if profils table already exists
+            self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='profils'")
+            if self.cursor.fetchone():
+                return  # Table already exists
+            
+            # Create PROFILS table (isolated, no FK in E1 tables)
+            sql_profils = """
+            CREATE TABLE IF NOT EXISTS profils (
+                profil_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                firstname VARCHAR(100) NOT NULL,
+                lastname VARCHAR(100) NOT NULL,
+                role VARCHAR(20) NOT NULL CHECK(role IN ('reader', 'writer', 'deleter', 'admin')),
+                active BOOLEAN DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_login DATETIME,
+                username VARCHAR(50) UNIQUE
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_profils_email ON profils(email);
+            CREATE INDEX IF NOT EXISTS idx_profils_role ON profils(role);
+            CREATE INDEX IF NOT EXISTS idx_profils_active ON profils(active);
+            
+            CREATE TABLE IF NOT EXISTS user_action_log (
+                action_log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                profil_id INTEGER NOT NULL REFERENCES profils(profil_id) ON DELETE CASCADE,
+                action_type VARCHAR(50) NOT NULL,
+                resource_type VARCHAR(50) NOT NULL,
+                resource_id INTEGER,
+                action_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                ip_address VARCHAR(45),
+                details TEXT
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_action_log_profil ON user_action_log(profil_id);
+            CREATE INDEX IF NOT EXISTS idx_action_log_date ON user_action_log(action_date);
+            CREATE INDEX IF NOT EXISTS idx_action_log_type ON user_action_log(action_type);
+            """
+            
+            self.cursor.executescript(sql_profils)
+            self.conn.commit()
+        except Exception as e:
+            print(f"   ⚠️  Profils table creation error: {str(e)[:60]}")
+    
+    def log_user_action(self, profil_id: int, action_type: str, 
+                       resource_type: str, resource_id: int | None = None,
+                       ip_address: str | None = None, details: str | None = None) -> bool:
+        """Log user action in USER_ACTION_LOG (audit trail) - Isolated from E1 tables"""
+        try:
+            self.cursor.execute("""
+                INSERT INTO user_action_log 
+                (profil_id, action_type, resource_type, resource_id, ip_address, details)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (profil_id, action_type, resource_type, resource_id, ip_address, details))
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"   ⚠️  Action log error: {str(e)[:60]}")
+            return False
 

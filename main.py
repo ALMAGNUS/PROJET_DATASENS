@@ -1,8 +1,21 @@
 #!/usr/bin/env python3
 """DataSens E1+ - MAIN ENTRY (Pipeline SOLID/DRY)"""
-import json, sys, os, shutil, time
+import json, sys, os, shutil, time, io
 from pathlib import Path
 from datetime import date, datetime
+
+# Fix encoding for Windows console
+if sys.platform == 'win32':
+    try:
+        # Only wrap if not already wrapped
+        if not isinstance(sys.stdout, io.TextIOWrapper) or sys.stdout.encoding != 'utf-8':
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        if not isinstance(sys.stderr, io.TextIOWrapper) or sys.stderr.encoding != 'utf-8':
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    except (AttributeError, OSError):
+        # If stdout/stderr don't have buffer attribute, skip wrapping
+        pass
+
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 from core import ContentTransformer, Source, create_extractor
 from repository import Repository
@@ -61,11 +74,15 @@ class E1Pipeline:
         sources = self.load_sources()
         articles = []
 
+        total_sources = sum(1 for s in sources if s.active)
+        current_source = 0
+        
         for source in sources:
             if not source.active:
                 continue
 
-            print(f"{source.source_name}... ({source.acquisition_type})", end=" ")
+            current_source += 1
+            print(f"[{current_source}/{total_sources}] {source.source_name}... ({source.acquisition_type})", end=" ", flush=True)
             start_time = time.time()
             try:
                 extractor = create_extractor(source)
@@ -85,6 +102,8 @@ class E1Pipeline:
                 # Message spécial pour ZZDB
                 if 'zzdb' in source.source_name.lower():
                     print(f"OK {len(extracted)} articles [ZZDB → DataSens]")
+                elif len(extracted) > 1000:
+                    print(f"OK {len(extracted):,} articles (traitement en cours...)")
                 else:
                     print(f"OK {len(extracted)}")
             except Exception as e:
@@ -126,6 +145,9 @@ class E1Pipeline:
         print("\n" + "="*70)
         print("[LOADING] Database ingestion + Tagging + Sentiment")
         print("="*70)
+        if len(articles) > 1000:
+            print(f"   Traitement de {len(articles):,} articles (cela peut prendre plusieurs minutes)...")
+            print("   Progression: ", end="", flush=True)
 
         # Create sources partition dir for today
         today = date.today()
@@ -138,7 +160,13 @@ class E1Pipeline:
         # Save articles as JSON
         articles_data = []
         zzdb_loaded = 0  # Compteur ZZDB
-        for article, source_name in articles:
+        total_articles = len(articles)
+        show_progress = total_articles > 1000
+        
+        for idx, (article, source_name) in enumerate(articles, 1):
+            # Afficher progression tous les 100 articles si beaucoup d'articles
+            if show_progress and idx % 100 == 0:
+                print(".", end="", flush=True)
             source_id = self.db.get_source_id(source_name)
             if source_id:
                 # Load article and get ID
@@ -240,18 +268,21 @@ class E1Pipeline:
                         
                         # Message détaillé pour ZZDB
                         if 'zzdb' in source_name.lower():
-                            print(f"\n   🔗 [ZZDB → DataSens] Connexion validée :")
+                            print(f"\n   [ZZDB → DataSens] Connexion validee :")
                             print(f"      • Source: {source_name}")
-                            print(f"      • Articles transférés: {count}")
+                            print(f"      • Articles transferes: {count}")
                             print(f"      • Fichier: {file_path or 'N/A'}")
                             print(f"      • Base ZZDB: zzdb/synthetic_data.db → CSV → datasens.db")
-                            print(f"      • Status: INTÉGRÉ (fondation statique)")
+                            print(f"      • Status: INTEGRE (fondation statique)")
                         else:
-                            print(f"\n   📦 [FONDATION] {source_name} intégrée : {count} articles (première fois)")
+                            print(f"\n   [FONDATION] {source_name} integree : {count} articles (premiere fois)")
+        
+        if show_progress:
+            print()  # Nouvelle ligne après les points de progression
         
         print(f"\nOK Total loaded: {self.stats['loaded']}")
         if zzdb_loaded > 0:
-            print(f"   🔗 ZZDB → DataSens: {zzdb_loaded} articles chargés dans datasens.db")
+            print(f"   [ZZDB → DataSens] {zzdb_loaded} articles charges dans datasens.db")
         print(f"   Tagged: {self.stats['tagged']}")
         print(f"   Analyzed: {self.stats['analyzed']}")
         print(f"Deduplicated: {self.stats['deduplicated']}")

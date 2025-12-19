@@ -84,7 +84,7 @@ class TopicTagger:
         c = self.conn.cursor()
         c.execute("DELETE FROM document_topic WHERE raw_data_id = ?", (raw_data_id,))
         
-        # Si aucun topic trouvé, assigner "autre" par défaut
+        # Si aucun topic trouvé, assigner "autre" pour topic_1 et topic_2
         if not scores:
             c.execute("SELECT topic_id FROM topic WHERE name = ?", ('autre',))
             tid = c.fetchone()
@@ -95,19 +95,64 @@ class TopicTagger:
                 c.execute("SELECT topic_id FROM topic WHERE name = ?", ('autre',))
                 tid = c.fetchone()
             if tid:
+                # Topic_1 : "autre" avec confiance 0.3
                 c.execute("INSERT INTO document_topic (raw_data_id, topic_id, confidence_score, tagger) VALUES (?, ?, ?, ?)",
                          (raw_data_id, tid[0], 0.3, 'keyword_default'))
+                # Topic_2 : "autre" avec confiance 0.1 (fallback)
+                c.execute("INSERT INTO document_topic (raw_data_id, topic_id, confidence_score, tagger) VALUES (?, ?, ?, ?)",
+                         (raw_data_id, tid[0], 0.1, 'keyword_fallback'))
                 self.conn.commit()
                 return True
             return False
         
-        # Assigner max 2 topics avec meilleure confiance
-        for topic_name, conf in sorted(scores.items(), key=lambda x: -x[1])[:2]:
-            c.execute("SELECT topic_id FROM topic WHERE name = ?", (topic_name,))
-            tid = c.fetchone()
-            if tid:
+        # Assigner TOUJOURS 2 topics (meilleure confiance + second meilleur ou "autre")
+        sorted_topics = sorted(scores.items(), key=lambda x: -x[1])
+        
+        # Topic 1 : Meilleur score (ou "autre" si aucun)
+        if sorted_topics:
+            topic1_name, topic1_conf = sorted_topics[0]
+            c.execute("SELECT topic_id FROM topic WHERE name = ?", (topic1_name,))
+            tid1 = c.fetchone()
+            if tid1:
                 c.execute("INSERT INTO document_topic (raw_data_id, topic_id, confidence_score, tagger) VALUES (?, ?, ?, ?)",
-                         (raw_data_id, tid[0], conf, 'keyword'))
+                         (raw_data_id, tid1[0], topic1_conf, 'keyword'))
+        else:
+            # Aucun topic trouvé → assigner "autre"
+            c.execute("SELECT topic_id FROM topic WHERE name = ?", ('autre',))
+            tid1 = c.fetchone()
+            if not tid1:
+                c.execute("INSERT INTO topic (name, keywords, category, active) VALUES (?, ?, ?, ?)",
+                         ('autre', 'divers,general', 'general', 1))
+                self.conn.commit()
+                c.execute("SELECT topic_id FROM topic WHERE name = ?", ('autre',))
+                tid1 = c.fetchone()
+            if tid1:
+                c.execute("INSERT INTO document_topic (raw_data_id, topic_id, confidence_score, tagger) VALUES (?, ?, ?, ?)",
+                         (raw_data_id, tid1[0], 0.3, 'keyword_default'))
+        
+        # Topic 2 : Second meilleur score (si existe) ou "autre" avec confiance réduite
+        if len(sorted_topics) >= 2:
+            topic2_name, topic2_conf = sorted_topics[1]
+            c.execute("SELECT topic_id FROM topic WHERE name = ?", (topic2_name,))
+            tid2 = c.fetchone()
+            if tid2:
+                c.execute("INSERT INTO document_topic (raw_data_id, topic_id, confidence_score, tagger) VALUES (?, ?, ?, ?)",
+                         (raw_data_id, tid2[0], topic2_conf, 'keyword'))
+        else:
+            # Un seul topic ou aucun → assigner "autre" comme topic_2 avec confiance faible
+            c.execute("SELECT topic_id FROM topic WHERE name = ?", ('autre',))
+            tid2 = c.fetchone()
+            if not tid2:
+                c.execute("INSERT INTO topic (name, keywords, category, active) VALUES (?, ?, ?, ?)",
+                         ('autre', 'divers,general', 'general', 1))
+                self.conn.commit()
+                c.execute("SELECT topic_id FROM topic WHERE name = ?", ('autre',))
+                tid2 = c.fetchone()
+            if tid2:
+                # Topic_2 avec confiance très faible (0.1) pour indiquer qu'il s'agit d'un fallback
+                c.execute("INSERT INTO document_topic (raw_data_id, topic_id, confidence_score, tagger) VALUES (?, ?, ?, ?)",
+                         (raw_data_id, tid2[0], 0.1, 'keyword_fallback'))
+        
         self.conn.commit()
         return True
     

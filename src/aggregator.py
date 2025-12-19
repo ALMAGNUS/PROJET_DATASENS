@@ -8,38 +8,12 @@ class DataAggregator:
         self.conn = sqlite3.connect(db_path)
     
     def _collect_local_files(self) -> pd.DataFrame:
-        """Collect Kaggle/GDELT files from local data/raw/"""
+        """Collect GDELT files from local data/raw/ (ZZDB and Kaggle excluded: already in DB via extractors)"""
         data = []
         for p in [Path('data/raw'), Path.home() / 'datasens_project' / 'data' / 'raw', Path.home() / 'Desktop' / 'DEV IA 2025' / 'PROJET_DATASENS' / 'data' / 'raw']:
             if not p.exists(): continue
-            for src_dir in list(p.glob('Kaggle_*')) + list(p.glob('kaggle_*')) + list(p.glob('gdelt_*')) + list(p.glob('zzdb_*')):
-                if not src_dir.is_dir(): continue
-                for csv_file in src_dir.rglob('*.csv'):
-                    try:
-                        if csv_file.stat().st_size == 0: continue
-                        with open(csv_file, 'r', encoding='utf-8', errors='ignore') as f:
-                            reader = csv.DictReader(f)
-                            for row in reader:
-                                title = row.get('title') or row.get('Title') or row.get('headline') or ''
-                                content = row.get('content') or row.get('Content') or row.get('text') or ''
-                                if not title and len(row) > 0: title = str(list(row.values())[0])[:500] if list(row.values()) else ''
-                                if not content and len(row) > 1: content = ' '.join(str(v) for v in list(row.values())[1:] if v)[:2000]
-                                if len(title) > 3 and len(content) > 10:
-                                    data.append({'source': src_dir.name, 'title': title[:500], 'content': content[:2000], 'url': row.get('url', '') or row.get('URL', ''), 'collected_at': ''})
-                    except: pass
-                for json_file in src_dir.rglob('*.json'):
-                    if 'manifest' in json_file.name.lower(): continue
-                    try:
-                        with open(json_file, 'r', encoding='utf-8') as f:
-                            raw = json.load(f)
-                            items = raw.get('items', []) if isinstance(raw, dict) else raw if isinstance(raw, list) else []
-                            for item in items:
-                                if isinstance(item, dict):
-                                    title = item.get('title') or item.get('headline') or ''
-                                    content = item.get('content') or item.get('text') or item.get('description') or ''
-                                    if len(title) > 3 and len(content) > 10:
-                                        data.append({'source': src_dir.name, 'title': title[:500], 'content': content[:2000], 'url': item.get('url', ''), 'collected_at': ''})
-                    except: pass
+            # ZZDB and Kaggle sources excluded: they are already in DB (via CSVExtractor/SQLiteExtractor/KaggleExtractor)
+            # Only collect GDELT files that are not in DB (GDELT peut être lu directement depuis fichiers locaux)
             for gdelt_dir in p.glob('gdelt_*'):
                 if not gdelt_dir.is_dir(): continue
                 for json_file in gdelt_dir.rglob('*.json'):
@@ -82,7 +56,7 @@ class DataAggregator:
         return df
     
     def aggregate_silver(self) -> pd.DataFrame:
-        """SILVER: RAW + topics (sans sentiment)"""
+        """SILVER: RAW + topics (sans sentiment) - TOUJOURS 2 topics par article"""
         df = self.aggregate_raw()
         # S'assurer que source_type est présent
         if 'source_type' not in df.columns:
@@ -92,6 +66,16 @@ class DataAggregator:
         t2 = topics[topics['rn'] == 2][['raw_data_id', 'topic_name', 'confidence_score']].rename(columns={'topic_name': 'topic_2', 'confidence_score': 'topic_2_score'})
         df = df.merge(t1, left_on='id', right_on='raw_data_id', how='left').merge(t2, left_on='id', right_on='raw_data_id', how='left')
         df = df.drop(columns=[c for c in df.columns if 'raw_data_id' in c], errors='ignore')
+        
+        # GARANTIR topic_2 : Si topic_2 est vide mais topic_1 existe, assigner "autre" comme topic_2
+        mask_topic2_empty = df['topic_2'].isna() | (df['topic_2'] == '')
+        mask_topic1_exists = df['topic_1'].notna() & (df['topic_1'] != '')
+        mask_fill_topic2 = mask_topic2_empty & mask_topic1_exists
+        
+        df.loc[mask_fill_topic2, 'topic_2'] = 'autre'
+        df.loc[mask_fill_topic2, 'topic_2_score'] = 0.1  # Confiance faible pour fallback
+        
+        # Fillna pour les cas où topic_1 est aussi vide
         df[['topic_1', 'topic_2']] = df[['topic_1', 'topic_2']].fillna('')
         df[['topic_1_score', 'topic_2_score']] = df[['topic_1_score', 'topic_2_score']].fillna(0.0)
         return df

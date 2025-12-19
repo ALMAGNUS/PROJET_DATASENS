@@ -307,32 +307,6 @@ class CSVExtractor(BaseExtractor):
             if os.getenv('DISABLE_ZZDB_CSV', 'false').lower() == 'true':
                 return articles
             
-            # GARDE-FOU 0: Vérifier si la source est déjà intégrée (comme Kaggle/GDELT)
-            # Si des articles existent déjà dans la base, on ne re-collecte plus (source statique)
-            db_path = os.getenv('DB_PATH', str(Path.home() / 'datasens_project' / 'datasens.db'))
-            if Path(db_path).exists():
-                try:
-                    conn_check = sqlite3.connect(db_path)
-                    cursor_check = conn_check.cursor()
-                    # Vérifier si la source existe et a déjà des articles
-                    cursor_check.execute("""
-                        SELECT COUNT(*) 
-                        FROM raw_data r
-                        JOIN source s ON r.source_id = s.source_id
-                        WHERE s.name = ?
-                    """, (self.name,))
-                    existing_count = cursor_check.fetchone()[0]
-                    conn_check.close()
-                    
-                    if existing_count > 0:
-                        # Source déjà intégrée - on ne re-collecte plus (fondation statique)
-                        return articles
-                except:
-                    pass  # Si erreur, on continue quand même
-            
-            # GARDE-FOU 2: Limite max d'articles par exécution (seulement si première intégration)
-            MAX_CSV_PER_RUN = int(os.getenv('ZZDB_CSV_MAX_ARTICLES', '100'))
-            
             # CSV path - try multiple locations (comme Kaggle/GDELT dans data/raw/)
             possible_paths = [
                 # Emplacement standard dans data/raw/ (comme Kaggle/GDELT)
@@ -357,13 +331,65 @@ class CSVExtractor(BaseExtractor):
             if not csv_path or not csv_path.exists():
                 return articles
             
-            # Lire le CSV
+            # GARDE-FOU 0: Vérifier si la source est déjà intégrée COMPLÈTEMENT (comme Kaggle/GDELT)
+            # Si le CSV a été intégré en totalité, on ne re-collecte plus (source statique)
+            # Sinon, on continue pour compléter l'import (déduplication automatique via fingerprint)
+            # IMPORTANT: La déduplication via fingerprint (SHA256(title|content)) empêche les doublons
+            # même si les articles existent déjà dans la DB (toutes sources confondues)
+            # 
+            # OPTION: FORCE_ZZDB_REIMPORT=true permet de forcer la réimportation même si déjà intégré
+            # (utile pour améliorer le dataset et réinjecter les versions améliorées)
+            force_reimport = os.getenv('FORCE_ZZDB_REIMPORT', 'false').lower() == 'true'
+            
+            db_path = os.getenv('DB_PATH', str(Path.home() / 'datasens_project' / 'datasens.db'))
+            if Path(db_path).exists() and not force_reimport:
+                try:
+                    # Compter les lignes valides dans le CSV
+                    csv_valid_count = 0
+                    with open(csv_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            title = row.get('title', '').strip()
+                            content = row.get('content', '').strip()
+                            if not title or not content:
+                                continue
+                            title_clean = title[:500].strip()
+                            content_clean = content[:2000].strip()
+                            if len(title_clean) < 10 or len(title_clean) > 500:
+                                continue
+                            if len(content_clean) < 50 or len(content_clean) > 5000:
+                                continue
+                            words = content_clean.split()
+                            if len(set(words)) < len(words) * 0.3:
+                                continue
+                            csv_valid_count += 1
+                    
+                    # Compter les articles existants dans la DB pour cette source uniquement
+                    conn_check = sqlite3.connect(db_path)
+                    cursor_check = conn_check.cursor()
+                    cursor_check.execute("""
+                        SELECT COUNT(*) 
+                        FROM raw_data r
+                        JOIN source s ON r.source_id = s.source_id
+                        WHERE s.name = ?
+                    """, (self.name,))
+                    existing_count = cursor_check.fetchone()[0]
+                    conn_check.close()
+                    
+                    # Si le nombre d'articles dans la DB >= nombre d'articles valides dans le CSV
+                    # → Import complet, on ne re-collecte plus (fondation statique)
+                    # SAUF si FORCE_ZZDB_REIMPORT=true (permet amélioration continue du dataset)
+                    # NOTE: La déduplication via fingerprint dans load_article_with_id() empêche
+                    # les doublons même si on re-collecte (même article = même fingerprint = rejeté)
+                    if existing_count >= csv_valid_count:
+                        return articles
+                except:
+                    pass  # Si erreur, on continue quand même
+            
+            # Lire le CSV - IMPORT COMPLET (comme Kaggle/GDELT, pas de limite artificielle)
             with open(csv_path, 'r', encoding='utf-8', errors='ignore') as f:
                 reader = csv.DictReader(f)
-                for row_num, row in enumerate(reader):
-                    if row_num >= MAX_CSV_PER_RUN:
-                        break
-                    
+                for row in reader:
                     # Extraire les colonnes du CSV
                     title = row.get('title', '').strip()
                     content = row.get('content', '').strip()
@@ -397,18 +423,15 @@ class CSVExtractor(BaseExtractor):
                     )
                     
                     # GARDE-FOU 6: Validation finale avec is_valid()
+                    # Déduplication via fingerprint dans load_article_with_id()
                     if a.is_valid():
                         articles.append(a)
-                        
-                        # GARDE-FOU 7: Limite absolue par exécution
-                        if len(articles) >= MAX_CSV_PER_RUN:
-                            break
         except Exception as e:
             print(f"   ⚠️  {self.name}: {str(e)[:40]}")
         return articles
 
 class KaggleExtractor(BaseExtractor):
-    """Extract articles from Kaggle datasets (CSV/JSON)"""
+    """Extract articles from Kaggle datasets (CSV/JSON) - Support dossier unique sans partitionnement"""
     def extract(self) -> list[Article]:
         from pathlib import Path
         articles = []
@@ -417,46 +440,82 @@ class KaggleExtractor(BaseExtractor):
             base_dirs = [
                 Path.home() / 'Desktop' / 'DEV IA 2025' / 'PROJET_DATASENS' / 'data' / 'raw' / self.name,
                 Path.home() / 'datasens_project' / 'data' / 'raw' / self.name,
+                Path(__file__).parent.parent.parent / 'data' / 'raw' / self.name,
+                Path.cwd() / 'data' / 'raw' / self.name,
             ]
             
             for base in base_dirs:
                 if not base.exists():
                     continue
                 
-                # Chercher TOUS les CSV récursivement (peu importe le sous-dossier date)
+                # Chercher TOUS les CSV récursivement (peu importe le sous-dossier date ou directement dans le dossier)
                 for csv_file in base.rglob('*.csv'):
                     try:
+                        # Ignorer les fichiers vides ou trop petits
+                        if csv_file.stat().st_size < 100:
+                            continue
+                        
                         with open(csv_file, 'r', encoding='utf-8', errors='ignore') as f:
-                            for row_num, row in enumerate(csv.reader(f)):
-                                if row_num > 100 or row_num == 0: continue
-                                if len(row) >= 2:
-                                    title = row[0][:500] if row[0] else 'Kaggle'
-                                    content = ' '.join(row[1:])[:2000] if len(row) > 1 else title
-                                    if len(title) > 3 and len(content) > 10:
-                                        a = Article(title=title, content=content, url=self.url, source_name=self.name)
+                            reader = csv.reader(f)
+                            header = next(reader, None)  # Skip header
+                            
+                            for row in reader:
+                                if not row or len(row) < 2:
+                                    continue
+                                
+                                # Essayer de détecter les colonnes title/content
+                                title = ''
+                                content = ''
+                                
+                                # Si header existe, essayer de trouver title/content
+                                if header:
+                                    try:
+                                        header_lower = [h.lower() if h else '' for h in header]
+                                        title_idx = next((i for i, h in enumerate(header_lower) if 'title' in h or 'headline' in h), 0)
+                                        content_idx = next((i for i, h in enumerate(header_lower) if 'content' in h or 'text' in h or 'body' in h), 1)
+                                        title = str(row[title_idx] if title_idx < len(row) else row[0] if row else '')[:500].strip()
+                                        content = str(row[content_idx] if content_idx < len(row) else ' '.join(row[1:]) if len(row) > 1 else '')[:2000].strip()
+                                    except:
+                                        title = str(row[0])[:500].strip() if row else ''
+                                        content = ' '.join(str(v) for v in row[1:] if v)[:2000].strip() if len(row) > 1 else title
+                                else:
+                                    # Pas de header, utiliser les colonnes par position
+                                    title = str(row[0])[:500].strip() if row else ''
+                                    content = ' '.join(str(v) for v in row[1:] if v)[:2000].strip() if len(row) > 1 else title
+                                
+                                if len(title) > 3 and len(content) > 10:
+                                    a = Article(title=title, content=content, url=self.url, source_name=self.name)
+                                    if a.is_valid():
                                         articles.append(a)
                     except Exception as e:
                         pass
                 
                 # Chercher TOUS les JSON récursivement aussi
                 for json_file in base.rglob('*.json'):
+                    if 'manifest' in json_file.name.lower():
+                        continue
                     try:
+                        if json_file.stat().st_size < 100:
+                            continue
+                        
                         import json as json_lib
                         with open(json_file, 'r', encoding='utf-8', errors='ignore') as f:
                             data = json_lib.load(f)
-                            if isinstance(data, list):
-                                for item in data[:50]:
-                                    if isinstance(item, dict):
-                                        title = str(item.get('title', item.get('headline', 'Kaggle')))[:500]
-                                        content = str(item.get('content', item.get('text', item.get('description', title))))[:2000]
-                                        if len(title) > 3 and len(content) > 10:
-                                            a = Article(title=title, content=content, url=self.url, source_name=self.name)
+                            items = data if isinstance(data, list) else (data.get('items', []) if isinstance(data, dict) else [])
+                            
+                            for item in items:
+                                if isinstance(item, dict):
+                                    title = str(item.get('title', item.get('headline', item.get('Title', 'Kaggle'))))[:500].strip()
+                                    content = str(item.get('content', item.get('text', item.get('description', item.get('Content', item.get('Text', title))))))[:2000].strip()
+                                    if len(title) > 3 and len(content) > 10:
+                                        a = Article(title=title, content=content, url=self.url, source_name=self.name)
+                                        if a.is_valid():
                                             articles.append(a)
                     except Exception as e:
                         pass
         except Exception as e:
-            print(f"   ❌ {self.name}: {str(e)[:40]}")
-        return articles[:50]
+            print(f"   ⚠️  {self.name}: {str(e)[:40]}")
+        return articles  # Retourner TOUS les articles (pas de limite artificielle)
 
 def create_extractor(source: Source) -> BaseExtractor:
     """Factory - route source to correct extractor"""
