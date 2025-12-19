@@ -23,7 +23,7 @@ class Repository(DatabaseLoader):
             if self.cursor.fetchone():
                 return  # Schema already exists
             
-            # Create 6 core tables
+            # Create 6 core tables E1
             sql_tables = """
             -- 1. SOURCE
             CREATE TABLE IF NOT EXISTS source (
@@ -103,13 +103,8 @@ class Repository(DatabaseLoader):
             print(f"   ⚠️  Schema initialization error: {str(e)[:60]}")
     
     def _ensure_sources(self):
-        """Load sources from sources_config.json if they don't exist in DB"""
+        """Load sources from sources_config.json - Add missing sources even if some exist"""
         try:
-            # Check if sources already exist
-            self.cursor.execute("SELECT COUNT(*) FROM source")
-            if self.cursor.fetchone()[0] > 0:
-                return  # Sources already exist
-            
             # Load from config file
             config_path = Path(__file__).parent.parent / 'sources_config.json'
             if not config_path.exists():
@@ -118,9 +113,18 @@ class Repository(DatabaseLoader):
             with open(config_path, 'r', encoding='utf-8') as f:
                 config = json.load(f)
             
-            # Insert sources
+            # Get existing source names
+            self.cursor.execute("SELECT name FROM source")
+            existing_names = {row[0] for row in self.cursor.fetchall()}
+            
+            # Insert missing sources
             for source_data in config.get('sources', []):
                 source = Source(**source_data)
+                
+                # Skip if source already exists
+                if source.source_name in existing_names:
+                    continue
+                
                 try:
                     self.cursor.execute("""
                         INSERT INTO source (name, source_type, url, sync_frequency, active, created_at)
@@ -149,11 +153,14 @@ class Repository(DatabaseLoader):
             if existing:
                 return None  # Duplicate
             
+            # GARDE-FOU ZZDB: Qualité réduite pour données synthétiques (0.3 au lieu de 0.5)
+            quality_score = 0.3 if article.source_name and 'zzdb' in article.source_name.lower() else 0.5
+            
             self.cursor.execute("""
                 INSERT INTO raw_data (source_id, title, content, url, fingerprint, published_at, collected_at, quality_score)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (source_id, article.title, article.content, article.url, fp, 
-                  article.published_at, datetime.now().isoformat(), 0.5))
+                  article.published_at, datetime.now().isoformat(), quality_score))
             self.conn.commit()
             
             # Get inserted ID
@@ -163,4 +170,48 @@ class Repository(DatabaseLoader):
         except Exception as e:
             print(f"   ⚠️  DB error: {str(e)[:40]}")
             return None
+    
+    def log_foundation_integration(self, source_id: int, source_name: str, source_type: str, 
+                                   file_path: str = None, file_size: int = None, 
+                                   rows_integrated: int = 0, status: str = 'INTEGRATED', 
+                                   notes: str = None) -> bool:
+        """Log l'intégration d'une source statique (fondation) via sync_log (table E1)"""
+        try:
+            # Utiliser sync_log avec status='FOUNDATION_INTEGRATED' pour les fondations
+            notes_full = f"FONDATION: {source_name} ({source_type})"
+            if file_path:
+                notes_full += f" | File: {file_path}"
+            if notes:
+                notes_full += f" | {notes}"
+            
+            self.log_sync(source_id, rows_integrated, 'FOUNDATION_INTEGRATED', notes_full)
+            return True
+        except Exception as e:
+            print(f"   ⚠️  Foundation log error: {str(e)[:40]}")
+            return False
+    
+    def is_foundation_integrated(self, source_name: str) -> bool:
+        """Vérifie si une source statique (fondation) a déjà été intégrée via sync_log"""
+        try:
+            self.cursor.execute("""
+                SELECT COUNT(*) 
+                FROM sync_log sl
+                JOIN source s ON sl.source_id = s.source_id
+                WHERE s.name = ? AND sl.status = 'FOUNDATION_INTEGRATED'
+            """, (source_name,))
+            count = self.cursor.fetchone()[0]
+            return count > 0
+        except:
+            # Fallback: vérifier si des articles existent déjà pour cette source
+            try:
+                self.cursor.execute("""
+                    SELECT COUNT(*) 
+                    FROM raw_data r
+                    JOIN source s ON r.source_id = s.source_id
+                    WHERE s.name = ?
+                """, (source_name,))
+                count = self.cursor.fetchone()[0]
+                return count > 0
+            except:
+                return False
 

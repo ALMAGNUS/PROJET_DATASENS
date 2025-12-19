@@ -82,7 +82,11 @@ class E1Pipeline:
                 if source_id:
                     self.db.log_sync(source_id, len(extracted), 'OK')
                 
-                print(f"OK {len(extracted)}")
+                # Message spécial pour ZZDB
+                if 'zzdb' in source.source_name.lower():
+                    print(f"OK {len(extracted)} articles [ZZDB → DataSens]")
+                else:
+                    print(f"OK {len(extracted)}")
             except Exception as e:
                 source_errors_total.labels(source=source.source_name).inc()
                 print(f"ERROR: {str(e)[:40]}")
@@ -106,6 +110,17 @@ class E1Pipeline:
         print(f"OK Cleaned: {self.stats['cleaned']}")
         return cleaned
 
+    def _is_foundation_source(self, source_name: str) -> tuple[bool, str]:
+        """Détermine si une source est statique (fondation) et son type"""
+        source_lower = source_name.lower()
+        if 'kaggle' in source_lower:
+            return True, 'flat_files'  # Fichiers plats (Kaggle)
+        elif 'gdelt' in source_lower:
+            return True, 'bigdata'  # Big Data (GDELT)
+        elif 'zzdb' in source_lower and 'csv' in source_lower:
+            return True, 'db_non_relational'  # CSV export ZZDB
+        return False, 'real_source'  # Source dynamique (RSS, API, etc.)
+    
     def load(self, articles: list):
         """Load to database + tag topics + analyze sentiment"""
         print("\n" + "="*70)
@@ -117,8 +132,12 @@ class E1Pipeline:
         sources_dir = Path(__file__).parent / 'data' / 'raw' / f'sources_{today:%Y-%m-%d}'
         sources_dir.mkdir(parents=True, exist_ok=True)
         
+        # Track foundation integrations (première fois)
+        foundation_sources = {}  # {source_name: (count, source_type, file_path)}
+        
         # Save articles as JSON
         articles_data = []
+        zzdb_loaded = 0  # Compteur ZZDB
         for article, source_name in articles:
             source_id = self.db.get_source_id(source_name)
             if source_id:
@@ -127,6 +146,17 @@ class E1Pipeline:
                 if raw_data_id:
                     self.stats['loaded'] += 1
                     articles_loaded_total.inc()
+                    
+                    # Compteur ZZDB
+                    if 'zzdb' in source_name.lower():
+                        zzdb_loaded += 1
+                    
+                    # Track foundation sources (statiques) pour logging
+                    is_foundation, foundation_type = self._is_foundation_source(source_name)
+                    if is_foundation:
+                        if source_name not in foundation_sources:
+                            foundation_sources[source_name] = [0, foundation_type, None]
+                        foundation_sources[source_name][0] += 1
                     # Tag topics (max 2)
                     if self.tagger.tag(raw_data_id, article.title, article.content):
                         self.stats['tagged'] += 1
@@ -178,7 +208,50 @@ class E1Pipeline:
                 w.writeheader()
                 w.writerows(articles_data)
 
+        # Logger les intégrations de fondation (première fois)
+        for source_name, (count, foundation_type, _) in foundation_sources.items():
+            if count > 0:
+                source_id = self.db.get_source_id(source_name)
+                if source_id:
+                    # Vérifier si c'est la première intégration
+                    if not self.db.is_foundation_integrated(source_name):
+                        # Trouver le chemin du fichier source
+                        file_path = None
+                        file_size = None
+                        if 'zzdb' in source_name.lower() and 'csv' in source_name.lower():
+                            csv_path = Path(__file__).parent / 'data' / 'raw' / 'zzdb_csv' / 'zzdb_dataset.csv'
+                            if not csv_path.exists():
+                                csv_path = Path(__file__).parent / 'zzdb' / 'export' / 'zzdb_dataset.csv'
+                            if csv_path.exists():
+                                file_path = str(csv_path)
+                                file_size = csv_path.stat().st_size
+                        
+                        # Logger l'intégration de fondation
+                        self.db.log_foundation_integration(
+                            source_id=source_id,
+                            source_name=source_name,
+                            source_type=foundation_type,
+                            file_path=file_path,
+                            file_size=file_size,
+                            rows_integrated=count,
+                            status='INTEGRATED',
+                            notes=f'Première intégration - Source statique (fondation) pour structurer le dataset'
+                        )
+                        
+                        # Message détaillé pour ZZDB
+                        if 'zzdb' in source_name.lower():
+                            print(f"\n   🔗 [ZZDB → DataSens] Connexion validée :")
+                            print(f"      • Source: {source_name}")
+                            print(f"      • Articles transférés: {count}")
+                            print(f"      • Fichier: {file_path or 'N/A'}")
+                            print(f"      • Base ZZDB: zzdb/synthetic_data.db → CSV → datasens.db")
+                            print(f"      • Status: INTÉGRÉ (fondation statique)")
+                        else:
+                            print(f"\n   📦 [FONDATION] {source_name} intégrée : {count} articles (première fois)")
+        
         print(f"\nOK Total loaded: {self.stats['loaded']}")
+        if zzdb_loaded > 0:
+            print(f"   🔗 ZZDB → DataSens: {zzdb_loaded} articles chargés dans datasens.db")
         print(f"   Tagged: {self.stats['tagged']}")
         print(f"   Analyzed: {self.stats['analyzed']}")
         print(f"Deduplicated: {self.stats['deduplicated']}")

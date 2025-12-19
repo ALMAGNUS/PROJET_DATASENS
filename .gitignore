@@ -63,3 +63,6 @@ htmlcov/
 
 # Data files
 data/
+
+# ZZDB LAB IA - Dataset synthétique (non visible pour le jury)
+zzdb/

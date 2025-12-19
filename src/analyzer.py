@@ -16,18 +16,38 @@ class SentimentAnalyzer:
                     'amélioration', 'progrès', 'développement', 'expansion', 'montée', 'gain',
                     'profit', 'bénéfice', 'avantage', 'opportunité', 'espoir', 'confiance']
     
-    # Liste de mots-clés négatifs (forts et modérés)
+    # Liste de mots-clés négatifs (forts et modérés) - ENRICHIE
     NEG_STRONG = ['horrible', 'terrible', 'catastrophe', 'désastre', 'tragédie', 'crise',
                   'échec', 'défaite', 'perte', 'chute', 'effondrement', 'faillite', 'ruine',
                   'désastreux', 'dramatique', 'grave', 'critique', 'urgent', 'danger',
-                  'menace', 'risque', 'alarme', 'alerte', 'panique', 'chaos', 'désordre']
+                  'menace', 'risque', 'alarme', 'alerte', 'panique', 'chaos', 'désordre',
+                  'détresse', 'souffrance', 'misère', 'pauvreté', 'désespoir', 'désolation',
+                  'désastre', 'calamité', 'fléau', 'scandale', 'corruption', 'fraude',
+                  'violence', 'agression', 'attaque', 'conflit', 'guerre', 'hostilité',
+                  'haine', 'colère', 'rage', 'fureur', 'indignation', 'révolte', 'rébellion',
+                  'grève', 'manifestation', 'protestation', 'émeute', 'trouble', 'instabilité',
+                  'récession', 'dépression', 'déflation', 'chômage', 'licenciement', 'fermeture',
+                  'pollution', 'contamination', 'dégradation', 'destruction', 'dévastation']
     
     NEG_MODERATE = ['mal', 'mauvais', 'nul', 'déçu', 'problème', 'difficile', 'compliqué',
-                    'inquiétant', 'préoccupant', 'décevant', 'décevant', 'décevant', 'faible',
-                    'insuffisant', 'limité', 'réduit', 'baisse', 'diminution', 'réduction',
-                    'déclin', 'chute', 'baisse', 'baisse', 'déficit', 'perte', 'manque',
-                    'absence', 'défaut', 'erreur', 'faute', 'difficulté', 'obstacle', 'barrière',
-                    'contrainte', 'limitation', 'restriction', 'pénalité', 'sanction', 'amende']
+                    'inquiétant', 'préoccupant', 'décevant', 'faible', 'insuffisant', 'limité',
+                    'réduit', 'baisse', 'diminution', 'réduction', 'déclin', 'chute', 'déficit',
+                    'perte', 'manque', 'absence', 'défaut', 'erreur', 'faute', 'difficulté',
+                    'obstacle', 'barrière', 'contrainte', 'limitation', 'restriction', 'pénalité',
+                    'sanction', 'amende', 'amélioration', 'dégradation', 'détérioration',
+                    'inquiétude', 'anxiété', 'stress', 'pression', 'tension', 'conflit',
+                    'désaccord', 'divergence', 'opposition', 'résistance', 'refus', 'rejet',
+                    'déception', 'frustration', 'désillusion', 'amertume', 'amertume',
+                    'mécontentement', 'insatisfaction', 'désapprobation', 'critique',
+                    'dénonciation', 'accusation', 'condamnation', 'blâme', 'reproche',
+                    'désavantage', 'inconvénient', 'handicap', 'faiblesse', 'vulnérabilité',
+                    'instabilité', 'incertitude', 'doute', 'scepticisme', 'méfiance',
+                    'déflation', 'dévaluation', 'dépréciation', 'déclin', 'régression',
+                    'stagnation', 'immobilisme', 'blocage', 'impasse', 'échec', 'raté',
+                    'incompétence', 'inefficacité', 'dysfonctionnement', 'panne', 'défaillance',
+                    'carence', 'insuffisance', 'manque', 'pénurie', 'rareté', 'disette',
+                    'inégalité', 'injustice', 'discrimination', 'exclusion', 'marginalisation',
+                    'précarité', 'vulnérabilité', 'fragilité', 'instabilité', 'insécurité']
     
     def __init__(self, db_path: str):
         self.conn = sqlite3.connect(db_path)
@@ -71,26 +91,34 @@ class SentimentAnalyzer:
         pos_ratio = pos_score / total_score
         neg_ratio = neg_score / total_score
         
-        # Seuil pour classification
-        if pos_ratio > 0.6 and pos_score >= 2:
-            # Positif si > 60% et au moins 2 points
-            confidence = min(0.5 + (pos_ratio - 0.6) * 1.25, 0.95)
+        # Seuil pour classification - LOGIQUE AMÉLIORÉE
+        # Priorité aux scores forts
+        if neg_score >= 3 and neg_ratio >= 0.5:
+            # Négatif si score >= 3 et ratio >= 50%
+            confidence = min(0.5 + (neg_ratio - 0.5) * 1.0, 0.95)
+            return ('négatif', round(confidence, 3))
+        elif pos_score >= 3 and pos_ratio >= 0.5:
+            # Positif si score >= 3 et ratio >= 50%
+            confidence = min(0.5 + (pos_ratio - 0.5) * 1.0, 0.95)
             return ('positif', round(confidence, 3))
         elif neg_ratio > 0.6 and neg_score >= 2:
             # Négatif si > 60% et au moins 2 points
             confidence = min(0.5 + (neg_ratio - 0.6) * 1.25, 0.95)
             return ('négatif', round(confidence, 3))
+        elif pos_ratio > 0.6 and pos_score >= 2:
+            # Positif si > 60% et au moins 2 points
+            confidence = min(0.5 + (pos_ratio - 0.6) * 1.25, 0.95)
+            return ('positif', round(confidence, 3))
+        elif neg_score > pos_score and neg_score >= 1:
+            # Négatif si plus de négatifs (même si < 60%) - PRIORITÉ AUX NÉGATIFS
+            confidence = min(0.5 + (neg_ratio - 0.5) * 0.8, 0.85)
+            return ('négatif', round(confidence, 3))
         elif pos_score > neg_score and pos_score >= 1:
             # Positif si plus de positifs (même si < 60%)
             confidence = min(0.5 + (pos_ratio - 0.5) * 0.8, 0.85)
             return ('positif', round(confidence, 3))
-        elif neg_score > pos_score and neg_score >= 1:
-            # Négatif si plus de négatifs (même si < 60%)
-            confidence = min(0.5 + (neg_ratio - 0.5) * 0.8, 0.85)
-            return ('négatif', round(confidence, 3))
         else:
             # Neutre si équilibré ou scores trop faibles
-            # Score varie selon l'équilibre
             if abs(pos_score - neg_score) <= 1:
                 return ('neutre', 0.5)
             elif pos_score > neg_score:
