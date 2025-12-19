@@ -106,7 +106,14 @@ class DataSensDashboard:
         if self.stats['new_by_source']:
             print(f"\n[NOUVEAUX] NOUVEAUX ARTICLES AUJOURD'HUI PAR SOURCE")
             for source, count in sorted(self.stats['new_by_source'].items(), key=lambda x: -x[1]):
-                print(f"   • {source:30s}: {count:4d} articles")
+                source_lower = source.lower()
+                if 'zzdb' in source_lower:
+                    marker = " [DB NON-REL] [DONNÉES SYNTHÈSE] [LAB IA]"
+                elif 'kaggle' in source_lower:
+                    marker = " [FICHIERS PLATS]"
+                else:
+                    marker = ""
+                print(f"   • {source:30s}: {count:4d} articles{marker}")
         
         # Enrichissement Topics
         print(f"\n[TOPICS] ENRICHISSEMENT TOPICS")
@@ -118,20 +125,80 @@ class DataSensDashboard:
             for topic, count in sorted(self.stats['topics_dist'].items(), key=lambda x: -x[1])[:5]:
                 print(f"      • {topic:20s}: {count:4d} articles")
         
-        # Enrichissement Sentiment
+        # Enrichissement Sentiment - AFFICHAGE COMPLET (positif, négatif, neutre)
         print(f"\n[SENTIMENT] ENRICHISSEMENT SENTIMENT")
         total_sent = sum(s['count'] for s in self.stats['sentiment'].values())
-        for label, data in sorted(self.stats['sentiment'].items(), key=lambda x: -x[1]['count']):
-            pct = (data['count'] / max(total_sent, 1)) * 100
-            print(f"   {label:10s}: {data['count']:4d} articles ({pct:5.1f}%) - Score moyen: {data['avg_score']:.2f}")
+        if total_sent > 0:
+            # Afficher dans l'ordre : positif, négatif, neutre (même si 0)
+            sentiment_order = ['positif', 'négatif', 'neutre']
+            for label in sentiment_order:
+                data = self.stats['sentiment'].get(label, {'count': 0, 'avg_score': 0.0})
+                pct = (data['count'] / max(total_sent, 1)) * 100
+                marker = " ⚠️" if label == 'négatif' and data['count'] == 0 else ""
+                print(f"   {label:10s}: {data['count']:4d} articles ({pct:5.1f}%) - Score moyen: {data['avg_score']:.2f}{marker}")
+            
+            # Afficher aussi les autres labels s'il y en a
+            for label, data in sorted(self.stats['sentiment'].items(), key=lambda x: -x[1]['count']):
+                if label not in sentiment_order:
+                    pct = (data['count'] / max(total_sent, 1)) * 100
+                    print(f"   {label:10s}: {data['count']:4d} articles ({pct:5.1f}%) - Score moyen: {data['avg_score']:.2f}")
+        else:
+            print(f"   ⚠️  Aucun sentiment analysé")
         
-        # Par source
+        # Par source avec classification
         print(f"\n[SOURCES] ARTICLES PAR SOURCE")
-        print(f"   {'Source':<30s} {'Total':>8s} {'Unique':>8s} {'Dernière collecte':>20s}")
-        print(f"   {'-'*30} {'-'*8} {'-'*8} {'-'*20}")
+        print(f"   {'Source':<30s} {'Total':>8s} {'Unique':>8s} {'Dernière collecte':>20s} {'Type':>15s}")
+        print(f"   {'-'*30} {'-'*8} {'-'*8} {'-'*20} {'-'*15}")
+        zzdb_found = False
+        kaggle_found = False
+        zzdb_total = 0
+        zzdb_unique = 0
+        zzdb_sources = []
         for s in self.stats['by_source'][:15]:
             last = s['last'][:19] if s['last'] else 'Jamais'
-            print(f"   {s['source']:<30s} {s['total']:>8d} {s['unique']:>8d} {last:>20s}")
+            source_name = s['source']
+            source_lower = source_name.lower()
+            
+            # Regrouper les sources ZZDB
+            if 'zzdb' in source_lower:
+                zzdb_found = True
+                zzdb_total += s['total']
+                zzdb_unique += s['unique']
+                zzdb_sources.append((source_name, s, last))
+                continue  # On affichera après
+            
+            # Classification des autres sources
+            if 'kaggle' in source_lower:
+                source_type = "[FICHIERS PLATS]"
+                marker = ""
+                kaggle_found = True
+            else:
+                source_type = "[SOURCE RÉELLE]"
+                marker = ""
+            
+            print(f"   {source_name:<30s} {s['total']:>8d} {s['unique']:>8d} {last:>20s} {source_type:>15s}{marker}")
+        
+        # Afficher ZZDB regroupé
+        if zzdb_sources:
+            last_zzdb = max((s[2] for s in zzdb_sources), key=lambda x: x if x != 'Jamais' else '')
+            print(f"   {'ZZDB (TOTAL)':<30s} {zzdb_total:>8d} {zzdb_unique:>8d} {last_zzdb[:19] if last_zzdb != 'Jamais' else 'Jamais':>20s} {'[DB NON-REL]':>15s} [DONNÉES SYNTHÈSE] [LAB IA]")
+            for source_name, s, last in zzdb_sources:
+                status = "(désactivé)" if 'synthetic' in source_name.lower() else "(actif)"
+                print(f"      └─ {source_name:<27s} {s['total']:>8d} {s['unique']:>8d} {last[:19] if last != 'Jamais' else 'Jamais':>20s} {status}")
+        
+        # Notes explicatives
+        print(f"\n   [CLASSIFICATION DES SOURCES]")
+        if kaggle_found:
+            print(f"   • Kaggle : Fichiers plats (CSV/JSON) - Datasets locaux en format plat")
+        if zzdb_found:
+            print(f"   • ZZDB : Base de données non relationnelle (SQLite) + CSV export - DONNÉES DE SYNTHÈSE [LAB IA]")
+            print(f"   • ZZDB enrichit l'analyse des sentiments français dans un contexte de recherche.")
+            print(f"   • DONNÉES DE SYNTHÈSE spécialisées en climat social, politique, économique et financier français.")
+            print(f"   • Sources ZZDB :")
+            print(f"     - zzdb_synthetic (SQLite DB) : DÉSACTIVÉ (articles historiques uniquement)")
+            print(f"     - zzdb_csv (CSV export) : ACTIF (source principale, intégration unique comme fondation)")
+            print(f"   • Total ZZDB dans datasens.db : {zzdb_total if zzdb_found else 0} articles (données de synthèse)")
+            print(f"   • Les données de synthèse ZZDB sont intégrées comme fondation statique pour structurer le dataset.")
         
         # Évaluation dataset pour IA
         print(f"\n[IA] ÉVALUATION DATASET POUR IA")
@@ -159,6 +226,13 @@ class DataSensDashboard:
         if pct_enriched < 50:
             print(f"   [WARN] Attention: Seulement {pct_enriched:.1f}% des articles sont enrichis (topics + sentiment)")
             print(f"   [INFO] Solution: Lancer 'python scripts/enrich_all_articles.py' pour enrichir tous les articles")
+        
+        # Note sur la vision du projet
+        print(f"\n[VISION] FINALITÉ DU PROJET")
+        print(f"   Analyser l'état des sentiments des français pour alimenter :")
+        print(f"   • Acteurs politiques : Faire ressortir les préoccupations des français")
+        print(f"   • Acteurs financiers : Guider les décisions d'investissements")
+        print(f"   Voir docs/VISION_ACADEMIQUE.md pour plus de détails.")
         
         print("\n" + "="*80 + "\n")
     

@@ -97,13 +97,59 @@ class CollectionReport:
         print(f"   Articles analysés:      {session['analyzed']:,} ({session['analyzed']/max(session['total'],1)*100:.1f}%)")
         print(f"   Heure de début:        {self.session_start[:19]}")
         
-        # Détail par source
+        # Détail par source avec classification
         if self.stats['by_source']:
             print(f"\n[SOURCES] DÉTAIL PAR SOURCE")
-            print(f"   {'Source':<30s} {'Collectés':>10s} {'Taggés':>10s} {'Analysés':>10s}")
-            print(f"   {'-'*30} {'-'*10} {'-'*10} {'-'*10}")
+            print(f"   {'Source':<30s} {'Collectés':>10s} {'Taggés':>10s} {'Analysés':>10s} {'Type':>15s}")
+            print(f"   {'-'*30} {'-'*10} {'-'*10} {'-'*10} {'-'*15}")
+            zzdb_found = False
+            kaggle_found = False
+            zzdb_total = 0
+            zzdb_sources = []
+            self.zzdb_total = 0  # Pour utilisation dans les notes
             for s in self.stats['by_source']:
-                print(f"   {s['source']:<30s} {s['collected']:>10d} {s['tagged']:>10d} {s['analyzed']:>10d}")
+                source_name = s['source']
+                source_lower = source_name.lower()
+                
+                # Regrouper les sources ZZDB
+                if 'zzdb' in source_lower:
+                    zzdb_found = True
+                    zzdb_total += s['collected']
+                    self.zzdb_total = zzdb_total  # Stocker pour les notes
+                    zzdb_sources.append((source_name, s))
+                    continue  # On affichera après
+                
+                # Classification des autres sources
+                if 'kaggle' in source_lower:
+                    source_type = "[FICHIERS PLATS]"
+                    marker = ""
+                    kaggle_found = True
+                else:
+                    source_type = "[SOURCE RÉELLE]"
+                    marker = ""
+                
+                print(f"   {source_name:<30s} {s['collected']:>10d} {s['tagged']:>10d} {s['analyzed']:>10d} {source_type:>15s}{marker}")
+            
+            # Afficher ZZDB regroupé
+            if zzdb_sources:
+                print(f"   {'ZZDB (TOTAL)':<30s} {zzdb_total:>10d} {'':>10s} {'':>10s} {'[DB NON-REL]':>15s} [DONNÉES SYNTHÈSE] [LAB IA]")
+                for source_name, s in zzdb_sources:
+                    status = "(désactivé)" if 'synthetic' in source_name.lower() else "(actif)"
+                    print(f"      └─ {source_name:<27s} {s['collected']:>10d} {s['tagged']:>10d} {s['analyzed']:>10d} {status}")
+            
+            # Notes explicatives
+            print(f"\n   [CLASSIFICATION DES SOURCES]")
+            if kaggle_found:
+                print(f"   • Kaggle : Fichiers plats (CSV/JSON) - Datasets locaux")
+            if zzdb_found:
+                print(f"   • ZZDB : Base de données non relationnelle (SQLite) + CSV export - DONNÉES DE SYNTHÈSE [LAB IA]")
+                print(f"   • ZZDB permet d'enrichir l'analyse des sentiments français dans un contexte de recherche.")
+                print(f"   • DONNÉES DE SYNTHÈSE spécialisées en climat social, politique, économique et financier français.")
+                print(f"   • Sources ZZDB :")
+                print(f"     - zzdb_synthetic (SQLite DB) : DÉSACTIVÉ (articles historiques uniquement)")
+                print(f"     - zzdb_csv (CSV export) : ACTIF (source principale, intégration unique comme fondation)")
+                print(f"   • Total ZZDB dans datasens.db : {self.zzdb_total} articles (données de synthèse)")
+                print(f"   • Les données de synthèse ZZDB sont intégrées comme fondation statique pour structurer le dataset.")
         
         # Distribution topics
         if self.stats['topics']:
@@ -112,13 +158,32 @@ class CollectionReport:
                 pct = (count / max(session['tagged'], 1)) * 100
                 print(f"   • {topic:25s}: {count:4d} articles ({pct:5.1f}%)")
         
-        # Distribution sentiment
+        # Distribution sentiment - AFFICHAGE COMPLET (positif, négatif, neutre)
+        print(f"\n[SENTIMENT] DISTRIBUTION DU SENTIMENT (SESSION)")
         if self.stats['sentiment']:
-            print(f"\n[SENTIMENT] DISTRIBUTION DU SENTIMENT (SESSION)")
             total_sent = sum(self.stats['sentiment'].values())
-            for label, count in sorted(self.stats['sentiment'].items(), key=lambda x: -x[1]):
+            # Afficher dans l'ordre : positif, négatif, neutre (même si 0)
+            sentiment_order = ['positif', 'négatif', 'neutre']
+            for label in sentiment_order:
+                count = self.stats['sentiment'].get(label, 0)
                 pct = (count / max(total_sent, 1)) * 100
-                print(f"   • {label:10s}: {count:4d} articles ({pct:5.1f}%)")
+                marker = " ⚠️" if label == 'négatif' and count == 0 else ""
+                print(f"   • {label:10s}: {count:4d} articles ({pct:5.1f}%){marker}")
+            
+            # Afficher aussi les autres labels s'il y en a
+            for label, count in sorted(self.stats['sentiment'].items(), key=lambda x: -x[1]):
+                if label not in sentiment_order:
+                    pct = (count / max(total_sent, 1)) * 100
+                    print(f"   • {label:10s}: {count:4d} articles ({pct:5.1f}%)")
+        else:
+            print(f"   ⚠️  Aucun sentiment analysé dans cette session")
+        
+        # Note sur la vision du projet
+        print(f"\n[VISION] FINALITÉ DU PROJET")
+        print(f"   Analyser l'état des sentiments des français pour alimenter :")
+        print(f"   • Acteurs politiques : Faire ressortir les préoccupations des français")
+        print(f"   • Acteurs financiers : Guider les décisions d'investissements")
+        print(f"   Voir docs/VISION_ACADEMIQUE.md pour plus de détails.")
         
         print("\n" + "="*80 + "\n")
     

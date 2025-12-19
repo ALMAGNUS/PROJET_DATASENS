@@ -12,7 +12,7 @@ class DataAggregator:
         data = []
         for p in [Path('data/raw'), Path.home() / 'datasens_project' / 'data' / 'raw', Path.home() / 'Desktop' / 'DEV IA 2025' / 'PROJET_DATASENS' / 'data' / 'raw']:
             if not p.exists(): continue
-            for src_dir in list(p.glob('Kaggle_*')) + list(p.glob('kaggle_*')) + list(p.glob('gdelt_*')):
+            for src_dir in list(p.glob('Kaggle_*')) + list(p.glob('kaggle_*')) + list(p.glob('gdelt_*')) + list(p.glob('zzdb_*')):
                 if not src_dir.is_dir(): continue
                 for csv_file in src_dir.rglob('*.csv'):
                     try:
@@ -58,11 +58,24 @@ class DataAggregator:
     
     def aggregate_raw(self) -> pd.DataFrame:
         """RAW: DB + fichiers locaux (sans enrichissement)"""
-        df_db = pd.read_sql_query("SELECT r.raw_data_id as id, s.name as source, r.title, r.content, r.url, r.fingerprint, r.collected_at FROM raw_data r JOIN source s ON r.source_id = s.source_id ORDER BY r.collected_at DESC", self.conn)
+        df_db = pd.read_sql_query("SELECT r.raw_data_id as id, s.name as source, r.title, r.content, r.url, r.fingerprint, r.collected_at, r.quality_score FROM raw_data r JOIN source s ON r.source_id = s.source_id ORDER BY r.collected_at DESC", self.conn)
+        # Classification des sources : ZZDB = DB non relationnelle, Kaggle = fichiers plats
+        def classify_source(x):
+            x_lower = str(x).lower()
+            if 'zzdb' in x_lower:
+                return 'db_non_relational'  # Base de données non relationnelle
+            elif 'kaggle' in x_lower:
+                return 'flat_files'  # Fichiers plats
+            else:
+                return 'real_source'  # Source réelle
+        
+        df_db['source_type'] = df_db['source'].apply(classify_source)
         local_df = self._collect_local_files()
         if not local_df.empty:
             local_df['id'] = range(len(df_db), len(df_db) + len(local_df)) if not df_db.empty else range(len(local_df))
             local_df['fingerprint'] = ''
+            local_df['quality_score'] = 0.5
+            local_df['source_type'] = local_df['source'].apply(classify_source)
             df = pd.concat([df_db, local_df], ignore_index=True)
         else:
             df = df_db
@@ -71,6 +84,9 @@ class DataAggregator:
     def aggregate_silver(self) -> pd.DataFrame:
         """SILVER: RAW + topics (sans sentiment)"""
         df = self.aggregate_raw()
+        # S'assurer que source_type est présent
+        if 'source_type' not in df.columns:
+            df['source_type'] = df['source'].apply(lambda x: 'academic' if 'zzdb' in str(x).lower() else 'real')
         topics = pd.read_sql_query("SELECT dt.raw_data_id, t.name as topic_name, dt.confidence_score, ROW_NUMBER() OVER (PARTITION BY dt.raw_data_id ORDER BY dt.confidence_score DESC) as rn FROM document_topic dt JOIN topic t ON dt.topic_id = t.topic_id", self.conn)
         t1 = topics[topics['rn'] == 1][['raw_data_id', 'topic_name', 'confidence_score']].rename(columns={'topic_name': 'topic_1', 'confidence_score': 'topic_1_score'})
         t2 = topics[topics['rn'] == 2][['raw_data_id', 'topic_name', 'confidence_score']].rename(columns={'topic_name': 'topic_2', 'confidence_score': 'topic_2_score'})
@@ -83,6 +99,9 @@ class DataAggregator:
     def aggregate(self) -> pd.DataFrame:
         """GOLD: SILVER + sentiment"""
         df = self.aggregate_silver()
+        # S'assurer que source_type est présent
+        if 'source_type' not in df.columns:
+            df['source_type'] = df['source'].apply(lambda x: 'academic' if 'zzdb' in str(x).lower() else 'real')
         sentiment = pd.read_sql_query("SELECT raw_data_id, label as sentiment, score as sentiment_score FROM model_output WHERE model_name = 'sentiment_keyword'", self.conn)
         df = df.merge(sentiment, left_on='id', right_on='raw_data_id', how='left')
         df = df.drop(columns=[c for c in df.columns if 'raw_data_id' in c], errors='ignore')

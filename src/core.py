@@ -208,6 +208,205 @@ class GDELTFileExtractor(BaseExtractor):
             print(f"   ❌ {self.name}: {str(e)[:40]}")
         return articles[:100]
 
+class SQLiteExtractor(BaseExtractor):
+    """Extract articles from SQLite database (ZZDB synthetic data) - WITH SAFEGUARDS"""
+    def extract(self) -> list[Article]:
+        articles = []
+        try:
+            from pathlib import Path
+            import os
+            
+            # GARDE-FOU 1: Vérifier variable d'environnement pour désactiver ZZDB
+            if os.getenv('DISABLE_ZZDB', 'false').lower() == 'true':
+                return articles
+            
+            # GARDE-FOU 2: Limite max d'articles synthétiques par exécution
+            MAX_SYNTHETIC_PER_RUN = int(os.getenv('ZZDB_MAX_ARTICLES', '50'))
+            
+            # ZZDB database path - try multiple locations
+            possible_paths = [
+                Path(__file__).parent.parent.parent / 'zzdb' / 'synthetic_data.db',
+                Path.cwd() / 'zzdb' / 'synthetic_data.db',
+                Path(self.url) if Path(self.url).is_absolute() else Path.cwd() / self.url
+            ]
+            
+            db_path = None
+            for p in possible_paths:
+                if p.exists():
+                    db_path = p
+                    break
+            
+            if not db_path or not db_path.exists():
+                return articles
+            
+            conn = sqlite3.connect(str(db_path))
+            cursor = conn.cursor()
+            
+            # GARDE-FOU 3: Vérifier si des articles ont déjà été collectés récemment (dans les 24h)
+            # On sélectionne seulement les articles non récemment collectés
+            cursor.execute("""
+                SELECT title, content, url, sentiment, theme, published_at
+                FROM synthetic_articles
+                WHERE published_at < datetime('now', '-1 hour')
+                ORDER BY published_at DESC
+                LIMIT ?
+            """, (MAX_SYNTHETIC_PER_RUN,))
+            
+            for row in cursor.fetchall():
+                title, content, url, sentiment, theme, published_at = row
+                
+                # GARDE-FOU 4: Validation stricte du contenu
+                if not title or not content:
+                    continue
+                
+                # GARDE-FOU 5: Vérifier longueur minimale et maximale
+                title_clean = title.strip()
+                content_clean = content.strip()
+                
+                if len(title_clean) < 10 or len(title_clean) > 500:
+                    continue
+                if len(content_clean) < 50 or len(content_clean) > 5000:
+                    continue
+                
+                # GARDE-FOU 6: Vérifier que le contenu n'est pas trop répétitif
+                words = content_clean.split()
+                if len(set(words)) < len(words) * 0.3:  # Moins de 30% de mots uniques = trop répétitif
+                    continue
+                
+                a = Article(
+                    title=title_clean[:500],
+                    content=content_clean[:2000],
+                    url=url or self.url,
+                    source_name=self.name,
+                    published_at=published_at or datetime.now().isoformat()
+                )
+                
+                # GARDE-FOU 7: Validation finale avec is_valid()
+                if a.is_valid():
+                    articles.append(a)
+                    
+                    # GARDE-FOU 8: Limite absolue par exécution
+                    if len(articles) >= MAX_SYNTHETIC_PER_RUN:
+                        break
+            
+            conn.close()
+        except Exception as e:
+            print(f"   ⚠️  {self.name}: {str(e)[:40]}")
+        return articles
+
+class CSVExtractor(BaseExtractor):
+    """Extract articles from CSV file (ZZDB export) - INTÉGRATION UNIQUE (comme Kaggle/GDELT)"""
+    def extract(self) -> list[Article]:
+        articles = []
+        try:
+            from pathlib import Path
+            import os
+            import sqlite3
+            
+            # GARDE-FOU 1: Vérifier variable d'environnement pour désactiver ZZDB CSV
+            if os.getenv('DISABLE_ZZDB_CSV', 'false').lower() == 'true':
+                return articles
+            
+            # GARDE-FOU 0: Vérifier si la source est déjà intégrée (comme Kaggle/GDELT)
+            # Si des articles existent déjà dans la base, on ne re-collecte plus (source statique)
+            db_path = os.getenv('DB_PATH', str(Path.home() / 'datasens_project' / 'datasens.db'))
+            if Path(db_path).exists():
+                try:
+                    conn_check = sqlite3.connect(db_path)
+                    cursor_check = conn_check.cursor()
+                    # Vérifier si la source existe et a déjà des articles
+                    cursor_check.execute("""
+                        SELECT COUNT(*) 
+                        FROM raw_data r
+                        JOIN source s ON r.source_id = s.source_id
+                        WHERE s.name = ?
+                    """, (self.name,))
+                    existing_count = cursor_check.fetchone()[0]
+                    conn_check.close()
+                    
+                    if existing_count > 0:
+                        # Source déjà intégrée - on ne re-collecte plus (fondation statique)
+                        return articles
+                except:
+                    pass  # Si erreur, on continue quand même
+            
+            # GARDE-FOU 2: Limite max d'articles par exécution (seulement si première intégration)
+            MAX_CSV_PER_RUN = int(os.getenv('ZZDB_CSV_MAX_ARTICLES', '100'))
+            
+            # CSV path - try multiple locations (comme Kaggle/GDELT dans data/raw/)
+            possible_paths = [
+                # Emplacement standard dans data/raw/ (comme Kaggle/GDELT)
+                Path(__file__).parent.parent.parent / 'data' / 'raw' / 'zzdb_csv' / 'zzdb_dataset.csv',
+                Path.cwd() / 'data' / 'raw' / 'zzdb_csv' / 'zzdb_dataset.csv',
+                Path.home() / 'datasens_project' / 'data' / 'raw' / 'zzdb_csv' / 'zzdb_dataset.csv',
+                # Emplacements alternatifs (zzdb/export/)
+                Path(__file__).parent.parent.parent / 'zzdb' / 'export' / 'zzdb_dataset.csv',
+                Path(__file__).parent.parent.parent / 'zzdb' / 'zzdb_dataset.csv',
+                Path.cwd() / 'zzdb' / 'export' / 'zzdb_dataset.csv',
+                Path.cwd() / 'zzdb' / 'zzdb_dataset.csv',
+                # URL configurée
+                Path(self.url) if Path(self.url).is_absolute() else Path.cwd() / self.url
+            ]
+            
+            csv_path = None
+            for p in possible_paths:
+                if p.exists():
+                    csv_path = p
+                    break
+            
+            if not csv_path or not csv_path.exists():
+                return articles
+            
+            # Lire le CSV
+            with open(csv_path, 'r', encoding='utf-8', errors='ignore') as f:
+                reader = csv.DictReader(f)
+                for row_num, row in enumerate(reader):
+                    if row_num >= MAX_CSV_PER_RUN:
+                        break
+                    
+                    # Extraire les colonnes du CSV
+                    title = row.get('title', '').strip()
+                    content = row.get('content', '').strip()
+                    url = row.get('url', self.url or 'https://zzdb.datasens.fr')
+                    published_at = row.get('published_at', '') or datetime.now().isoformat()
+                    
+                    # GARDE-FOU 3: Validation stricte du contenu
+                    if not title or not content:
+                        continue
+                    
+                    # GARDE-FOU 4: Vérifier longueur minimale et maximale
+                    title_clean = title[:500].strip()
+                    content_clean = content[:2000].strip()
+                    
+                    if len(title_clean) < 10 or len(title_clean) > 500:
+                        continue
+                    if len(content_clean) < 50 or len(content_clean) > 5000:
+                        continue
+                    
+                    # GARDE-FOU 5: Vérifier que le contenu n'est pas trop répétitif
+                    words = content_clean.split()
+                    if len(set(words)) < len(words) * 0.3:
+                        continue
+                    
+                    a = Article(
+                        title=title_clean,
+                        content=content_clean,
+                        url=url,
+                        source_name=self.name,
+                        published_at=published_at
+                    )
+                    
+                    # GARDE-FOU 6: Validation finale avec is_valid()
+                    if a.is_valid():
+                        articles.append(a)
+                        
+                        # GARDE-FOU 7: Limite absolue par exécution
+                        if len(articles) >= MAX_CSV_PER_RUN:
+                            break
+        except Exception as e:
+            print(f"   ⚠️  {self.name}: {str(e)[:40]}")
+        return articles
+
 class KaggleExtractor(BaseExtractor):
     """Extract articles from Kaggle datasets (CSV/JSON)"""
     def extract(self) -> list[Article]:
@@ -264,6 +463,8 @@ def create_extractor(source: Source) -> BaseExtractor:
     acq_type, src_low = source.acquisition_type.lower(), source.source_name.lower()
     if acq_type == "rss": return RSSExtractor(source.source_name, source.url)
     elif acq_type == "bigdata": return GDELTFileExtractor(source.source_name, source.url)
+    elif acq_type == "sqlite" or ('zzdb' in src_low and 'csv' not in src_low): return SQLiteExtractor(source.source_name, source.url)
+    elif acq_type == "csv" or ('zzdb' in src_low and 'csv' in src_low): return CSVExtractor(source.source_name, source.url)
     elif acq_type == "dataset":
         if 'kaggle' in src_low: return KaggleExtractor(source.source_name, source.url)
         return KaggleExtractor(source.source_name, source.url)

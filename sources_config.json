@@ -208,6 +208,28 @@
       "file_naming": "french_tweets_YYYYMMDD_HHMMSS.csv",
       "refresh_frequency": "Daily",
       "active": true
+    },
+    {
+      "source_name": "zzdb_synthetic",
+      "description": "Synthetic data specialized in French sentiment, social, political, economic and financial climate - WITH SAFEGUARDS (max 50 articles/run, quality_score=0.3)",
+      "acquisition_type": "sqlite",
+      "theme": "synthetic",
+      "url": "zzdb/synthetic_data.db",
+      "partition_path": "/data/raw/zzdb_synthetic/date=YYYY-MM-DD/",
+      "file_naming": "zzdb_synthetic_YYYYMMDD_HHMMSS.parquet",
+      "refresh_frequency": "Daily",
+      "active": false
+    },
+    {
+      "source_name": "zzdb_csv",
+      "description": "ZZDB CSV export - Synthetic dataset from zzdb/export/zzdb_dataset.csv - WITH SAFEGUARDS (max 100 articles/run, quality_score=0.3)",
+      "acquisition_type": "csv",
+      "theme": "synthetic",
+      "url": "zzdb/zzdb_dataset.csv",
+      "partition_path": "/data/raw/zzdb_csv/date=YYYY-MM-DD/",
+      "file_naming": "zzdb_csv_YYYYMMDD_HHMMSS.parquet",
+      "refresh_frequency": "Daily",
+      "active": true
     }
   ]
 }
