@@ -1,21 +1,23 @@
 # ============================================================
-# DataSens — Requirements (E1 Complete)
+# DataSens — Requirements (E1 → E2/E3 Complete)
 # Python 3.10+
 # 
-# Modules utilisés:
-# - tagger.py, analyzer.py, repository.py: sqlite3 (built-in)
-# - aggregator.py: pandas, sqlite3
-# - exporter.py: pandas, pyarrow (pour parquet)
+# E1: Pipeline SQLite (Complete)
+# E2: PySpark Big Data (Ready)
+# E3: FastAPI + RBAC + Streamlit + Mistral (Ready)
 # ============================================================
 
-# Core Data Processing
-# Required for: aggregator.py (DataAggregator), exporter.py (GoldExporter)
+# ============================================================
+# E1: Core Data Processing
+# ============================================================
 pandas==2.3.3
 numpy==1.26.4
 pyarrow==22.0.0  # Required for parquet export in exporter.py
 fastparquet==2024.11.0
 
-# Web Scraping & Data Sources
+# ============================================================
+# E1: Web Scraping & Data Sources
+# ============================================================
 feedparser==6.0.11
 requests==2.32.3
 beautifulsoup4==4.12.3
@@ -24,52 +26,104 @@ httpx==0.27.0
 kagglehub==0.2.5
 faker==24.0.0  # ZZDB LAB IA - Génération données synthétiques (isolé dans zzdb/)
 
-# Database & ORM
+# ============================================================
+# E1: Database & ORM
+# ============================================================
 sqlalchemy==2.0.30
 sqlmodel==0.0.21
 
-# Data Validation & Typing
-pydantic==2.7.4
-python-dotenv==1.0.1
+# ============================================================
+# E2: PySpark Big Data Processing
+# ============================================================
+pyspark==3.5.1
+delta-spark==3.0.0  # Delta Lake support (optional, for advanced use cases)
 
-# Code Quality & Linting
-ruff==0.1.13
+# ============================================================
+# E3: FastAPI + RBAC + Authentication
+# ============================================================
+fastapi==0.111.0
+uvicorn[standard]==0.30.1  # ASGI server with standard extras
+python-jose[cryptography]==3.3.0  # JWT tokens
+passlib[bcrypt]==1.7.4  # Password hashing
+python-multipart==0.0.6  # Form data parsing
+email-validator==2.1.1  # Email validation
 
-# Logging & Output
-loguru==0.7.2
-rich==13.7.1
+# ============================================================
+# E3: Streamlit Dashboard
+# ============================================================
+streamlit==1.36.0
+streamlit-aggrid==0.3.4  # Advanced data grid
+streamlit-plotly-events==0.0.6  # Interactive plots
 
-# Development & Notebooks
-jupyter>=1.0.0
-ipython>=8.0.0
+# ============================================================
+# E3: Mistral AI (Generative AI)
+# ============================================================
+mistralai==1.0.0  # Mistral API client
+openai==1.54.0  # Alternative/compatible API client
 
-# ML & NLP (E2-ready, optional for E1)
+# ============================================================
+# E3: ML & NLP (FlauBERT, CamemBERT)
+# ============================================================
 scikit-learn==1.5.0
 transformers==4.41.2
 torch==2.3.1
+sentencepiece==0.2.0  # Tokenization for French models
+tokenizers==0.19.1
 
-# Visualization (E2+)
+# ============================================================
+# E3: Data Validation & Typing
+# ============================================================
+pydantic==2.7.4
+pydantic-settings==2.4.0  # Settings management
+python-dotenv==1.0.1
+
+# ============================================================
+# E3: Visualization & Analytics
+# ============================================================
 matplotlib==3.9.0
 seaborn==0.13.2
 plotly==5.18.0
 kaleido==0.2.1
 
-# Experiment Tracking (E3)
+# ============================================================
+# E3: Experiment Tracking & Monitoring
+# ============================================================
 mlflow==3.7.0
-
-# API Framework (E3)
-fastapi==0.111.0
-uvicorn==0.30.1
-
-# Testing
-pytest==8.2.2
-
-# Monitoring
 prometheus-client==0.20.0
+grafana-api==1.0.3  # Grafana API client (optional)
 
-# Scheduling (Dashboard & Aggregation)
+# ============================================================
+# Development & Code Quality
+# ============================================================
+ruff==0.1.13
+black==24.8.0  # Code formatter
+mypy==1.11.0  # Type checking
+pytest==8.2.2
+pytest-asyncio==0.24.0  # Async testing for FastAPI
+pytest-cov==5.0.0  # Coverage reporting
+httpx==0.27.0  # HTTP client for testing
+
+# ============================================================
+# Logging & Output
+# ============================================================
+loguru==0.7.2
+rich==13.7.1
+
+# ============================================================
+# Development & Notebooks
+# ============================================================
+jupyter>=1.0.0
+ipython>=8.0.0
+
+# ============================================================
+# Scheduling & Background Tasks
+# ============================================================
 apscheduler==3.10.4
+celery==5.4.0  # Distributed task queue (optional, for advanced use cases)
+redis==5.2.0  # Redis backend for Celery (optional)
 
-# Optional: PySpark (E1 V3+)
-# pyspark==3.5.1
-# delta-spark==3.0.0
+# ============================================================
+# Utilities
+# ============================================================
+python-dateutil==2.9.0
+pytz==2024.1  # Timezone support
