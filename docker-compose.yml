@@ -9,6 +9,7 @@ services:
       - ./data:/app/data
       - ./exports:/app/exports
       - ./sources_config.json:/app/sources_config.json
+      - ./zzdb:/app/zzdb:ro  # ZZDB en lecture seule
       - datasens-db:/app/data/datasens.db
     environment:
       - DB_PATH=/app/data/datasens.db

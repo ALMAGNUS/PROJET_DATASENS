@@ -1,10 +1,12 @@
 # DataSens E1 - Production Monolith (Python 3.10)
+# Version: v1.0.0-stable (FREEZE)
 FROM python:3.10-slim
 
 # Metadata
 LABEL maintainer="DataSens Team"
 LABEL description="DataSens E1 Pipeline - Monolith Production Ready"
-LABEL version="1.0.0"
+LABEL version="1.0.0-stable"
+LABEL freeze="true"
 
 # Environment
 ENV PYTHONUNBUFFERED=1 \
@@ -32,7 +34,7 @@ RUN pip install --no-cache-dir prometheus-client==0.20.0
 COPY . .
 
 # Create data directories
-RUN mkdir -p /app/data/raw /app/data/silver /app/data/gold /app/exports
+RUN mkdir -p /app/data/raw /app/data/silver /app/data/gold /app/exports /app/zzdb
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
