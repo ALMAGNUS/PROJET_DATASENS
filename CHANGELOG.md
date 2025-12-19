@@ -114,6 +114,117 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ---
 
+## [1.1.0] — 2025-12-19
+
+### 🔧 Corrections & Améliorations
+
+#### Fix Encodage UTF-8 (Windows)
+- ✅ Ajout fix encodage UTF-8 dans `main.py` pour Windows console
+- ✅ Gestion silencieuse des erreurs de déduplication (UNIQUE constraint)
+- ✅ Suppression des emojis problématiques dans les messages console
+
+#### Amélioration Pipeline
+- ✅ Indicateurs de progression : compteur `[X/Y]` pour les sources
+- ✅ Points de progression `.` tous les 100 articles lors du chargement
+- ✅ Messages informatifs pour grandes sources (> 1000 articles)
+- ✅ Optimisation gestion erreurs (déduplication silencieuse)
+
+#### Flow Kaggle Corrigé
+- ✅ Exclusion Kaggle de `_collect_local_files()` (évite duplication)
+- ✅ Kaggle vient uniquement de la DB via `aggregate_raw()`
+- ✅ Amélioration `KaggleExtractor` : support dossier unique sans partitionnement date
+- ✅ Lecture récursive de tous les fichiers CSV/JSON dans `kaggle_french_opinions/`
+- ✅ Détection automatique colonnes title/content
+- ✅ Suppression limites artificielles (traitement complet des datasets)
+
+#### Exports & Partitionnement
+- ✅ Suppression génération `gold_zzdb.csv` (fusionné dans `gold.csv`)
+- ✅ Exports standards : `raw.csv`, `silver.csv`, `gold.csv`, `gold.parquet`
+- ✅ Partitionnement ZZDB par source dans `data/gold/date=YYYY-MM-DD/source=zzdb_*/`
+
+#### Tables PROFILS & USER_ACTION_LOG
+- ✅ Création table `profils` (authentification future)
+- ✅ Création table `user_action_log` (audit trail)
+- ✅ Isolation complète des tables E1 (pas de FK dans RAW_DATA, SOURCE, etc.)
+- ✅ Relation 1-N : PROFILS → USER_ACTION_LOG
+- ✅ Référence indirecte via `resource_type` + `resource_id`
+
+#### Tests & Scripts
+- ✅ Déplacement scripts de test vers `tests/` (8 fichiers)
+- ✅ Scripts de vérification : `check_db_status.py`, `check_exports.py`, `check_kaggle_status.py`
+- ✅ Tests pipeline : `test_main_quick.py`, `test_main_minimal.py`, `test_main_run.py`
+- ✅ Script vérification Kaggle : `scripts/check_kaggle_files.py`
+
+#### Documentation
+- ✅ Création `FLOW_DONNEES.md` : documentation complète du flow de données
+- ✅ Création `docs/FLOW_KAGGLE_COMPLET.md` : flow Kaggle détaillé
+- ✅ Création `docs/TABLES_PROFILS_ACTION_LOG.md` : documentation tables auth/audit
+- ✅ Création `docs/KAGGLE_DOSSIER_UNIQUE.md` : guide structure Kaggle
+
+#### Collection Report
+- ✅ Exclusion sources fondation (Kaggle, GDELT events, ZZDB) des rapports quotidiens
+- ✅ Focus sur sources dynamiques dans les rapports de collecte
+- ✅ Distinction claire sources statiques vs dynamiques
+
+#### Enrichissement
+- ✅ Garantie 2 topics par article (fallback "autre" si nécessaire)
+- ✅ Amélioration détection sentiment négatif (listes de mots-clés étendues)
+- ✅ Enrichissement complet : 100% des articles (topics + sentiment)
+
+### 📊 Records Base de Données
+
+- **Total articles** : 42,466
+- **Taille DB** : 71.93 MB
+- **Taux enrichissement** : 100% (42,465 articles enrichis)
+- **Topics utilisés** : 25 topics différents
+- **Sources actives** : 21 sources
+
+#### Top 10 Sources
+- Kaggle French Opinions : 38,327 articles
+- Google News RSS : 1,274 articles
+- ZZDB CSV : 930 articles
+- Trustpilot Reviews : 578 articles
+- Yahoo Finance : 444 articles
+- Reddit France : 338 articles
+- RSS French News : 221 articles
+- OpenWeather API : 161 articles
+- GDELT Events : 70 articles
+- DataGouv Datasets : 50 articles
+
+#### Distribution Sentiment
+- Neutre : 19,770 articles (46.6%)
+- Négatif : 16,774 articles (39.5%)
+- Positif : 5,921 articles (13.9%)
+
+### 🔄 Changements Techniques
+
+#### Fichiers Modifiés
+- `main.py` : Fix encodage + indicateurs progression
+- `src/repository.py` : Déduplication silencieuse + tables PROFILS/USER_ACTION_LOG
+- `src/aggregator.py` : Exclusion Kaggle de `_collect_local_files()`
+- `src/exporter.py` : Suppression `gold_zzdb.csv`
+- `src/core.py` : Amélioration `KaggleExtractor`
+- `src/collection_report.py` : Exclusion sources fondation
+- `src/tagger.py` : Garantie 2 topics
+- `sources_config.json` : Configuration sources mise à jour
+
+#### Nouveaux Fichiers
+- `tests/` : 8 scripts de test
+- `scripts/check_kaggle_files.py` : Vérification fichiers Kaggle
+- `FLOW_DONNEES.md` : Documentation flow
+- `docs/FLOW_KAGGLE_COMPLET.md` : Flow Kaggle
+- `docs/TABLES_PROFILS_ACTION_LOG.md` : Documentation auth/audit
+
+### 🐛 Corrections de Bugs
+
+- ✅ Erreur UnicodeEncodeError sur Windows (emojis)
+- ✅ Duplication Kaggle dans exports (exclusion de `_collect_local_files()`)
+- ✅ Affichage erreurs UNIQUE constraint (déduplication silencieuse)
+- ✅ Génération fichier `gold_zzdb.csv` indésirable (supprimé)
+- ✅ Topics manquants (garantie 2 topics par article)
+
+---
+
 ## ✅ Status: E1 COMPLET & PRODUCTION-READY
 
 **E1 inclut tout ce qui est nécessaire pour** :
