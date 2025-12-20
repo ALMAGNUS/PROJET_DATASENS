@@ -5,6 +5,26 @@
 ![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)
 ![E1 Complete](https://img.shields.io/badge/E1-v1.0.0%20Complete-green?style=flat-square)
 
+---
+
+```text
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║     ██████╗   █████╗ ████████╗ █████╗ ███████╗███████╗███╗   ██╗███████╗     ║
+║     ██╔══██╗ ██╔══██╗╚══██╔══╝██╔══██╗██╔════╝██╔════╝████╗  ██║██╔════╝     ║
+║     ██║  ██║ ███████║   ██║   ███████║███████╗█████╗  ██╔██╗ ██║███████╗     ║
+║     ██║  ██║ ██╔══██║   ██║   ██╔══██║╚════██║██╔══╝  ██║╚██╗██║╚════██║     ║
+║     ██████╔╝ ██║  ██║   ██║   ██║  ██║███████║███████╗██║ ╚████║███████║     ║
+║     ╚═════╝  ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═══╝╚══════╝     ║
+║                                                                              ║
+║                   ╔════════════════════════════════════╗                     ║
+║                   ║  ---------- README -----------     ║                     ║
+║                   ╚════════════════════════════════════╝                     ║
+║                                                                              ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+```
+
 ## 🎯 Overview
 
 **DATASENS E1** is a professional data extraction, transformation, and export pipeline that:
@@ -292,27 +312,51 @@ python scripts/enrich_all_articles.py
 
 ```
 PROJET_DATASENS/
-├── main.py                          # E1 orchestration
+├── main.py                          # E1 orchestration (utilise E1 isolé)
 ├── setup_with_sql.py                # Database setup
-├── e1_export_correct.py             # RAW→SILVER→GOLD
 ├── requirements.txt                 # Dependencies
-├── sources_config.json              # 10 sources config
+├── sources_config.json              # Sources config
 ├── README.md                        # This file
-├── AGILE_ROADMAP.md                 # User stories
-├── SCHEMA_DESIGN.md                 # Database schema
+├── pytest.ini                       # Configuration pytest
 ├── src/
 │   ├── __init__.py
-│   └── core.py                      # All extractors
+│   ├── e1/                          # E1 ISOLÉ (package privé)
+│   │   ├── __init__.py
+│   │   ├── core.py                  # Extracteurs et transformers
+│   │   ├── repository.py            # Repository pattern
+│   │   ├── tagger.py                # Topic tagger
+│   │   ├── analyzer.py             # Sentiment analyzer
+│   │   ├── aggregator.py            # Data aggregator
+│   │   ├── exporter.py             # Gold exporter
+│   │   └── pipeline.py             # E1Pipeline isolé
+│   ├── e2/                          # E2 (FastAPI + RBAC) - PRÊT
+│   │   └── __init__.py
+│   ├── e3/                          # E3 (PySpark + ML) - PRÊT
+│   │   └── __init__.py
+│   ├── shared/                      # INTERFACES (contrats E1 ↔ E2/E3)
+│   │   ├── __init__.py
+│   │   └── interfaces.py           # E1DataReader (lecture seule)
+│   ├── dashboard.py                 # Dashboard utilitaires
+│   ├── collection_report.py         # Rapport de collecte
+│   └── metrics.py                   # Prometheus metrics
+├── tests/
+│   ├── test_e1_isolation.py         # Tests non-régression E1
+│   └── README_E1_ISOLATION.md       # Guide tests
+├── docs/
+│   ├── PLAN_ACTION_E1_E2_E3.md      # Plan d'action détaillé
+│   ├── E1_ISOLATION_STRATEGY.md    # Stratégie isolation
+│   ├── E1_ISOLATION_COMPLETE.md    # Récapitulatif Phase 0
+│   └── ROADMAP_EVOLUTION.md         # Roadmap E1 → E2 → E3
 └── data/
     ├── raw/
-    │   └── sources_2025-12-16/
+    │   └── sources_2025-12-20/
     │       ├── raw_articles.json
     │       └── raw_articles.csv
     ├── silver/
-    │   └── v_2025-12-16/
+    │   └── v_2025-12-20/
     │       └── silver_articles.parquet
     └── gold/
-        └── date=2025-12-16/
+        └── date=2025-12-20/
             └── articles.parquet
 ```
 
@@ -341,19 +385,56 @@ PROJET_DATASENS/
 
 ---
 
+## 🔒 E1 Isolation (Phase 0 - Complete)
+
+**E1 est maintenant isolé et protégé** pour la construction de E2/E3.
+
+### Structure Isolée
+- ✅ Package `src/e1/` : E1 complètement isolé
+- ✅ Interface `src/shared/interfaces.py` : E1DataReader (lecture seule)
+- ✅ Tests de non-régression : `tests/test_e1_isolation.py`
+- ✅ Documentation : `docs/E1_ISOLATION_STRATEGY.md`
+
+### Règles d'Isolation
+- ✅ E2/E3 utilisent UNIQUEMENT `E1DataReader` (pas de modification E1)
+- ✅ Tests E1 passent à 100% avant chaque merge E2/E3
+- ✅ Aucune modification `src/e1/` depuis E2/E3
+
+**Voir** : `docs/E1_ISOLATION_COMPLETE.md` pour détails complets
+
+---
+
 ## 🚀 Next Steps (E2/E3)
 
 This E1 pipeline feeds into:
 
-**E2 — ML Enrichment**
-- Advanced sentiment analysis (transformers)
-- Topic modeling (LDA, BERTopic)
-- Named entity recognition (NER)
+**Phase 1 — Docker & CI/CD**
+- Containerisation E1
+- Tests automatisés
+- CI/CD workflows
 
-**E3 — Production API**
-- FastAPI service
-- MLflow model registry
-- Real-time dashboards
+**Phase 2 — FastAPI + RBAC**
+- API REST sécurisée
+- Authentification JWT
+- Contrôle d'accès par zone (RAW/SILVER/GOLD)
+
+**Phase 3 — PySpark**
+- Traitement Big Data
+- Intégration avec FastAPI
+
+**Phase 4 — ML Fine-tuning**
+- Fine-tuning FlauBERT (sentiment)
+- Fine-tuning CamemBERT (topics)
+
+**Phase 5 — Streamlit Dashboard**
+- Visualisations interactives
+- Prédictions IA
+
+**Phase 6 — Mistral IA**
+- Insights générés par IA
+- Climat social/financier
+
+**Voir** : `docs/PLAN_ACTION_E1_E2_E3.md` pour plan détaillé
 
 ---
 
