@@ -1,7 +1,8 @@
 """Prometheus Metrics - DataSens E1 Pipeline Monitoring"""
-from prometheus_client import Counter, Histogram, Gauge, start_http_server
-from prometheus_client.core import CollectorRegistry, REGISTRY
 import time
+
+from prometheus_client import Counter, Gauge, Histogram, start_http_server
+from prometheus_client.core import CollectorRegistry
 
 # Registry
 registry = CollectorRegistry()
@@ -104,15 +105,15 @@ source_errors_total = Counter(
 
 class MetricsCollector:
     """Context manager for pipeline metrics"""
-    
+
     def __init__(self, stage: str):
         self.stage = stage
         self.start_time = None
-    
+
     def __enter__(self):
         self.start_time = time.time()
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         duration = time.time() - self.start_time
         pipeline_duration_seconds.labels(stage=self.stage).observe(duration)

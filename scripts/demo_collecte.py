@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Démo collecte - Avant/Après"""
+import re
 import subprocess
 import sys
 import time
-import re
 
 if sys.platform == 'win32':
     import io
@@ -68,7 +67,7 @@ print(f"  Avant:  {avant:,} articles")
 print(f"  Après:  {apres:,} articles")
 print(f"  Ajout:  {apres - avant:,} nouveaux articles")
 if apres > avant:
-    print(f"  ✅ Collecte réussie !")
+    print("  ✅ Collecte réussie !")
 else:
-    print(f"  ⚠️  Aucun nouvel article collecté")
+    print("  ⚠️  Aucun nouvel article collecté")
 print("="*80 + "\n")

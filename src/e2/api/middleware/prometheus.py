@@ -3,12 +3,13 @@ Prometheus Middleware for FastAPI E2 API
 =========================================
 Middleware pour exposer des métriques Prometheus
 """
+from collections.abc import Callable
 from time import time
-from typing import Callable
+
 from fastapi import Request, Response
+from prometheus_client import Counter, Gauge, Histogram, generate_latest
+from prometheus_client.core import CollectorRegistry
 from starlette.middleware.base import BaseHTTPMiddleware
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
-from prometheus_client.core import CollectorRegistry, REGISTRY
 
 # Registry pour E2 API
 e2_registry = CollectorRegistry()
@@ -70,11 +71,11 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
     Middleware Prometheus pour FastAPI E2
     Enregistre les métriques de requêtes HTTP
     """
-    
+
     def __init__(self, app, registry=None):
         super().__init__(app)
         self.registry = registry or e2_registry
-    
+
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """
         Dispatch request et enregistre les métriques
@@ -82,42 +83,42 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
         # Ignorer les endpoints de métriques et health check
         if request.url.path in ['/metrics', '/health', '/docs', '/redoc', '/openapi.json']:
             return await call_next(request)
-        
+
         # Début du timing
         start_time = time()
-        
+
         # Incrémenter connexions actives
         api_active_connections.inc()
-        
+
         try:
             # Exécuter la requête
             response = await call_next(request)
-            
+
             # Calculer la durée
             duration = time() - start_time
-            
+
             # Extraire endpoint (simplifié)
             endpoint = self._get_endpoint(request.url.path)
-            
+
             # Enregistrer les métriques
             api_requests_total.labels(
                 method=request.method,
                 endpoint=endpoint,
                 status_code=response.status_code
             ).inc()
-            
+
             api_request_duration_seconds.labels(
                 method=request.method,
                 endpoint=endpoint
             ).observe(duration)
-            
+
             # Enregistrer les erreurs
             if response.status_code >= 400:
                 api_errors_total.labels(
                     status_code=response.status_code,
                     endpoint=endpoint
                 ).inc()
-            
+
             # Métriques par zone
             if '/raw/' in request.url.path:
                 api_zone_access_total.labels(zone='raw', method=request.method).inc()
@@ -125,30 +126,30 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
                 api_zone_access_total.labels(zone='silver', method=request.method).inc()
             elif '/gold/' in request.url.path:
                 api_zone_access_total.labels(zone='gold', method=request.method).inc()
-            
+
             return response
-            
-        except Exception as e:
+
+        except Exception:
             # Erreur non gérée
             duration = time() - start_time
             endpoint = self._get_endpoint(request.url.path)
-            
+
             api_errors_total.labels(
                 status_code=500,
                 endpoint=endpoint
             ).inc()
-            
+
             api_request_duration_seconds.labels(
                 method=request.method,
                 endpoint=endpoint
             ).observe(duration)
-            
+
             raise
-        
+
         finally:
             # Décrémenter connexions actives
             api_active_connections.dec()
-    
+
     def _get_endpoint(self, path: str) -> str:
         """
         Normalise le path pour les métriques

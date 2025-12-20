@@ -1,6 +1,7 @@
 """Gold dataset export & PySpark integration demo."""
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
 
 
 class GoldDatasetManager:
@@ -31,11 +32,11 @@ class GoldDatasetManager:
         """Simulate new collection + enrichment."""
         df = pd.read_parquet(self.gold_path)
         initial = len(df)
-        
+
         # Simulate 200 new articles
         new_df = df.head(new_records).copy()
         enriched = pd.concat([df, new_df], ignore_index=True)
-        
+
         print(f"\n{'='*60}\nENRICHMENT SIMULATION\n{'='*60}")
         print(f"Initial GOLD:    {initial} articles")
         print(f"New collection:  {new_records} articles")

@@ -4,19 +4,20 @@ Permissions Dependencies - FastAPI Dependency Injection
 Dépendances pour vérifier les permissions par rôle
 """
 
-from typing import List
+
 from fastapi import Depends, HTTPException, status
-from src.e2.api.schemas.user import UserInDB
+
 from src.e2.api.dependencies.auth import get_current_active_user
+from src.e2.api.schemas.user import UserInDB
 
 
-def require_role(allowed_roles: List[str]):
+def require_role(allowed_roles: list[str]):
     """
     Factory pour créer une dépendance de permission par rôle
-    
+
     Args:
         allowed_roles: Liste des rôles autorisés
-    
+
     Returns:
         Dépendance FastAPI
     """
@@ -25,13 +26,13 @@ def require_role(allowed_roles: List[str]):
     ) -> UserInDB:
         """
         Vérifie que l'utilisateur a un des rôles autorisés
-        
+
         Args:
             current_user: Utilisateur actif
-        
+
         Returns:
             UserInDB
-        
+
         Raises:
             HTTPException 403: Si rôle non autorisé
         """
@@ -41,7 +42,7 @@ def require_role(allowed_roles: List[str]):
                 detail=f"Access denied. Required roles: {', '.join(allowed_roles)}"
             )
         return current_user
-    
+
     return role_checker
 
 

@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Validation complète du projet E1 - Preuves concrètes de fonctionnement"""
+import json
 import sqlite3
 import sys
-import json
-from pathlib import Path
 from datetime import datetime
-import subprocess
+from pathlib import Path
 
 if sys.platform == 'win32':
     import io
@@ -70,50 +68,50 @@ print("-" * 80)
 
 if db_path.exists():
     test("datasens.db existe", True, f"Chemin: {db_path}")
-    
+
     try:
         conn = sqlite3.connect(str(db_path))
         cursor = conn.cursor()
-        
+
         # Vérifier schéma
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = [r[0] for r in cursor.fetchall()]
         required_tables = ['source', 'raw_data', 'sync_log', 'topic', 'document_topic', 'model_output']
-        
+
         for table in required_tables:
             test(f"Table {table} existe", table in tables)
-        
+
         # Statistiques réelles
         cursor.execute("SELECT COUNT(*) FROM raw_data")
         total_articles = cursor.fetchone()[0]
-        test(f"Articles dans raw_data", total_articles > 0, f"{total_articles:,} articles")
-        
+        test("Articles dans raw_data", total_articles > 0, f"{total_articles:,} articles")
+
         cursor.execute("SELECT COUNT(DISTINCT source_id) FROM raw_data")
         sources_count = cursor.fetchone()[0]
-        test(f"Sources différentes", sources_count > 0, f"{sources_count} sources")
-        
+        test("Sources différentes", sources_count > 0, f"{sources_count} sources")
+
         cursor.execute("SELECT COUNT(*) FROM document_topic")
         tagged_count = cursor.fetchone()[0]
-        test(f"Articles taggés (topics)", tagged_count > 0, f"{tagged_count:,} tags")
-        
+        test("Articles taggés (topics)", tagged_count > 0, f"{tagged_count:,} tags")
+
         cursor.execute("SELECT COUNT(*) FROM model_output WHERE model_name = 'sentiment_keyword'")
         analyzed_count = cursor.fetchone()[0]
-        test(f"Articles analysés (sentiment)", analyzed_count > 0, f"{analyzed_count:,} analyses")
-        
+        test("Articles analysés (sentiment)", analyzed_count > 0, f"{analyzed_count:,} analyses")
+
         # Vérifier qualité des données
         cursor.execute("SELECT COUNT(*) FROM raw_data WHERE title IS NOT NULL AND title != ''")
         valid_titles = cursor.fetchone()[0]
-        test(f"Articles avec titre valide", valid_titles == total_articles, f"{valid_titles}/{total_articles}")
-        
+        test("Articles avec titre valide", valid_titles == total_articles, f"{valid_titles}/{total_articles}")
+
         cursor.execute("SELECT COUNT(*) FROM raw_data WHERE content IS NOT NULL AND content != ''")
         valid_content = cursor.fetchone()[0]
-        test(f"Articles avec contenu valide", valid_content == total_articles, f"{valid_content}/{total_articles}")
-        
+        test("Articles avec contenu valide", valid_content == total_articles, f"{valid_content}/{total_articles}")
+
         # Vérifier déduplication (fingerprint)
         cursor.execute("SELECT COUNT(DISTINCT fingerprint) FROM raw_data WHERE fingerprint IS NOT NULL")
         unique_fp = cursor.fetchone()[0]
-        test(f"Déduplication active (fingerprint)", unique_fp > 0, f"{unique_fp:,} fingerprints uniques")
-        
+        test("Déduplication active (fingerprint)", unique_fp > 0, f"{unique_fp:,} fingerprints uniques")
+
         conn.close()
     except Exception as e:
         test("Connexion à datasens.db", False, f"Erreur: {str(e)[:60]}")
@@ -125,23 +123,23 @@ print("-" * 80)
 
 if zzdb_path.exists():
     test("zzdb/synthetic_data.db existe", True, f"Chemin: {zzdb_path}")
-    
+
     try:
         conn = sqlite3.connect(str(zzdb_path))
         cursor = conn.cursor()
-        
+
         cursor.execute("SELECT COUNT(*) FROM synthetic_articles")
         total_zzdb = cursor.fetchone()[0]
-        test(f"Articles synthétiques ZZDB", total_zzdb > 0, f"{total_zzdb:,} articles")
-        
+        test("Articles synthétiques ZZDB", total_zzdb > 0, f"{total_zzdb:,} articles")
+
         cursor.execute("SELECT COUNT(DISTINCT theme) FROM synthetic_articles")
         themes_count = cursor.fetchone()[0]
-        test(f"Thèmes différents", themes_count > 0, f"{themes_count} thèmes")
-        
+        test("Thèmes différents", themes_count > 0, f"{themes_count} thèmes")
+
         cursor.execute("SELECT COUNT(DISTINCT sentiment) FROM synthetic_articles")
         sentiments_count = cursor.fetchone()[0]
-        test(f"Sentiments différents", sentiments_count > 0, f"{sentiments_count} sentiments")
-        
+        test("Sentiments différents", sentiments_count > 0, f"{sentiments_count} sentiments")
+
         conn.close()
     except Exception as e:
         test("Connexion à zzdb/synthetic_data.db", False, f"Erreur: {str(e)[:60]}")
@@ -154,8 +152,7 @@ print("-" * 80)
 # Vérifier que le pipeline peut être importé
 try:
     sys.path.insert(0, str(project_root))
-    from src.core import Article, Source, create_extractor
-    from src.repository import Repository
+    from src.core import Source, create_extractor
     test("Import modules core", True, "Article, Source, create_extractor")
     test("Import Repository", True, "Repository disponible")
 except Exception as e:
@@ -163,18 +160,17 @@ except Exception as e:
 
 # Vérifier extracteurs
 try:
-    from src.core import RSSExtractor, APIExtractor, SQLiteExtractor, CSVExtractor
     test("Extracteurs disponibles", True, "RSS, API, SQLite, CSV")
 except Exception as e:
     test("Extracteurs disponibles", False, f"Erreur: {str(e)[:60]}")
 
 # Vérifier sources config
 try:
-    with open(project_root / 'sources_config.json', 'r', encoding='utf-8') as f:
+    with open(project_root / 'sources_config.json', encoding='utf-8') as f:
         config = json.load(f)
         sources_count = len(config.get('sources', []))
         test("sources_config.json valide", sources_count > 0, f"{sources_count} sources configurées")
-        
+
         # Vérifier source zzdb
         zzdb_sources = [s for s in config['sources'] if 'zzdb' in s.get('source_name', '').lower()]
         test("Source ZZDB configurée", len(zzdb_sources) > 0, f"{len(zzdb_sources)} source(s) ZZDB")
@@ -187,21 +183,21 @@ print("-" * 80)
 exports_dir = project_root / 'exports'
 if exports_dir.exists():
     test("Dossier exports/ existe", True)
-    
+
     gold_csv = exports_dir / 'gold.csv'
     gold_parquet = exports_dir / 'gold.parquet'
-    
+
     if gold_csv.exists():
         # Compter lignes
         try:
-            with open(gold_csv, 'r', encoding='utf-8') as f:
+            with open(gold_csv, encoding='utf-8') as f:
                 lines = sum(1 for _ in f) - 1  # -1 pour header
             test("gold.csv existe et contient des données", lines > 0, f"{lines:,} lignes")
         except:
             test("gold.csv existe et contient des données", False)
     else:
         warn("gold.csv", "Fichier non trouvé - Générer avec python main.py")
-    
+
     if gold_parquet.exists():
         size_mb = gold_parquet.stat().st_size / (1024 * 1024)
         test("gold.parquet existe", True, f"Taille: {size_mb:.2f} MB")
@@ -217,19 +213,19 @@ if db_path.exists():
     try:
         conn = sqlite3.connect(str(db_path))
         cursor = conn.cursor()
-        
+
         # Vérifier enrichissement (topics + sentiment)
         cursor.execute("""
             SELECT COUNT(DISTINCT r.raw_data_id)
             FROM raw_data r
             WHERE EXISTS (SELECT 1 FROM document_topic dt WHERE dt.raw_data_id = r.raw_data_id)
-            AND EXISTS (SELECT 1 FROM model_output mo WHERE mo.raw_data_id = r.raw_data_id 
+            AND EXISTS (SELECT 1 FROM model_output mo WHERE mo.raw_data_id = r.raw_data_id
                         AND mo.model_name = 'sentiment_keyword')
         """)
         enriched_count = cursor.fetchone()[0]
-        test(f"Articles enrichis (topics + sentiment)", enriched_count > 0, 
+        test("Articles enrichis (topics + sentiment)", enriched_count > 0,
              f"{enriched_count:,} articles enrichis")
-        
+
         # Vérifier distribution sentiment
         cursor.execute("""
             SELECT label, COUNT(*) as count
@@ -238,9 +234,9 @@ if db_path.exists():
             GROUP BY label
         """)
         sentiments = cursor.fetchall()
-        test(f"Distribution sentiment", len(sentiments) > 0, 
+        test("Distribution sentiment", len(sentiments) > 0,
              f"{len(sentiments)} catégories: {', '.join([s[0] for s in sentiments])}")
-        
+
         # Vérifier quality_score pour ZZDB
         cursor.execute("""
             SELECT AVG(quality_score)
@@ -250,9 +246,9 @@ if db_path.exists():
         """)
         zzdb_quality = cursor.fetchone()[0]
         if zzdb_quality is not None:
-            test(f"Quality score ZZDB (garde-fou)", zzdb_quality == 0.3, 
+            test("Quality score ZZDB (garde-fou)", zzdb_quality == 0.3,
                  f"Score: {zzdb_quality} (attendu: 0.3)")
-        
+
         conn.close()
     except Exception as e:
         warn("Fonctionnalités avancées", f"Erreur: {str(e)[:60]}")
@@ -263,25 +259,25 @@ print("-" * 80)
 try:
     sys.path.insert(0, str(project_root))
     from src.core import Source, create_extractor
-    
+
     # Test avec source zzdb_synthetic
     test_source = Source(
         source_name="zzdb_synthetic",
         acquisition_type="sqlite",
         url="zzdb/synthetic_data.db"
     )
-    
+
     extractor = create_extractor(test_source)
-    test("Création extractor ZZDB", extractor is not None, 
+    test("Création extractor ZZDB", extractor is not None,
          f"Type: {type(extractor).__name__}")
-    
+
     # Test extraction (avec limite)
     import os
     os.environ['ZZDB_MAX_ARTICLES'] = '5'  # Limiter pour test rapide
     articles = extractor.extract()
-    test("Extraction ZZDB fonctionne", len(articles) >= 0, 
+    test("Extraction ZZDB fonctionne", len(articles) >= 0,
          f"{len(articles)} articles extraits (max 5 pour test)")
-    
+
 except Exception as e:
     test("Test extraction réelle", False, f"Erreur: {str(e)[:60]}")
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Affiche les statistiques record de la base datasens.db"""
 import sqlite3
 import sys
@@ -35,7 +34,7 @@ cursor.execute("""
     GROUP BY s.name
     ORDER BY count DESC
 """)
-print(f"\n📋 PAR SOURCE:")
+print("\n📋 PAR SOURCE:")
 for name, count in cursor.fetchall():
     print(f"   • {name:30s}: {count:6,} articles")
 
@@ -47,7 +46,7 @@ cursor.execute("""
     GROUP BY label
     ORDER BY count DESC
 """)
-print(f"\n😊 SENTIMENTS:")
+print("\n😊 SENTIMENTS:")
 sentiments = cursor.fetchall()
 total_sent = sum(s[1] for s in sentiments)
 for label, count in sentiments:
@@ -63,7 +62,7 @@ cursor.execute("""
     ORDER BY count DESC
     LIMIT 20
 """)
-print(f"\n🏷️  TOPICS (TOP 20):")
+print("\n🏷️  TOPICS (TOP 20):")
 for name, count in cursor.fetchall():
     print(f"   • {name:25s}: {count:6,} articles")
 
@@ -74,7 +73,7 @@ cursor.execute("""
     WHERE EXISTS (
         SELECT 1 FROM document_topic dt WHERE dt.raw_data_id = r.raw_data_id
     ) AND EXISTS (
-        SELECT 1 FROM model_output mo WHERE mo.raw_data_id = r.raw_data_id 
+        SELECT 1 FROM model_output mo WHERE mo.raw_data_id = r.raw_data_id
         AND mo.model_name = 'sentiment_keyword'
     )
 """)
@@ -84,7 +83,7 @@ print(f"\n✨ ARTICLES ENRICHIS: {enriched:,} / {total:,} ({pct_enriched:.1f}%)"
 
 # ZZDB
 cursor.execute("""
-    SELECT COUNT(*) 
+    SELECT COUNT(*)
     FROM raw_data r
     JOIN source s ON r.source_id = s.source_id
     WHERE s.name LIKE '%zzdb%'

@@ -1,21 +1,22 @@
 """Sentiment Analyzer → MODEL_OUTPUT"""
-import sqlite3
 import re
+import sqlite3
 from datetime import datetime
+
 
 class SentimentAnalyzer:
     # Liste de mots-clés positifs (forts et modérés)
-    POS_STRONG = ['excellent', 'fantastique', 'génial', 'parfait', 'merveilleux', 'formidable', 
+    POS_STRONG = ['excellent', 'fantastique', 'génial', 'parfait', 'merveilleux', 'formidable',
                   'extraordinaire', 'remarquable', 'exceptionnel', 'splendide', 'magnifique',
                   'brillant', 'superbe', 'idéal', 'optimal', 'optimal', 'réussi', 'victoire',
                   'succès', 'triomphe', 'gagnant', 'champion', 'meilleur', 'supérieur']
-    
+
     POS_MODERATE = ['bien', 'bon', 'super', 'agréable', 'satisfaisant', 'positif', 'favorable',
                     'prometteur', 'encourageant', 'optimiste', 'constructif', 'utile', 'efficace',
                     'performant', 'solide', 'stable', 'croissance', 'hausse', 'augmentation',
                     'amélioration', 'progrès', 'développement', 'expansion', 'montée', 'gain',
                     'profit', 'bénéfice', 'avantage', 'opportunité', 'espoir', 'confiance']
-    
+
     # Liste de mots-clés négatifs (forts et modérés) - ENRICHIE
     NEG_STRONG = ['horrible', 'terrible', 'catastrophe', 'désastre', 'tragédie', 'crise',
                   'échec', 'défaite', 'perte', 'chute', 'effondrement', 'faillite', 'ruine',
@@ -28,7 +29,7 @@ class SentimentAnalyzer:
                   'grève', 'manifestation', 'protestation', 'émeute', 'trouble', 'instabilité',
                   'récession', 'dépression', 'déflation', 'chômage', 'licenciement', 'fermeture',
                   'pollution', 'contamination', 'dégradation', 'destruction', 'dévastation']
-    
+
     NEG_MODERATE = ['mal', 'mauvais', 'nul', 'déçu', 'problème', 'difficile', 'compliqué',
                     'inquiétant', 'préoccupant', 'décevant', 'faible', 'insuffisant', 'limité',
                     'réduit', 'baisse', 'diminution', 'réduction', 'déclin', 'chute', 'déficit',
@@ -48,21 +49,21 @@ class SentimentAnalyzer:
                     'carence', 'insuffisance', 'manque', 'pénurie', 'rareté', 'disette',
                     'inégalité', 'injustice', 'discrimination', 'exclusion', 'marginalisation',
                     'précarité', 'vulnérabilité', 'fragilité', 'instabilité', 'insécurité']
-    
+
     def __init__(self, db_path: str):
         self.conn = sqlite3.connect(db_path)
         # Compiler les regex pour recherche de mots entiers
-        self.pos_patterns = [re.compile(r'\b' + re.escape(w) + r'\b', re.IGNORECASE) 
+        self.pos_patterns = [re.compile(r'\b' + re.escape(w) + r'\b', re.IGNORECASE)
                             for w in self.POS_STRONG + self.POS_MODERATE]
-        self.neg_patterns = [re.compile(r'\b' + re.escape(w) + r'\b', re.IGNORECASE) 
+        self.neg_patterns = [re.compile(r'\b' + re.escape(w) + r'\b', re.IGNORECASE)
                             for w in self.NEG_STRONG + self.NEG_MODERATE]
-    
+
     def analyze(self, text: str) -> tuple[str, float]:
         if not text or len(text.strip()) < 10:
             return ('neutre', 0.5)
-        
+
         t = text.lower()
-        
+
         # Compter les occurrences avec poids (fort = 2, modéré = 1)
         pos_score = 0
         for i, pattern in enumerate(self.pos_patterns):
@@ -71,7 +72,7 @@ class SentimentAnalyzer:
                 pos_score += matches * 2  # Poids fort
             else:
                 pos_score += matches * 1  # Poids modéré
-        
+
         neg_score = 0
         for i, pattern in enumerate(self.neg_patterns):
             matches = len(pattern.findall(t))
@@ -79,18 +80,18 @@ class SentimentAnalyzer:
                 neg_score += matches * 2  # Poids fort
             else:
                 neg_score += matches * 1  # Poids modéré
-        
+
         # Calculer le score total et la différence
         total_score = pos_score + neg_score
-        
+
         if total_score == 0:
             # Aucun mot-clé trouvé → neutre avec score bas
             return ('neutre', 0.5)
-        
+
         # Calculer le ratio
         pos_ratio = pos_score / total_score
         neg_ratio = neg_score / total_score
-        
+
         # Seuil pour classification - LOGIQUE AMÉLIORÉE
         # Priorité aux scores forts
         if neg_score >= 3 and neg_ratio >= 0.5:
@@ -125,7 +126,7 @@ class SentimentAnalyzer:
                 return ('neutre', 0.55)  # Légèrement positif mais pas assez
             else:
                 return ('neutre', 0.45)  # Légèrement négatif mais pas assez
-    
+
     def save(self, raw_data_id: int, title: str, content: str) -> bool:
         sent, score = self.analyze(f"{title} {content}")
         c = self.conn.cursor()
@@ -134,7 +135,7 @@ class SentimentAnalyzer:
                  (raw_data_id, 'sentiment_keyword', sent, round(score, 3), datetime.now().isoformat()))
         self.conn.commit()
         return True
-    
+
     def close(self):
         self.conn.close()
 

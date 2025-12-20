@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Interroger directement SQLite - Simple et direct"""
-import sqlite3
-from pathlib import Path
 import os
+import sqlite3
 import sys
+from pathlib import Path
 
 # Fix encoding for Windows console
 if sys.platform == 'win32':
@@ -21,29 +20,29 @@ def query(sql):
     if not Path(db_path).exists():
         print(f"[ERREUR] Base de données introuvable: {db_path}")
         return
-    
+
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row  # Pour accéder aux colonnes par nom
     cursor = conn.cursor()
-    
+
     try:
         cursor.execute(sql)
         rows = cursor.fetchall()
-        
+
         if rows:
             # Afficher les noms de colonnes
             columns = [description[0] for description in cursor.description]
             print("\n" + " | ".join(f"{col:20s}" for col in columns))
             print("-" * (len(columns) * 23))
-            
+
             # Afficher les résultats
             for row in rows:
                 print(" | ".join(f"{str(val)[:20]:20s}" for val in row))
-            
+
             print(f"\n{len(rows)} ligne(s)")
         else:
             print("Aucun résultat")
-            
+
     except Exception as e:
         print(f"[ERREUR] {e}")
     finally:

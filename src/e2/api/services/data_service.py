@@ -5,14 +5,16 @@ Service pour lire RAW/SILVER/GOLD via E1DataReader (isolation respectée)
 SRP: Responsabilité unique = accès aux données E1
 """
 
-from typing import Optional, List
+from datetime import date as date_type
+from datetime import datetime
 from pathlib import Path
-from datetime import date, datetime
+
 import pandas as pd
 from dateutil import parser as date_parser
+
 from src.config import get_data_dir
-from src.shared.interfaces import E1DataReader, E1DataReaderImpl
 from src.e2.api.schemas.article import ArticleResponse
+from src.shared.interfaces import E1DataReader, E1DataReaderImpl
 
 
 class DataService:
@@ -21,8 +23,8 @@ class DataService:
     SRP: Responsabilité unique = accès données
     DIP: Dépend de l'interface E1DataReader (abstraction)
     """
-    
-    def __init__(self, data_reader: Optional[E1DataReader] = None):
+
+    def __init__(self, data_reader: E1DataReader | None = None):
         """
         Args:
             data_reader: Instance E1DataReader (injection de dépendance)
@@ -36,32 +38,29 @@ class DataService:
             self.data_reader = E1DataReaderImpl(base_path, db_path)
         else:
             self.data_reader = data_reader
-    
+
     def get_raw_articles(
-        self, 
-        date: Optional[str] = None,
-        limit: Optional[int] = None,
+        self,
+        date: str | None = None,
+        limit: int | None = None,
         offset: int = 0
-    ) -> List[ArticleResponse]:
+    ) -> list[ArticleResponse]:
         """
         Récupère les articles RAW
-        
+
         Args:
             date: Date au format YYYY-MM-DD (optionnel)
             limit: Nombre max d'articles (optionnel)
             offset: Offset pour pagination
-        
+
         Returns:
             Liste d'ArticleResponse
         """
         df = self.data_reader.read_raw_data(date)
-        
+
         # Pagination
-        if limit:
-            df = df.iloc[offset:offset + limit]
-        else:
-            df = df.iloc[offset:]
-        
+        df = df.iloc[offset:offset + limit] if limit else df.iloc[offset:]
+
         # Convertir en ArticleResponse
         articles = []
         for _, row in df.iterrows():
@@ -74,9 +73,9 @@ class DataService:
                         published_at = date_parser.parse(published_at_val)
                     except (ValueError, TypeError):
                         published_at = None
-                elif isinstance(published_at_val, (datetime, date_module)):
+                elif isinstance(published_at_val, datetime | date_type):
                     published_at = published_at_val
-            
+
             collected_at_val = row.get("collected_at")
             collected_at = None
             if pd.notna(collected_at_val):
@@ -85,9 +84,9 @@ class DataService:
                         collected_at = date_parser.parse(collected_at_val)
                     except (ValueError, TypeError):
                         collected_at = None
-                elif isinstance(collected_at_val, (datetime, date_module)):
+                elif isinstance(collected_at_val, datetime | date_type):
                     collected_at = collected_at_val
-            
+
             articles.append(ArticleResponse(
                 raw_data_id=int(row.get("raw_data_id", 0)) if pd.notna(row.get("raw_data_id")) else 0,
                 source_id=int(row.get("source_id", 0)) if pd.notna(row.get("source_id")) else 0,
@@ -101,34 +100,31 @@ class DataService:
                 sentiment=None,  # RAW n'a pas de sentiment
                 topics=None  # RAW n'a pas de topics
             ))
-        
+
         return articles
-    
+
     def get_silver_articles(
         self,
-        date: Optional[str] = None,
-        limit: Optional[int] = None,
+        date: str | None = None,
+        limit: int | None = None,
         offset: int = 0
-    ) -> List[ArticleResponse]:
+    ) -> list[ArticleResponse]:
         """
         Récupère les articles SILVER
-        
+
         Args:
             date: Date au format YYYY-MM-DD (optionnel)
             limit: Nombre max d'articles (optionnel)
             offset: Offset pour pagination
-        
+
         Returns:
             Liste d'ArticleResponse
         """
         df = self.data_reader.read_silver_data(date)
-        
+
         # Pagination
-        if limit:
-            df = df.iloc[offset:offset + limit]
-        else:
-            df = df.iloc[offset:]
-        
+        df = df.iloc[offset:offset + limit] if limit else df.iloc[offset:]
+
         # Convertir en ArticleResponse
         articles = []
         for _, row in df.iterrows():
@@ -141,7 +137,7 @@ class DataService:
                     published_at = None
             elif pd.isna(published_at):
                 published_at = None
-            
+
             collected_at = row.get("collected_at")
             if pd.notna(collected_at) and isinstance(collected_at, str):
                 try:
@@ -150,7 +146,7 @@ class DataService:
                     collected_at = None
             elif pd.isna(collected_at):
                 collected_at = None
-            
+
             articles.append(ArticleResponse(
                 raw_data_id=int(row.get("raw_data_id", 0)) if pd.notna(row.get("raw_data_id")) else 0,
                 source_id=int(row.get("source_id", 0)) if pd.notna(row.get("source_id")) else 0,
@@ -164,34 +160,31 @@ class DataService:
                 sentiment=None,  # SILVER peut avoir sentiment mais pas garanti
                 topics=None  # SILVER peut avoir topics mais pas garanti
             ))
-        
+
         return articles
-    
+
     def get_gold_articles(
         self,
-        date: Optional[str] = None,
-        limit: Optional[int] = None,
+        date: str | None = None,
+        limit: int | None = None,
         offset: int = 0
-    ) -> List[ArticleResponse]:
+    ) -> list[ArticleResponse]:
         """
         Récupère les articles GOLD (enrichis)
-        
+
         Args:
             date: Date au format YYYY-MM-DD (optionnel)
             limit: Nombre max d'articles (optionnel)
             offset: Offset pour pagination
-        
+
         Returns:
             Liste d'ArticleResponse avec sentiment et topics
         """
         df = self.data_reader.read_gold_data(date)
-        
+
         # Pagination
-        if limit:
-            df = df.iloc[offset:offset + limit]
-        else:
-            df = df.iloc[offset:]
-        
+        df = df.iloc[offset:offset + limit] if limit else df.iloc[offset:]
+
         # Convertir en ArticleResponse
         articles = []
         for _, row in df.iterrows():
@@ -204,9 +197,9 @@ class DataService:
                         published_at = date_parser.parse(published_at_val)
                     except (ValueError, TypeError):
                         published_at = None
-                elif isinstance(published_at_val, (datetime, date_module)):
+                elif isinstance(published_at_val, datetime | date_type):
                     published_at = published_at_val
-            
+
             collected_at_val = row.get("collected_at")
             collected_at = None
             if pd.notna(collected_at_val):
@@ -215,9 +208,9 @@ class DataService:
                         collected_at = date_parser.parse(collected_at_val)
                     except (ValueError, TypeError):
                         collected_at = None
-                elif isinstance(collected_at_val, (datetime, date_module)):
+                elif isinstance(collected_at_val, datetime | date_type):
                     collected_at = collected_at_val
-            
+
             # Extraire topics (peut être une liste ou string)
             topics = row.get("topics")
             if pd.notna(topics):
@@ -229,7 +222,7 @@ class DataService:
                     topics = None
             else:
                 topics = None
-            
+
             articles.append(ArticleResponse(
                 raw_data_id=int(row.get("raw_data_id", 0)) if pd.notna(row.get("raw_data_id")) else 0,
                 source_id=int(row.get("source_id", 0)) if pd.notna(row.get("source_id")) else 0,
@@ -243,13 +236,13 @@ class DataService:
                 sentiment=row.get("sentiment") if pd.notna(row.get("sentiment")) else None,
                 topics=topics
             ))
-        
+
         return articles
-    
+
     def get_database_stats(self) -> dict:
         """
         Récupère les statistiques de la base de données
-        
+
         Returns:
             Dict avec statistiques
         """
@@ -257,7 +250,7 @@ class DataService:
 
 
 # Singleton instance
-_data_service: Optional[DataService] = None
+_data_service: DataService | None = None
 
 
 def get_data_service() -> DataService:

@@ -4,14 +4,16 @@ Auth Routes - Authentication Endpoints
 Endpoints pour authentification (login)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
 from datetime import timedelta
+
+from fastapi import APIRouter, HTTPException, status
+
+from src.config import get_settings
+from src.e2.api.middleware.prometheus import record_auth_failure, record_auth_success
 from src.e2.api.schemas.auth import LoginRequest, LoginResponse
 from src.e2.api.schemas.token import TokenData
 from src.e2.api.services.user_service import get_user_service
 from src.e2.auth.security import get_security_service
-from src.config import get_settings
-from src.e2.api.middleware.prometheus import record_auth_success, record_auth_failure
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 settings = get_settings()
@@ -23,15 +25,15 @@ user_service = get_user_service()
 async def login(login_data: LoginRequest):
     """
     Endpoint de login
-    
+
     Authentifie un utilisateur et retourne un token JWT
-    
+
     Args:
         login_data: Email et password
-    
+
     Returns:
         LoginResponse avec token JWT et infos utilisateur
-    
+
     Raises:
         HTTPException 401: Si credentials invalides
     """
@@ -44,10 +46,10 @@ async def login(login_data: LoginRequest):
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     # Enregistrer succès authentification
     record_auth_success()
-    
+
     # Créer le token JWT
     access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
     token_data = TokenData(
@@ -59,10 +61,10 @@ async def login(login_data: LoginRequest):
         data={"sub": str(token_data.profil_id), "email": token_data.email, "role": token_data.role},
         expires_delta=access_token_expires
     )
-    
+
     # Mettre à jour last_login
     user_service.update_last_login(user.profil_id)
-    
+
     return LoginResponse(
         access_token=access_token,
         token_type="bearer",

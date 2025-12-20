@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.config import get_settings, get_data_dir
+from src.config import get_data_dir, get_settings
 
 settings = get_settings()
 db_path = settings.db_path
@@ -43,11 +43,11 @@ try:
             last_login DATETIME,
             username VARCHAR(50) UNIQUE
         );
-        
+
         CREATE INDEX IF NOT EXISTS idx_profils_email ON profils(email);
         CREATE INDEX IF NOT EXISTS idx_profils_role ON profils(role);
         CREATE INDEX IF NOT EXISTS idx_profils_active ON profils(active);
-        
+
         CREATE TABLE IF NOT EXISTS user_action_log (
             action_log_id INTEGER PRIMARY KEY AUTOINCREMENT,
             profil_id INTEGER NOT NULL REFERENCES profils(profil_id) ON DELETE CASCADE,
@@ -58,7 +58,7 @@ try:
             ip_address VARCHAR(45),
             details TEXT
         );
-        
+
         CREATE INDEX IF NOT EXISTS idx_action_log_profil ON user_action_log(profil_id);
         CREATE INDEX IF NOT EXISTS idx_action_log_date ON user_action_log(action_date);
         CREATE INDEX IF NOT EXISTS idx_action_log_type ON user_action_log(action_type);
