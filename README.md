@@ -415,35 +415,59 @@ PROJET_DATASENS/
 
 ---
 
-## 🚀 Next Steps (E2/E3)
+## 🚀 Phases du Projet
 
-This E1 pipeline feeds into:
+### ✅ Phase 0 — Isolation E1 (TERMINÉE)
+- Package `src/e1/` isolé et protégé
+- Interface `E1DataReader` pour lecture seule
+- Tests de non-régression (11 tests)
 
-**Phase 1 — Docker & CI/CD**
-- Containerisation E1
-- Tests automatisés
-- CI/CD workflows
+### ✅ Phase 2 — FastAPI + RBAC (TERMINÉE)
+- API REST sécurisée avec JWT
+- Authentification et autorisation par rôles
+- Audit trail complet
+- 16 tests API (100% passing)
 
-**Phase 2 — FastAPI + RBAC**
-- API REST sécurisée
-- Authentification JWT
-- Contrôle d'accès par zone (RAW/SILVER/GOLD)
+### ✅ Phase 3 — PySpark Integration (TERMINÉE)
+- **SparkSession** singleton (mode local)
+- **GoldParquetReader** : Lecture Parquet GOLD depuis E1
+- **GoldDataProcessor** : Agrégations et analyses Big Data
+- **4 endpoints analytics** intégrés dans E2 API
+- **13 tests PySpark** (100% passing)
+- **87,907 lignes** dans 4 fichiers Parquet GOLD
 
-**Phase 3 — PySpark**
-- Traitement Big Data
-- Intégration avec FastAPI
+**Outils PySpark disponibles** :
+```bash
+# Shell interactif PySpark
+python scripts/pyspark_shell.py
 
-**Phase 4 — ML Fine-tuning**
+# Tests rapides locaux
+python scripts/test_spark_simple.py
+
+# Tests complets
+pytest tests/test_spark_integration.py -v
+```
+
+**Endpoints Analytics** :
+- `GET /api/v1/analytics/sentiment/distribution` : Distribution des sentiments
+- `GET /api/v1/analytics/source/aggregation` : Agrégation par source
+- `GET /api/v1/analytics/statistics` : Statistiques générales
+- `GET /api/v1/analytics/available-dates` : Dates disponibles
+
+### 🔄 Phase 4 — ML Fine-tuning (À VENIR)
 - Fine-tuning FlauBERT (sentiment)
 - Fine-tuning CamemBERT (topics)
+- Model registry (MLflow)
 
-**Phase 5 — Streamlit Dashboard**
+### 🔄 Phase 5 — Streamlit Dashboard (À VENIR)
 - Visualisations interactives
-- Prédictions IA
+- Prédictions IA en temps réel
+- Dashboard analytics
 
-**Phase 6 — Mistral IA**
+### 🔄 Phase 6 — Mistral IA (À VENIR)
 - Insights générés par IA
 - Climat social/financier
+- Analyse prédictive
 
 **Voir** : `docs/PLAN_ACTION_E1_E2_E3.md` pour plan détaillé
 
@@ -461,6 +485,55 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---
 
-**Last Updated:** December 16, 2025  
+---
+
+## 📊 Parquet GOLD vs Base de Données
+
+### Différence entre Parquet et Dashboard E1
+
+Le **dashboard E1** affiche le **total des articles dans la base de données SQLite** (`datasens.db`), qui contient **tous les articles collectés depuis le début** (43,022 articles au 20/12/2025).
+
+Les **fichiers Parquet GOLD** sont **exportés par date** lors de chaque exécution du pipeline E1. Chaque fichier Parquet contient uniquement les articles **exportés pour cette date spécifique**.
+
+**Fichiers Parquet disponibles** :
+- `data/gold/date=2025-12-16/articles.parquet` : 216 lignes
+- `data/gold/date=2025-12-18/articles.parquet` : 2,094 lignes
+- `data/gold/date=2025-12-19/articles.parquet` : 42,466 lignes
+- `data/gold/date=2025-12-20/articles.parquet` : 43,131 lignes
+
+**Total Parquet** : 87,907 lignes (certains articles peuvent être dans plusieurs fichiers si exportés plusieurs fois)
+
+### Manipuler les Parquet avec PySpark
+
+Utilisez le script interactif pour manipuler vos fichiers Parquet :
+
+```bash
+# Windows
+scripts\manage_parquet.bat
+
+# Linux/Mac
+bash scripts/manage_parquet.sh
+```
+
+**Fonctionnalités disponibles** :
+- ✅ Lire et afficher les données Parquet
+- ✅ Filtrer les données (conditions SQL)
+- ✅ Modifier les valeurs
+- ✅ Ajouter des colonnes
+- ✅ Supprimer des lignes
+- ✅ Sauvegarder en nouveaux fichiers Parquet
+- ✅ Appliquer des traitements (agrégations, statistiques)
+
+**Exemple d'utilisation** :
+1. Lancer le script : `python scripts/manage_parquet.py`
+2. Choisir option `2` : Lire Parquet (toutes dates)
+3. Choisir option `5` : Filtrer DataFrame (ex: `sentiment = 'positif'`)
+4. Choisir option `9` : Sauvegarder en nouveau fichier Parquet
+
+---
+
+**Last Updated:** December 20, 2025  
 **Status:** ✅ Production Ready  
-**E1 Complete:** ✅ All components delivered
+**E1 Complete:** ✅ All components delivered  
+**E2 Complete:** ✅ FastAPI + RBAC (100%)  
+**E3 Complete:** ✅ PySpark Integration (100%)
