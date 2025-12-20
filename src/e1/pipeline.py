@@ -12,11 +12,9 @@ from .aggregator import DataAggregator
 from .exporter import GoldExporter
 
 # Imports depuis src/ (utilitaires - peuvent rester en src/ pour l'instant)
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from dashboard import DataSensDashboard
-from collection_report import CollectionReport
-from metrics import (
+from src.dashboard import DataSensDashboard
+from src.collection_report import CollectionReport
+from src.metrics import (
     MetricsCollector, start_metrics_server, update_database_stats,
     pipeline_runs_total, articles_extracted_total, articles_loaded_total,
     articles_tagged_total, articles_analyzed_total, articles_deduplicated_total,
