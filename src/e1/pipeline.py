@@ -5,23 +5,41 @@ import time
 from datetime import date, datetime
 from pathlib import Path
 
-from src.collection_report import CollectionReport
-
 # Imports depuis src/ (utilitaires - peuvent rester en src/ pour l'instant)
-from src.dashboard import DataSensDashboard
-from src.metrics import (
-    MetricsCollector,
-    articles_analyzed_total,
-    articles_deduplicated_total,
-    articles_extracted_total,
-    articles_loaded_total,
-    articles_tagged_total,
-    extraction_duration_seconds,
-    pipeline_runs_total,
-    source_errors_total,
-    start_metrics_server,
-    update_database_stats,
-)
+# Note: Quand src/ est dans PYTHONPATH, utiliser imports sans préfixe src.
+try:
+    from collection_report import CollectionReport
+    from dashboard import DataSensDashboard
+    from metrics import (
+        MetricsCollector,
+        articles_analyzed_total,
+        articles_deduplicated_total,
+        articles_extracted_total,
+        articles_loaded_total,
+        articles_tagged_total,
+        extraction_duration_seconds,
+        pipeline_runs_total,
+        source_errors_total,
+        start_metrics_server,
+        update_database_stats,
+    )
+except ImportError:
+    # Fallback pour imports locaux (si src/ n'est pas dans PYTHONPATH)
+    from src.collection_report import CollectionReport
+    from src.dashboard import DataSensDashboard
+    from src.metrics import (
+        MetricsCollector,
+        articles_analyzed_total,
+        articles_deduplicated_total,
+        articles_extracted_total,
+        articles_loaded_total,
+        articles_tagged_total,
+        extraction_duration_seconds,
+        pipeline_runs_total,
+        source_errors_total,
+        start_metrics_server,
+        update_database_stats,
+    )
 
 from .aggregator import DataAggregator
 from .analyzer import SentimentAnalyzer
