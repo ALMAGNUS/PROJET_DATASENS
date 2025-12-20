@@ -114,6 +114,61 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ---
 
+## [1.4.0] — 2025-12-20
+
+### ✨ Nouvelles Fonctionnalités
+
+#### Fusion Incrémentale Parquet GOLD → GoldAI
+- ✅ **Script de fusion incrémentale** : `scripts/merge_parquet_goldai.py`
+  - Fusion intelligente des Parquet GOLD quotidiens en GoldAI pour l'IA/Mistral
+  - Fusion incrémentale : ajoute uniquement les nouvelles dates
+  - Déduplication par `id` (keep='last' basé sur `collected_at`)
+  - Partitionnement par date : `data/goldai/date=YYYY-MM-DD/goldai.parquet`
+  - Fusion complète : `data/goldai/merged_all_dates.parquet` (pour Mistral)
+  - Versioning automatique : backup des versions précédentes
+  - Metadata JSON : suivi des dates incluses, nombre de lignes, version
+- ✅ **Architecture OOP/SOLID/DRY** : Séparation des responsabilités
+  - `GoldAIMetadataManager` : Gestion métadonnées (SRP)
+  - `GoldAIDeduplicator` : Déduplication (SRP)
+  - `GoldAIDataLoader` : Chargement données (SRP)
+  - `GoldAIDataMerger` : Union DataFrames (SRP)
+  - `GoldAISaver` : Sauvegarde (SRP)
+  - `GoldAIMerger` : Orchestrateur (composition)
+- ✅ **Scripts de lancement** : `merge_parquet_goldai.bat` et `.sh` pour Windows/Linux
+
+#### Configuration
+- ✅ **Nouveau paramètre** : `goldai_base_path` dans `src/config.py` (défaut: `data/goldai`)
+- ✅ **Helper function** : `get_goldai_dir()` pour accès au répertoire GoldAI
+
+### 🔧 Corrections Techniques
+
+#### Ruff Linting
+- ✅ **Corrections automatiques** : 58 erreurs corrigées dans `scripts/manage_parquet.py`
+  - Imports triés et formatés
+  - Whitespace supprimé des lignes vides
+  - Type hints modernisés (`Optional[X]` → `X | None`)
+  - f-strings corrigés
+  - Code conforme aux standards ruff
+
+### 📊 Statistiques
+
+- **Fichiers créés** : 3 fichiers (script Python + 2 scripts batch/shell)
+- **Lignes ajoutées** : ~240 lignes de code (architecture OOP/SOLID/DRY)
+- **Corrections ruff** : 58 erreurs corrigées
+
+### 🔄 Changements Techniques
+
+#### Nouveaux Fichiers
+- `scripts/merge_parquet_goldai.py` : Script de fusion incrémentale GoldAI
+- `scripts/merge_parquet_goldai.bat` : Lanceur Windows
+- `scripts/merge_parquet_goldai.sh` : Lanceur Linux/Mac
+
+#### Fichiers Modifiés
+- `src/config.py` : Ajout `goldai_base_path` et `get_goldai_dir()`
+- `scripts/manage_parquet.py` : Corrections ruff (58 erreurs)
+
+---
+
 ## [1.3.0] — 2025-12-20
 
 ### 🚀 Phase 3: PySpark Integration Complète

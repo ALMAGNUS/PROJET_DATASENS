@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     spark_executor_memory: str = Field(default="2g", description="Spark executor memory")
     parquet_base_path: str = Field(default="data/gold", description="Base path for Parquet files")
     parquet_partition_column: str = Field(default="date", description="Partition column name")
+    goldai_base_path: str = Field(default="data/goldai", description="Base path for GoldAI merged Parquet files")
 
     # ============================================================
     # E3: FastAPI Configuration
@@ -142,6 +143,11 @@ def get_silver_dir() -> Path:
 def get_gold_dir() -> Path:
     """Get gold data directory path"""
     return get_data_dir() / "gold"
+
+
+def get_goldai_dir() -> Path:
+    """Get goldai data directory path"""
+    return get_data_dir() / "goldai"
 
 
 def get_exports_dir() -> Path:
