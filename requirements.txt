@@ -43,10 +43,10 @@ delta-spark==3.0.0  # Delta Lake support (optional, for advanced use cases)
 # ============================================================
 fastapi==0.111.0
 uvicorn[standard]==0.30.1  # ASGI server with standard extras
-python-jose[cryptography]==3.3.0  # JWT tokens
+python-jose[cryptography]==3.5.0  # JWT tokens
 passlib[bcrypt]==1.7.4  # Password hashing
 python-multipart>=0.0.7  # Form data parsing (required by fastapi 0.111.0)
-email-validator==2.1.1  # Email validation
+email-validator==2.3.0  # Email validation
 
 # ============================================================
 # E3: Streamlit Dashboard
