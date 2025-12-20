@@ -296,10 +296,79 @@ def interactive_menu():
             if current_df is None:
                 print("ERREUR: Aucun DataFrame charge")
                 continue
-            column = input("Nom colonne: ").strip()
-            old_value = input("Ancienne valeur: ").strip()
-            new_value = input("Nouvelle valeur: ").strip()
-            current_df = modify_dataframe(current_df, column, old_value, new_value)
+            
+            print("\n" + "=" * 70)
+            print("MODIFIER VALEUR DANS DATAFRAME")
+            print("=" * 70)
+            
+            # Afficher les colonnes disponibles
+            print("\nColonnes disponibles:")
+            for i, col_name in enumerate(current_df.columns, 1):
+                print(f"  {i}. {col_name}")
+            
+            # Demander la colonne
+            print("\nQuelle colonne voulez-vous modifier?")
+            column_input = input("  Numero ou nom de colonne: ").strip()
+            
+            # Si c'est un numéro, convertir en nom de colonne
+            try:
+                col_index = int(column_input) - 1
+                if 0 <= col_index < len(current_df.columns):
+                    column = current_df.columns[col_index]
+                    print(f"  Colonne selectionnee: {column}")
+                else:
+                    print(f"ERREUR: Numero invalide (1-{len(current_df.columns)})")
+                    continue
+            except ValueError:
+                # C'est un nom de colonne
+                column = column_input
+                if column not in current_df.columns:
+                    print(f"ERREUR: Colonne '{column}' introuvable")
+                    continue
+            
+            # Afficher quelques exemples de valeurs pour cette colonne
+            print(f"\nExemples de valeurs dans la colonne '{column}':")
+            try:
+                # Compter les valeurs distinctes
+                distinct_values = current_df.select(column).distinct().limit(10).collect()
+                if distinct_values:
+                    for i, row in enumerate(distinct_values, 1):
+                        value = row[column]
+                        count = current_df.filter(col(column) == value).count()
+                        print(f"  {i}. '{value}' ({count:,} lignes)")
+                else:
+                    print("  (Aucune valeur trouvee)")
+            except Exception as e:
+                print(f"  (Impossible d'afficher les valeurs: {e})")
+            
+            # Demander l'ancienne et nouvelle valeur
+            print(f"\nQuelle valeur voulez-vous remplacer dans '{column}'?")
+            old_value = input("  Ancienne valeur: ").strip()
+            
+            # Vérifier combien de lignes seront modifiées
+            try:
+                count_to_modify = current_df.filter(col(column) == old_value).count()
+                if count_to_modify == 0:
+                    print(f"  ATTENTION: Aucune ligne avec valeur '{old_value}' trouvee")
+                    confirm = input("  Continuer quand meme? (o/n): ").strip().lower()
+                    if confirm != 'o':
+                        continue
+                else:
+                    print(f"  {count_to_modify:,} ligne(s) seront modifiee(s)")
+            except Exception:
+                pass  # Ignorer si erreur
+            
+            new_value = input("  Nouvelle valeur: ").strip()
+            
+            # Confirmation
+            print(f"\nConfirmation:")
+            print(f"  Colonne: {column}")
+            print(f"  Remplacer: '{old_value}' -> '{new_value}'")
+            confirm = input("  Confirmer? (o/n): ").strip().lower()
+            if confirm == 'o':
+                current_df = modify_dataframe(current_df, column, old_value, new_value)
+            else:
+                print("  Modification annulee")
         elif choice == "7":
             if current_df is None:
                 print("ERREUR: Aucun DataFrame charge")
