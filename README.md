@@ -264,7 +264,7 @@ python scripts/enrich_all_articles.py
 
 ## 🏗️ Database Schema
 
-### 7 Core Tables
+### 6 Core Tables (E1)
 
 1. **source** — 10 configured sources
 2. **raw_data** — 216 articles (direct from extractors)
@@ -272,7 +272,8 @@ python scripts/enrich_all_articles.py
 4. **topic** — 8 predefined topics
 5. **document_topic** — 207 article-topic mappings
 6. **model_output** — 648 ML predictions
-7. **sqlite_sequence** — Auto-increment counters
+
+**Note:** `sqlite_sequence` est une table système SQLite (gérée automatiquement) qui stocke les compteurs AUTOINCREMENT. Elle n'est pas une table métier.
 
 ---
 
