@@ -98,17 +98,42 @@ def show_dataframe_info(df: DataFrame):
 def filter_dataframe(df: DataFrame, condition: str) -> DataFrame:
     """Filtre un DataFrame avec une condition SQL"""
     try:
+        # Détecter si c'est juste une valeur (pas d'opérateur SQL)
+        # Si pas de =, <, >, !=, LIKE, IN, etc., essayer de deviner
+        condition_clean = condition.strip()
+        
+        # Si c'est juste une valeur sans opérateur, essayer de deviner la colonne
+        if not any(op in condition_clean for op in ['=', '<', '>', '!=', '<>', 'LIKE', 'IN', 'IS', 'BETWEEN']):
+            # Essayer avec sentiment (le plus commun)
+            if condition_clean.lower() in ['positif', 'negatif', 'neutre', 'positive', 'negative', 'neutral']:
+                condition_clean = f"sentiment = '{condition_clean}'"
+                print(f"INFO: Condition interpretee comme: {condition_clean}")
+            # Essayer avec source
+            elif condition_clean in df.columns:
+                print(f"ERREUR: Colonne '{condition_clean}' detectee mais valeur manquante.")
+                print(f"       Utilisez: {condition_clean} = 'valeur'")
+                return df
+            else:
+                # Essayer avec sentiment par défaut
+                condition_clean = f"sentiment = '{condition_clean}'"
+                print(f"INFO: Condition interpretee comme: {condition_clean}")
+        
         # Créer vue temporaire
         df.createOrReplaceTempView("temp_df")
         
         # Exécuter requête SQL
         spark = get_spark_session()
-        filtered = spark.sql(f"SELECT * FROM temp_df WHERE {condition}")
+        filtered = spark.sql(f"SELECT * FROM temp_df WHERE {condition_clean}")
         
         print(f"OK: {filtered.count():,} lignes apres filtre")
         return filtered
     except Exception as e:
         print(f"ERREUR filtre: {e}")
+        print("\nAIDE: La condition SQL doit etre complete, par exemple:")
+        print("  - sentiment = 'positif'")
+        print("  - source = 'google_news_rss'")
+        print("  - sentiment_score > 0.7")
+        print("  - sentiment IN ('positif', 'negatif')")
         return df
 
 
@@ -141,18 +166,36 @@ def add_column(df: DataFrame, column_name: str, default_value) -> DataFrame:
 def delete_rows(df: DataFrame, condition: str) -> DataFrame:
     """Supprime des lignes selon une condition"""
     try:
+        # Détecter si c'est juste une valeur (pas d'opérateur SQL)
+        condition_clean = condition.strip()
+        
+        # Si c'est juste une valeur sans opérateur, essayer de deviner la colonne
+        if not any(op in condition_clean for op in ['=', '<', '>', '!=', '<>', 'LIKE', 'IN', 'IS', 'BETWEEN']):
+            # Essayer avec sentiment (le plus commun)
+            if condition_clean.lower() in ['positif', 'negatif', 'neutre', 'positive', 'negative', 'neutral']:
+                condition_clean = f"sentiment = '{condition_clean}'"
+                print(f"INFO: Condition interpretee comme: {condition_clean}")
+            else:
+                # Essayer avec sentiment par défaut
+                condition_clean = f"sentiment = '{condition_clean}'"
+                print(f"INFO: Condition interpretee comme: {condition_clean}")
+        
         # Créer vue temporaire
         df.createOrReplaceTempView("temp_df")
         
         # Exécuter requête SQL avec NOT condition
         spark = get_spark_session()
-        filtered = spark.sql(f"SELECT * FROM temp_df WHERE NOT ({condition})")
+        filtered = spark.sql(f"SELECT * FROM temp_df WHERE NOT ({condition_clean})")
         
         deleted_count = df.count() - filtered.count()
         print(f"OK: {deleted_count:,} lignes supprimees")
         return filtered
     except Exception as e:
         print(f"ERREUR suppression: {e}")
+        print("\nAIDE: La condition SQL doit etre complete, par exemple:")
+        print("  - sentiment = 'neutre'")
+        print("  - sentiment_score < 0.3")
+        print("  - source = 'zzdb_csv'")
         return df
 
 
@@ -252,7 +295,12 @@ def interactive_menu():
             if current_df is None:
                 print("ERREUR: Aucun DataFrame charge")
                 continue
-            condition = input("Condition SQL pour supprimer (ex: sentiment = 'neutre'): ").strip()
+            print("\nExemples de conditions SQL:")
+            print("  - sentiment = 'neutre'")
+            print("  - sentiment_score < 0.3")
+            print("  - source = 'zzdb_csv'")
+            print("\nAstuce: Vous pouvez aussi entrer juste 'neutre' (sera interprete comme sentiment = 'neutre')")
+            condition = input("\nCondition SQL pour supprimer: ").strip()
             current_df = delete_rows(current_df, condition)
         elif choice == "9":
             if current_df is None:
