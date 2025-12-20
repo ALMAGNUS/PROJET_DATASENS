@@ -1,6 +1,7 @@
 """Topic Tagger - max 2 topics → DOCUMENT_TOPIC"""
 import sqlite3
 
+
 class TopicTagger:
     def __init__(self, db_path: str):
         self.conn = sqlite3.connect(db_path)
@@ -66,7 +67,7 @@ class TopicTagger:
                             'ONU', 'UE', 'Europe', 'Union européenne', 'OTAN', 'migration', 'réfugié'],
         }
         self._ensure_topics()
-    
+
     def _ensure_topics(self):
         c = self.conn.cursor()
         for name in self.keywords:
@@ -75,15 +76,15 @@ class TopicTagger:
                 c.execute("INSERT INTO topic (name, keywords, category, active) VALUES (?, ?, ?, ?)",
                          (name, ','.join(self.keywords[name]), 'general', 1))
         self.conn.commit()
-    
+
     def tag(self, raw_data_id: int, title: str, content: str) -> bool:
         text = f"{title} {content}".lower()
-        scores = {name: min(sum(1 for kw in kws if kw in text) / len(kws), 1.0) 
+        scores = {name: min(sum(1 for kw in kws if kw in text) / len(kws), 1.0)
                  for name, kws in self.keywords.items() if any(kw in text for kw in kws)}
-        
+
         c = self.conn.cursor()
         c.execute("DELETE FROM document_topic WHERE raw_data_id = ?", (raw_data_id,))
-        
+
         # Si aucun topic trouvé, assigner "autre" pour topic_1 et topic_2
         if not scores:
             c.execute("SELECT topic_id FROM topic WHERE name = ?", ('autre',))
@@ -104,10 +105,10 @@ class TopicTagger:
                 self.conn.commit()
                 return True
             return False
-        
+
         # Assigner TOUJOURS 2 topics (meilleure confiance + second meilleur ou "autre")
         sorted_topics = sorted(scores.items(), key=lambda x: -x[1])
-        
+
         # Topic 1 : Meilleur score (ou "autre" si aucun)
         if sorted_topics:
             topic1_name, topic1_conf = sorted_topics[0]
@@ -129,7 +130,7 @@ class TopicTagger:
             if tid1:
                 c.execute("INSERT INTO document_topic (raw_data_id, topic_id, confidence_score, tagger) VALUES (?, ?, ?, ?)",
                          (raw_data_id, tid1[0], 0.3, 'keyword_default'))
-        
+
         # Topic 2 : Second meilleur score (si existe) ou "autre" avec confiance réduite
         if len(sorted_topics) >= 2:
             topic2_name, topic2_conf = sorted_topics[1]
@@ -152,10 +153,10 @@ class TopicTagger:
                 # Topic_2 avec confiance très faible (0.1) pour indiquer qu'il s'agit d'un fallback
                 c.execute("INSERT INTO document_topic (raw_data_id, topic_id, confidence_score, tagger) VALUES (?, ?, ?, ?)",
                          (raw_data_id, tid2[0], 0.1, 'keyword_fallback'))
-        
+
         self.conn.commit()
         return True
-    
+
     def close(self):
         self.conn.close()
 

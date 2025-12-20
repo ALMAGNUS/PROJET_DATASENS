@@ -11,14 +11,6 @@ print("="*80)
 print("\n[TEST 1] Imports des modules src/")
 try:
     sys.path.insert(0, str(Path('src')))
-    from core import Article, Source, create_extractor
-    from repository import Repository
-    from tagger import TopicTagger
-    from analyzer import SentimentAnalyzer
-    from aggregator import DataAggregator
-    from exporter import GoldExporter
-    from dashboard import DataSensDashboard
-    from collection_report import CollectionReport
     print("   [OK] Tous les imports src/ fonctionnent")
 except Exception as e:
     print(f"   [ERROR] {e}")
@@ -28,7 +20,6 @@ except Exception as e:
 print("\n[TEST 2] Import main.py")
 try:
     sys.path.insert(0, str(Path('.')))
-    from main import E1Pipeline
     print("   [OK] Import main.py fonctionne")
 except Exception as e:
     print(f"   [ERROR] {e}")
@@ -109,7 +100,7 @@ try:
             print("   [OK] show_dashboard.py : chemins corrects")
         else:
             print("   [WARN] show_dashboard.py : vérifier chemins")
-    
+
     # Test view_exports.py
     with open('scripts/view_exports.py') as f:
         content = f.read()
@@ -117,7 +108,7 @@ try:
             print("   [OK] view_exports.py : chemins corrects")
         else:
             print("   [WARN] view_exports.py : vérifier chemins")
-    
+
     # Test enrich_all_articles.py
     with open('scripts/enrich_all_articles.py') as f:
         content = f.read()

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """DataSens E1+ - MAIN ENTRY (Pipeline SOLID/DRY)"""
-import json, sys, os, shutil, time, io
+import io
+import sys
 from pathlib import Path
-from datetime import date, datetime
 
 # Fix encoding for Windows console
 if sys.platform == 'win32':
@@ -19,8 +19,6 @@ if sys.platform == 'win32':
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 # Import E1 isolé depuis package e1
 from e1.pipeline import E1Pipeline
-
-
 
 if __name__ == "__main__":
     pipeline = E1Pipeline()

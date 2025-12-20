@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Visualisation rapide des données enrichies"""
-import pandas as pd
-from pathlib import Path
 import sys
-import os
+from pathlib import Path
+
+import pandas as pd
 
 # Fix encoding for Windows console
 if sys.platform == 'win32':
@@ -15,30 +14,30 @@ if sys.platform == 'win32':
 def view_gold():
     """Affiche un aperçu du fichier GOLD avec topics et sentiment"""
     gold_file = Path(__file__).parent.parent / 'exports' / 'gold.csv'
-    
+
     if not gold_file.exists():
         print(f"[ERROR] {gold_file} n'existe pas")
         print("   Lancez d'abord: python main.py")
         return
-    
+
     df = pd.read_csv(gold_file, encoding='utf-8')
-    
+
     print("\n" + "="*80)
     print("[VISUALISATION] GOLD DATASET - DONNÉES ENRICHIES")
     print("="*80)
     print(f"\n   Fichier: {gold_file}")
     print(f"   Total articles: {len(df):,}")
     print(f"   Colonnes: {len(df.columns)}")
-    
+
     # Statistiques par topic
-    print(f"\n[TOPICS] Distribution des topics:")
+    print("\n[TOPICS] Distribution des topics:")
     topic1_counts = df[df['topic_1'] != '']['topic_1'].value_counts()
     for topic, count in topic1_counts.head(10).items():
         pct = (count / len(df)) * 100
         print(f"   • {topic:25s}: {count:4d} articles ({pct:5.1f}%)")
-    
+
     # Statistiques par sentiment
-    print(f"\n[SENTIMENT] Distribution du sentiment:")
+    print("\n[SENTIMENT] Distribution du sentiment:")
     if 'sentiment' in df.columns:
         sentiment_counts = df['sentiment'].value_counts()
         total_sent = len(df[df['sentiment'].notna()])
@@ -48,27 +47,27 @@ def view_gold():
             # Emoji pour visualisation
             emoji = {'positif': '✅', 'neutre': '⚪', 'négatif': '❌'}.get(sent, '📊')
             print(f"   {emoji} {sent:10s}: {count:4d} articles ({pct:5.1f}%) - Score moyen: {avg_score:.3f}")
-        
+
         # Afficher le total
         print(f"\n   📊 TOTAL: {total_sent:,} articles avec sentiment analysé")
     else:
         print("   ⚠️  Colonne 'sentiment' introuvable dans gold.csv")
-    
+
     # Statistiques par source
-    print(f"\n[SOURCES] Top 10 sources:")
+    print("\n[SOURCES] Top 10 sources:")
     source_counts = df['source'].value_counts()
     for source, count in source_counts.head(10).items():
         pct = (count / len(df)) * 100
         print(f"   • {source:30s}: {count:4d} articles ({pct:5.1f}%)")
-    
+
     # Exemples d'articles enrichis
-    print(f"\n[EXEMPLES] 5 articles enrichis (avec topics + sentiment):")
+    print("\n[EXEMPLES] 5 articles enrichis (avec topics + sentiment):")
     print("   " + "-"*76)
     # Filtrer les articles avec topics non vides
     enriched = df[df['topic_1'].notna() & (df['topic_1'] != '') & (df['sentiment'] != '')].head(5)
     if len(enriched) == 0:
         enriched = df[df['sentiment'] != ''].head(5)  # Fallback: juste avec sentiment
-    
+
     for idx, (_, row) in enumerate(enriched.iterrows(), 1):
         print(f"\n   [{idx}] {row['source']}")
         title = str(row['title'])[:60] if pd.notna(row['title']) else 'N/A'
@@ -81,7 +80,7 @@ def view_gold():
             topics_str += f" + {row['topic_2']} ({score2:.2f})"
         print(f"       Topics: {topics_str}")
         print(f"       Sentiment: {row['sentiment']} (score: {row['sentiment_score']:.2f})")
-    
+
     print("\n" + "="*80)
     print("\nPour voir plus de détails:")
     print("   - Ouvrir exports/gold.csv dans Excel")

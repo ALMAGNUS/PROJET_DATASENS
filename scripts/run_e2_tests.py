@@ -6,13 +6,14 @@ Script pour lancer les tests E2 API
 import subprocess
 import sys
 
+
 def main():
     """Lance les tests E2 API"""
     print("=" * 70)
     print("DataSens E2 API - Tests")
     print("=" * 70)
     print()
-    
+
     try:
         # Lancer pytest
         result = subprocess.run(
@@ -20,10 +21,10 @@ def main():
             capture_output=False,
             text=True
         )
-        
+
         # Retourner le code de sortie
         sys.exit(result.returncode)
-        
+
     except Exception as e:
         print(f"ERREUR: {e}")
         sys.exit(1)

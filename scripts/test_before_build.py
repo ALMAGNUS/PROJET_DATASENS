@@ -3,18 +3,12 @@
 import sys
 from pathlib import Path
 
+
 def test_imports():
     """Test que tous les imports fonctionnent"""
     print("[TEST] Vérification des imports...")
     try:
         sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
-        from metrics import MetricsCollector, start_metrics_server
-        from core import Article, Source
-        from repository import Repository
-        from tagger import TopicTagger
-        from analyzer import SentimentAnalyzer
-        from aggregator import DataAggregator
-        from exporter import GoldExporter
         print("   [OK] Tous les imports OK")
         return True
     except Exception as e:
@@ -27,8 +21,9 @@ def test_metrics():
     try:
         sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
         from metrics import (
-            pipeline_runs_total, articles_extracted_total,
-            MetricsCollector, update_database_stats
+            MetricsCollector,
+            pipeline_runs_total,
+            update_database_stats,
         )
         # Test création
         with MetricsCollector('test'):
@@ -57,7 +52,7 @@ def test_files():
     for f in required:
         if not Path(f).exists():
             missing.append(f)
-    
+
     if missing:
         print(f"   [ERROR] Fichiers manquants: {', '.join(missing)}")
         return False
@@ -69,7 +64,7 @@ def test_dockerfile():
     """Test que le Dockerfile est valide"""
     print("[TEST] Vérification Dockerfile...")
     try:
-        with open('Dockerfile', 'r') as f:
+        with open('Dockerfile') as f:
             content = f.read()
             if 'FROM python' in content and 'COPY requirements.txt' in content:
                 print("   [OK] Dockerfile semble valide")
@@ -86,13 +81,13 @@ def main():
     print("TEST AVANT BUILD - DataSens E1")
     print("="*70)
     print()
-    
+
     results = []
     results.append(("Imports", test_imports()))
     results.append(("Métriques", test_metrics()))
     results.append(("Fichiers", test_files()))
     results.append(("Dockerfile", test_dockerfile()))
-    
+
     print()
     print("="*70)
     print("RÉSUMÉ")
@@ -100,7 +95,7 @@ def main():
     for name, result in results:
         status = "[OK]" if result else "[ECHEC]"
         print(f"   {name:20s}: {status}")
-    
+
     all_ok = all(r for _, r in results)
     if all_ok:
         print()

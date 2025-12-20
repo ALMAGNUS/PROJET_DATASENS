@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Test complet de ZZDB - Base synthétique"""
-import sys
-import sqlite3
-from pathlib import Path
 import os
+import sqlite3
+import sys
+from pathlib import Path
 
 if sys.platform == 'win32':
     import io
@@ -47,7 +46,7 @@ print(f"   Thèmes: {themes}")
 # 3. Test extraction
 print("\n[3/6] Test extraction SQLiteExtractor...")
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
-from core import create_extractor, Source
+from core import Source, create_extractor
 
 s = Source(source_name='zzdb_synthetic', acquisition_type='sqlite', url='zzdb/synthetic_data.db')
 e = create_extractor(s)
@@ -67,7 +66,7 @@ try:
     p = E1Pipeline()
     pipeline_articles = p.extract()
     zzdb_articles = [a for a, s in pipeline_articles if s == 'zzdb_synthetic']
-    
+
     print(f"   ✅ {len(zzdb_articles)} articles ZZDB dans le pipeline")
     print(f"   Total extraits: {len(pipeline_articles)} articles")
     p.db.conn.close()
@@ -82,8 +81,8 @@ if Path(main_db).exists():
     main_conn = sqlite3.connect(main_db)
     main_c = main_conn.cursor()
     main_c.execute("""
-        SELECT COUNT(*) FROM raw_data r 
-        JOIN source s ON r.source_id = s.source_id 
+        SELECT COUNT(*) FROM raw_data r
+        JOIN source s ON r.source_id = s.source_id
         WHERE s.name = 'zzdb_synthetic'
     """)
     zzdb_in_main = main_c.fetchone()[0]
@@ -100,22 +99,22 @@ try:
     if main_db_path:
         agg = DataAggregator(main_db_path)
         df = agg.aggregate()
-        
+
         zzdb_count = len(df[df['source'] == 'zzdb_synthetic']) if 'source' in df.columns else 0
         academic_count = len(df[df['source_type'] == 'academic']) if 'source_type' in df.columns else 0
-        
+
         print(f"   ✅ GOLD export - Articles ZZDB: {zzdb_count}")
         print(f"   ✅ GOLD export - Articles académiques: {academic_count}")
         print(f"   Total GOLD: {len(df)}")
-        
+
         if 'source_type' in df.columns:
-            print(f"   Colonne source_type présente: ✅")
+            print("   Colonne source_type présente: ✅")
         else:
-            print(f"   Colonne source_type manquante: ⚠️")
-        
+            print("   Colonne source_type manquante: ⚠️")
+
         agg.close()
     else:
-        print(f"   ⚠️  Base principale non disponible pour test exports")
+        print("   ⚠️  Base principale non disponible pour test exports")
 except Exception as e:
     print(f"   ⚠️  Erreur exports: {str(e)[:60]}")
 

@@ -11,7 +11,7 @@ from pathlib import Path
 # Ajouter le répertoire racine au path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.config import get_settings, get_data_dir
+from src.config import get_data_dir, get_settings
 from src.e2.auth.security import get_security_service
 
 settings = get_settings()
@@ -34,12 +34,12 @@ try:
     if not cursor.fetchone():
         print("ERREUR: Table PROFILS n'existe pas. Executez d'abord le pipeline E1 pour creer la table.")
         sys.exit(1)
-    
+
     # Créer utilisateur admin de test
     email = "admin@datasens.test"
     password = "admin123"  # Mot de passe simple pour test
     password_hash = security_service.hash_password(password)
-    
+
     # Vérifier si l'utilisateur existe déjà
     cursor.execute("SELECT profil_id FROM profils WHERE email = ?", (email,))
     if cursor.fetchone():
@@ -55,14 +55,14 @@ try:
             INSERT INTO profils (email, password_hash, firstname, lastname, role, active, username)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (email, password_hash, "Admin", "Test", "admin", 1, "admin"))
-    
+
     conn.commit()
-    
+
     # Créer aussi un utilisateur reader
     email_reader = "reader@datasens.test"
     password_reader = "reader123"
     password_hash_reader = security_service.hash_password(password_reader)
-    
+
     cursor.execute("SELECT profil_id FROM profils WHERE email = ?", (email_reader,))
     if cursor.fetchone():
         print(f"ATTENTION: Utilisateur {email_reader} existe deja. Mise a jour...")
@@ -77,14 +77,14 @@ try:
             INSERT INTO profils (email, password_hash, firstname, lastname, role, active, username)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (email_reader, password_hash_reader, "Reader", "Test", "reader", 1, "reader"))
-    
+
     conn.commit()
-    
+
     print("\nOK: Utilisateurs de test crees:")
     print(f"   Admin: {email} / {password} (role: admin)")
     print(f"   Reader: {email_reader} / {password_reader} (role: reader)")
     print("\nVous pouvez maintenant tester l'API avec ces credentials")
-    
+
 except Exception as e:
     print(f"ERREUR: {e}")
     conn.rollback()

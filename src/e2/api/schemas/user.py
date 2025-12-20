@@ -5,8 +5,8 @@ Modèles de validation pour utilisateurs (PROFILS table)
 """
 
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserBase(BaseModel):
@@ -14,7 +14,7 @@ class UserBase(BaseModel):
     email: EmailStr
     firstname: str = Field(..., min_length=1, max_length=100)
     lastname: str = Field(..., min_length=1, max_length=100)
-    username: Optional[str] = Field(None, max_length=50)
+    username: str | None = Field(None, max_length=50)
     role: str = Field(..., pattern="^(reader|writer|deleter|admin)$")
 
 
@@ -25,12 +25,12 @@ class UserCreate(UserBase):
 
 class UserUpdate(BaseModel):
     """Schema pour mise à jour utilisateur (tous champs optionnels)"""
-    email: Optional[EmailStr] = None
-    firstname: Optional[str] = Field(None, min_length=1, max_length=100)
-    lastname: Optional[str] = Field(None, min_length=1, max_length=100)
-    username: Optional[str] = Field(None, max_length=50)
-    role: Optional[str] = Field(None, pattern="^(reader|writer|deleter|admin)$")
-    active: Optional[bool] = None
+    email: EmailStr | None = None
+    firstname: str | None = Field(None, min_length=1, max_length=100)
+    lastname: str | None = Field(None, min_length=1, max_length=100)
+    username: str | None = Field(None, max_length=50)
+    role: str | None = Field(None, pattern="^(reader|writer|deleter|admin)$")
+    active: bool | None = None
 
 
 class UserResponse(UserBase):
@@ -39,8 +39,8 @@ class UserResponse(UserBase):
     active: bool
     created_at: datetime
     updated_at: datetime
-    last_login: Optional[datetime] = None
-    
+    last_login: datetime | None = None
+
     model_config = ConfigDict(from_attributes=True)
 
 

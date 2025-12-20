@@ -16,6 +16,6 @@ DATA_ROOT = Path.home() / 'datasens_project'
 # Ensure data directories exist
 DATA_ROOT.mkdir(parents=True, exist_ok=True)
 
-print(f"[OK] DataSens E1 initialized")
+print("[OK] DataSens E1 initialized")
 print(f"   Project: {PROJECT_ROOT}")
 print(f"   Data: {DATA_ROOT}")
