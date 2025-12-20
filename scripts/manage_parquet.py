@@ -90,9 +90,33 @@ def show_dataframe_info(df: DataFrame):
     print("\nSchema:")
     df.printSchema()
     
-    # Afficher quelques lignes
-    print("\nPremieres lignes (5):")
-    df.show(5, truncate=False)
+    # Afficher quelques lignes avec troncature pour lisibilité
+    print("\nPremieres lignes (5) - Colonnes tronquees pour lisibilite:")
+    print("(Utilisez option 5 pour filtrer et voir des colonnes specifiques)")
+    
+    # Sélectionner seulement quelques colonnes importantes pour l'affichage
+    important_cols = []
+    for col_name in ['id', 'source', 'title', 'sentiment', 'sentiment_score', 'topic_1', 'topic_2']:
+        if col_name in df.columns:
+            important_cols.append(col_name)
+    
+    # Si on a des colonnes importantes, les afficher
+    if important_cols:
+        try:
+            df.select(important_cols).show(5, truncate=50)
+        except Exception:
+            # Fallback: afficher toutes les colonnes mais avec troncature
+            df.show(5, truncate=50)
+    else:
+        # Fallback: afficher toutes les colonnes mais avec troncature
+        df.show(5, truncate=50)
+    
+    # Proposer d'afficher toutes les colonnes si demandé
+    print("\nPour voir toutes les colonnes (avec troncature):")
+    print("  Tapez 'all' pour afficher toutes les colonnes")
+    choice = input("  Votre choix (Enter pour continuer): ").strip().lower()
+    if choice == 'all':
+        df.show(5, truncate=50)
 
 
 def filter_dataframe(df: DataFrame, condition: str) -> DataFrame:
