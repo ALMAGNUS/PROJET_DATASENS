@@ -237,3 +237,132 @@ class TestPagination:
         data = response.json()
         assert data["page"] == 2
         assert data["page_size"] == 10
+
+
+class TestAuditTrail:
+    """Tests pour l'audit trail (user_action_log)"""
+    
+    def test_audit_trail_logs_read_action(self, client, auth_token, test_user):
+        """Test que les actions READ sont loggées dans user_action_log"""
+        db_path = settings.db_path
+        if not db_path.startswith("/") and not db_path.startswith("C:"):
+            db_path = str(get_data_dir().parent / db_path)
+        
+        # Compter les logs avant
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM user_action_log WHERE profil_id = ?", (test_user["profil_id"],))
+        count_before = cursor.fetchone()[0]
+        conn.close()
+        
+        # Faire une requête qui devrait être loggée
+        response = client.get(
+            "/api/v1/raw/articles?page_size=1",
+            headers={"Authorization": f"Bearer {auth_token}"}
+        )
+        assert response.status_code == 200
+        
+        # Vérifier qu'un log a été ajouté
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM user_action_log WHERE profil_id = ?", (test_user["profil_id"],))
+        count_after = cursor.fetchone()[0]
+        
+        # Vérifier le dernier log
+        cursor.execute("""
+            SELECT action_type, resource_type, ip_address, details
+            FROM user_action_log
+            WHERE profil_id = ?
+            ORDER BY action_date DESC
+            LIMIT 1
+        """, (test_user["profil_id"],))
+        log = cursor.fetchone()
+        conn.close()
+        
+        assert count_after > count_before, "Un log d'audit devrait avoir été créé"
+        assert log is not None, "Le log devrait exister"
+        assert log[0] == "read", f"Action type devrait être 'read', got '{log[0]}'"
+        assert log[1] == "raw_data", f"Resource type devrait être 'raw_data', got '{log[1]}'"
+        assert log[3] is not None, "Details (status_code) devrait être présent"
+    
+    def test_audit_trail_logs_gold_access(self, client, auth_token, test_user):
+        """Test que les accès GOLD sont loggés"""
+        db_path = settings.db_path
+        if not db_path.startswith("/") and not db_path.startswith("C:"):
+            db_path = str(get_data_dir().parent / db_path)
+        
+        # Faire une requête GOLD
+        response = client.get(
+            "/api/v1/gold/articles?page_size=1",
+            headers={"Authorization": f"Bearer {auth_token}"}
+        )
+        assert response.status_code == 200
+        
+        # Vérifier le log
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT action_type, resource_type
+            FROM user_action_log
+            WHERE profil_id = ? AND resource_type = 'gold_data'
+            ORDER BY action_date DESC
+            LIMIT 1
+        """, (test_user["profil_id"],))
+        log = cursor.fetchone()
+        conn.close()
+        
+        assert log is not None, "Un log GOLD devrait exister"
+        assert log[0] == "read", "Action type devrait être 'read'"
+        assert log[1] == "gold_data", "Resource type devrait être 'gold_data'"
+    
+    def test_audit_trail_no_log_for_health_check(self, client):
+        """Test que /health n'est pas loggé (exclu de l'audit)"""
+        db_path = settings.db_path
+        if not db_path.startswith("/") and not db_path.startswith("C:"):
+            db_path = str(get_data_dir().parent / db_path)
+        
+        # Compter les logs avant
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM user_action_log")
+        count_before = cursor.fetchone()[0]
+        conn.close()
+        
+        # Faire une requête /health (non authentifiée)
+        response = client.get("/health")
+        assert response.status_code == 200
+        
+        # Vérifier qu'aucun log n'a été ajouté
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM user_action_log")
+        count_after = cursor.fetchone()[0]
+        conn.close()
+        
+        assert count_after == count_before, "/health ne devrait pas être loggé"
+    
+    def test_audit_trail_no_log_for_unauthorized(self, client):
+        """Test que les requêtes non authentifiées ne sont pas loggées"""
+        db_path = settings.db_path
+        if not db_path.startswith("/") and not db_path.startswith("C:"):
+            db_path = str(get_data_dir().parent / db_path)
+        
+        # Compter les logs avant
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM user_action_log")
+        count_before = cursor.fetchone()[0]
+        conn.close()
+        
+        # Faire une requête non authentifiée (devrait retourner 403)
+        response = client.get("/api/v1/raw/articles")
+        assert response.status_code == 403
+        
+        # Vérifier qu'aucun log n'a été ajouté (pas de profil_id)
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM user_action_log")
+        count_after = cursor.fetchone()[0]
+        conn.close()
+        
+        assert count_after == count_before, "Les requêtes non authentifiées ne devraient pas être loggées"
