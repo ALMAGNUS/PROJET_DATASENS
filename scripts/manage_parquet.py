@@ -179,11 +179,51 @@ def modify_dataframe(df: DataFrame, column: str, old_value: str, new_value: str)
 def add_column(df: DataFrame, column_name: str, default_value) -> DataFrame:
     """Ajoute une colonne au DataFrame"""
     try:
+        # Vérifier si la colonne existe déjà
+        if column_name in df.columns:
+            print(f"ATTENTION: La colonne '{column_name}' existe deja")
+            confirm = input("  Remplacer? (o/n): ").strip().lower()
+            if confirm != 'o':
+                print("  Ajout annule")
+                return df
+        
         modified = df.withColumn(column_name, lit(default_value))
         print(f"OK: Colonne '{column_name}' ajoutee avec valeur: {default_value}")
         return modified
     except Exception as e:
         print(f"ERREUR ajout colonne: {e}")
+        return df
+
+
+def drop_column(df: DataFrame, column_name: str) -> DataFrame:
+    """Supprime une colonne du DataFrame"""
+    try:
+        if column_name not in df.columns:
+            print(f"ERREUR: La colonne '{column_name}' n'existe pas")
+            return df
+        
+        # Afficher quelques infos sur la colonne avant suppression
+        try:
+            sample_values = df.select(column_name).limit(5).collect()
+            print(f"\nExemples de valeurs dans '{column_name}':")
+            for i, row in enumerate(sample_values, 1):
+                print(f"  {i}. {row[column_name]}")
+        except Exception:
+            pass
+        
+        # Confirmation
+        confirm = input(f"\nConfirmer suppression de la colonne '{column_name}'? (o/n): ").strip().lower()
+        if confirm != 'o':
+            print("  Suppression annulee")
+            return df
+        
+        # Supprimer la colonne
+        columns_to_keep = [col for col in df.columns if col != column_name]
+        modified = df.select(*columns_to_keep)
+        print(f"OK: Colonne '{column_name}' supprimee")
+        return modified
+    except Exception as e:
+        print(f"ERREUR suppression colonne: {e}")
         return df
 
 
@@ -263,9 +303,10 @@ def interactive_menu():
         print("  5. Filtrer DataFrame (condition SQL)")
         print("  6. Modifier valeur (colonne, ancienne valeur, nouvelle valeur)")
         print("  7. Ajouter colonne")
-        print("  8. Supprimer lignes (condition SQL)")
-        print("  9. Sauvegarder DataFrame en Parquet")
-        print("  10. Appliquer traitement (aggregation, statistiques)")
+        print("  8. Supprimer colonne")
+        print("  9. Supprimer lignes (condition SQL)")
+        print("  10. Sauvegarder DataFrame en Parquet")
+        print("  11. Appliquer traitement (aggregation, statistiques)")
         print("  0. Quitter")
         
         choice = input("\nVotre choix: ").strip()
@@ -373,7 +414,21 @@ def interactive_menu():
             if current_df is None:
                 print("ERREUR: Aucun DataFrame charge")
                 continue
-            column_name = input("Nom nouvelle colonne: ").strip()
+            
+            print("\n" + "=" * 70)
+            print("AJOUTER COLONNE")
+            print("=" * 70)
+            
+            # Afficher colonnes existantes
+            print("\nColonnes existantes:")
+            for i, col_name in enumerate(current_df.columns, 1):
+                print(f"  {i}. {col_name}")
+            
+            column_name = input("\nNom nouvelle colonne: ").strip()
+            if not column_name:
+                print("ERREUR: Nom de colonne vide")
+                continue
+            
             default_value = input("Valeur par defaut: ").strip()
             # Essayer de convertir en nombre si possible
             try:
@@ -383,8 +438,43 @@ def interactive_menu():
                     default_value = int(default_value)
             except ValueError:
                 pass  # Garder comme string
+            
             current_df = add_column(current_df, column_name, default_value)
         elif choice == "8":
+            if current_df is None:
+                print("ERREUR: Aucun DataFrame charge")
+                continue
+            
+            print("\n" + "=" * 70)
+            print("SUPPRIMER COLONNE")
+            print("=" * 70)
+            
+            # Afficher colonnes disponibles
+            print("\nColonnes disponibles:")
+            for i, col_name in enumerate(current_df.columns, 1):
+                print(f"  {i}. {col_name}")
+            
+            print("\nQuelle colonne voulez-vous supprimer?")
+            column_input = input("  Numero ou nom de colonne: ").strip()
+            
+            # Si c'est un numéro, convertir en nom de colonne
+            try:
+                col_index = int(column_input) - 1
+                if 0 <= col_index < len(current_df.columns):
+                    column_name = current_df.columns[col_index]
+                    print(f"  Colonne selectionnee: {column_name}")
+                else:
+                    print(f"ERREUR: Numero invalide (1-{len(current_df.columns)})")
+                    continue
+            except ValueError:
+                # C'est un nom de colonne
+                column_name = column_input
+                if column_name not in current_df.columns:
+                    print(f"ERREUR: Colonne '{column_name}' introuvable")
+                    continue
+            
+            current_df = drop_column(current_df, column_name)
+        elif choice == "9":
             if current_df is None:
                 print("ERREUR: Aucun DataFrame charge")
                 continue
@@ -395,7 +485,7 @@ def interactive_menu():
             print("\nAstuce: Vous pouvez aussi entrer juste 'neutre' (sera interprete comme sentiment = 'neutre')")
             condition = input("\nCondition SQL pour supprimer: ").strip()
             current_df = delete_rows(current_df, condition)
-        elif choice == "9":
+        elif choice == "10":
             if current_df is None:
                 print("ERREUR: Aucun DataFrame charge")
                 continue
@@ -410,6 +500,20 @@ def interactive_menu():
                     continue
             save_parquet(current_df, output_path, partition_date)
         elif choice == "10":
+            if current_df is None:
+                print("ERREUR: Aucun DataFrame charge")
+                continue
+            output_path = input("Chemin sortie (ex: data/gold/custom/articles.parquet): ").strip()
+            partition_date_str = input("Date partition (YYYY-MM-DD, optionnel): ").strip()
+            partition_date = None
+            if partition_date_str:
+                try:
+                    partition_date = date.fromisoformat(partition_date_str)
+                except ValueError:
+                    print("ERREUR: Format date invalide")
+                    continue
+            save_parquet(current_df, output_path, partition_date)
+        elif choice == "11":
             if current_df is None:
                 print("ERREUR: Aucun DataFrame charge")
                 continue
