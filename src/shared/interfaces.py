@@ -9,7 +9,7 @@ RÈGLE: E2/E3 ne touchent JAMAIS directement à E1
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from datetime import date
+from datetime import date as date_module
 from typing import Optional
 import pandas as pd
 import sqlite3
@@ -102,7 +102,7 @@ class E1DataReaderImpl(E1DataReader):
     def read_raw_data(self, date: Optional[str] = None) -> pd.DataFrame:
         """Lit RAW depuis data/raw/sources_YYYY-MM-DD/raw_articles.csv"""
         if date is None:
-            date_str = date.today().isoformat()
+            date_str = date_module.today().isoformat()
         else:
             date_str = date
         
@@ -118,7 +118,7 @@ class E1DataReaderImpl(E1DataReader):
     def read_silver_data(self, date: Optional[str] = None) -> pd.DataFrame:
         """Lit SILVER depuis data/silver/v_YYYY-MM-DD/silver_articles.parquet"""
         if date is None:
-            date_str = date.today().isoformat()
+            date_str = date_module.today().isoformat()
         else:
             date_str = date
         
@@ -135,7 +135,7 @@ class E1DataReaderImpl(E1DataReader):
     def read_gold_data(self, date: Optional[str] = None) -> pd.DataFrame:
         """Lit GOLD depuis data/gold/date=YYYY-MM-DD/articles.parquet"""
         if date is None:
-            date_str = date.today().isoformat()
+            date_str = date_module.today().isoformat()
         else:
             date_str = date
         
@@ -151,7 +151,12 @@ class E1DataReaderImpl(E1DataReader):
     
     def get_database_stats(self) -> dict:
         """Lit stats depuis datasens.db (lecture seule)"""
-        conn = sqlite3.connect(self.db_path)
+        # S'assurer que le chemin est absolu
+        db_path = self.db_path
+        if not str(db_path).startswith("/") and not str(db_path).startswith("C:"):
+            db_path = Path(db_path).resolve()
+        
+        conn = sqlite3.connect(str(db_path))
         cursor = conn.cursor()
         
         try:

@@ -51,7 +51,7 @@ async def login(login_data: LoginRequest):
         role=user.role
     )
     access_token = security_service.create_access_token(
-        data={"sub": token_data.profil_id, "email": token_data.email, "role": token_data.role},
+        data={"sub": str(token_data.profil_id), "email": token_data.email, "role": token_data.role},
         expires_delta=access_token_expires
     )
     

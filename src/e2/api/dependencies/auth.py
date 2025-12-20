@@ -43,9 +43,17 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Récupérer profil_id depuis le payload
-    profil_id: Optional[int] = payload.get("sub")
-    if profil_id is None:
+    # Récupérer profil_id depuis le payload (sub est une string dans JWT)
+    sub = payload.get("sub")
+    if sub is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    try:
+        profil_id = int(sub)
+    except (ValueError, TypeError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
