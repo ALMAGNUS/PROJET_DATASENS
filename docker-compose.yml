@@ -1,5 +1,5 @@
 services:
-  # DataSens E1 Pipeline
+  # DataSens E1 Pipeline (Isolated)
   datasens-e1:
     build:
       context: .
@@ -14,15 +14,17 @@ services:
     environment:
       - DB_PATH=/app/data/datasens.db
       - METRICS_PORT=8000
+      - PYTHONPATH=/app
     ports:
       - "8000:8000"  # Prometheus metrics
     networks:
       - datasens-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import sqlite3; conn = sqlite3.connect('/app/data/datasens.db'); conn.close()"]
+      test: ["CMD", "python", "-c", "from src.e1.pipeline import E1Pipeline; import sqlite3; import os; db_path = os.getenv('DB_PATH', '/app/data/datasens.db'); conn = sqlite3.connect(db_path); conn.close(); print('✅ Health check OK')"]
       interval: 30s
       timeout: 10s
+      start_period: 10s
       retries: 3
 
   # Prometheus - Metrics Collection

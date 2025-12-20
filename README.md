@@ -129,39 +129,49 @@ python e1_export_correct.py
 
 ---
 
-## 🔗 Data Sources (13 total)
+## 🔗 Data Sources (14 sources actives)
 
-### Live Extraction Sources (8)
+### Sources Actives (14 sources)
 
-| # | Source | Type | Records | Status |
-|---|--------|------|---------|--------|
-| 1 | rss_french_news | RSS | 23 | ✓ |
-| 2 | datagouv_datasets | API | 50 | ✓ |
-| 3 | reddit_france | API | 0 | ✓ |
-| 4 | trustpilot_reviews | Scraping | 14 | ✓ |
-| 5 | google_news_rss | RSS | 38 | ✓ |
-| 6 | gdelt_events | BigData | 1 | ✓ |
-| 7 | insee_indicators | API | 0 | ✓ |
-| 8 | openweather_api | API | 5 | ✓ |
-| 9 | kaggle_french_opinions | Dataset | 0 | ✓ |
-| 10 | ifop_barometers | Scraping | 0 | ✓ |
+> **Note**: Les statistiques ci-dessous sont une **photo au 2025-12-20**. La collecte évolue quotidiennement pour les sources dynamiques. Les nombres d'articles augmentent à chaque exécution du pipeline.
 
-### Kaggle Datasets (Partitioned Ingestion - 5)
+| # | Source | Type | Records (20/12/2025) | Status |
+|---|--------|------|---------------------|--------|
+| 1 | kaggle_french_opinions | Dataset | 38,327 | ✓ Fondation |
+| 2 | google_news_rss | RSS | 1,456 | ✓ Dynamique |
+| 3 | zzdb_csv | CSV | 930 | ✓ Fondation |
+| 4 | trustpilot_reviews | Scraping | 658 | ✓ Dynamique |
+| 5 | yahoo_finance | RSS | 624 | ✓ Dynamique |
+| 6 | reddit_france | API | 377 | ✓ Dynamique |
+| 7 | rss_french_news | RSS | 259 | ✓ Dynamique |
+| 8 | openweather_api | API | 187 | ✓ Dynamique |
+| 9 | gdelt_events | BigData | 79 | ✓ Fondation |
+| 10 | datagouv_datasets | Dataset | 50 | ✓ Dynamique |
+| 11 | ifop_barometers | Scraping | 18 | ✓ Dynamique |
+| 12 | insee_indicators | API | 5 | ✓ Dynamique |
+| 13 | GDELT_Last15_English | BigData | 2 | ✓ Dynamique |
+| 14 | GDELT_Master_List | BigData | 0 | ✓ Dynamique |
 
-| # | Dataset | Records | Status |
-|---|---------|---------|--------|
-| 1 | Kaggle_StopWords_28Lang | 28 languages | ✓ |
-| 2 | Kaggle_StopWords | Multi-lang | ✓ |
-| 3 | Kaggle_FrenchFinNews | News corpus | ✓ |
-| 4 | Kaggle_SentimentLexicons | 81 languages | ✓ |
-| 5 | Kaggle_InsuranceReviews | Review corpus | ✓ |
+**Total articles en base** (au 20/12/2025): **43,022 articles**
 
-### GDELT Public Data (2)
+**Classification**:
+- **Fondation** (statiques, intégrées une fois) : `kaggle_french_opinions`, `gdelt_events`, `zzdb_csv`
+  - Ces sources sont figées après leur première intégration et ne sont plus collectées
+- **Dynamiques** (collecte quotidienne) : Toutes les autres sources actives
+  - Les sources dynamiques collectent de nouveaux articles à chaque exécution du pipeline
+  - Les nombres d'articles augmentent quotidiennement pour ces sources
 
-| # | Source | Type | Status |
-|---|--------|------|--------|
-| 1 | GDELT_Last15_English | Event feed | ✓ |
-| 2 | GDELT_Master_List | Archive index | ✓ |
+### Sources Inactives (pour référence)
+
+| Source | Type | Status |
+|--------|------|--------|
+| Kaggle_StopWords_28Lang | Dataset | Inactif |
+| Kaggle_StopWords | Dataset | Inactif |
+| Kaggle_FrenchFinNews | Dataset | Inactif |
+| Kaggle_SentimentLexicons | Dataset | Inactif |
+| Kaggle_InsuranceReviews | Dataset | Inactif |
+| Kaggle_FrenchTweets | Dataset | Inactif |
+| zzdb_synthetic | SQLite | Inactif |
 
 ---
 
