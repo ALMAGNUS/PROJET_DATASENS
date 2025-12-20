@@ -10,20 +10,20 @@ Permet de manipuler les fichiers Parquet GOLD :
 """
 
 import sys
-from pathlib import Path
 from datetime import date
-from typing import Optional
+from pathlib import Path
 
 # Ajouter racine projet au path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / 'src'))
 
 try:
-    from spark.session import get_spark_session, close_spark_session
+    from pyspark.sql import DataFrame
+    from pyspark.sql.functions import col, lit, when
+
     from spark.adapters import GoldParquetReader
     from spark.processors import GoldDataProcessor
-    from pyspark.sql import DataFrame
-    from pyspark.sql.functions import col, when, lit
+    from spark.session import close_spark_session, get_spark_session
     print("OK Imports reussis")
 except ImportError as e:
     print(f"ERREUR Import: {e}")
@@ -35,7 +35,7 @@ def show_parquet_info(reader: GoldParquetReader):
     print("\n" + "=" * 70)
     print("INFORMATIONS PARQUET GOLD")
     print("=" * 70)
-    
+
     dates = reader.get_available_dates()
     print(f"\nDates disponibles: {len(dates)}")
     for d in dates:
@@ -48,11 +48,11 @@ def show_parquet_info(reader: GoldParquetReader):
                 print(f"  - {d:%Y-%m-%d}: {num_rows:,} lignes ({size_mb:.2f} MB)")
             except Exception as e:
                 print(f"  - {d:%Y-%m-%d}: ERREUR lecture ({e})")
-    
+
     print()
 
 
-def read_parquet(reader: GoldParquetReader, target_date: Optional[date] = None) -> DataFrame:
+def read_parquet(reader: GoldParquetReader, target_date: date | None = None) -> DataFrame:
     """Lit un fichier Parquet"""
     try:
         if target_date:
@@ -61,7 +61,7 @@ def read_parquet(reader: GoldParquetReader, target_date: Optional[date] = None) 
         else:
             print("Lecture Parquet pour toutes les dates")
             df = reader.read_gold()
-        
+
         print(f"OK: {df.count():,} lignes, {len(df.columns)} colonnes")
         return df
     except FileNotFoundError as e:
@@ -76,30 +76,30 @@ def show_dataframe_info(df: DataFrame):
     """Affiche les informations sur un DataFrame"""
     if df is None:
         return
-    
+
     print("\n" + "=" * 70)
     print("INFORMATIONS DATAFRAME")
     print("=" * 70)
     print(f"Lignes: {df.count():,}")
     print(f"Colonnes: {len(df.columns)}")
-    print(f"\nColonnes disponibles:")
+    print("\nColonnes disponibles:")
     for i, col_name in enumerate(df.columns, 1):
         print(f"  {i}. {col_name}")
-    
+
     # Afficher schéma
     print("\nSchema:")
     df.printSchema()
-    
+
     # Afficher quelques lignes avec troncature pour lisibilité
     print("\nPremieres lignes (5) - Colonnes tronquees pour lisibilite:")
     print("(Utilisez option 5 pour filtrer et voir des colonnes specifiques)")
-    
+
     # Sélectionner seulement quelques colonnes importantes pour l'affichage
     important_cols = []
     for col_name in ['id', 'source', 'title', 'sentiment', 'sentiment_score', 'topic_1', 'topic_2']:
         if col_name in df.columns:
             important_cols.append(col_name)
-    
+
     # Si on a des colonnes importantes, les afficher
     if important_cols:
         try:
@@ -110,7 +110,7 @@ def show_dataframe_info(df: DataFrame):
     else:
         # Fallback: afficher toutes les colonnes mais avec troncature
         df.show(5, truncate=50)
-    
+
     # Proposer d'afficher toutes les colonnes si demandé
     print("\nPour voir toutes les colonnes (avec troncature):")
     print("  Tapez 'all' pour afficher toutes les colonnes")
@@ -125,7 +125,7 @@ def filter_dataframe(df: DataFrame, condition: str) -> DataFrame:
         # Détecter si c'est juste une valeur (pas d'opérateur SQL)
         # Si pas de =, <, >, !=, LIKE, IN, etc., essayer de deviner
         condition_clean = condition.strip()
-        
+
         # Si c'est juste une valeur sans opérateur, essayer de deviner la colonne
         if not any(op in condition_clean for op in ['=', '<', '>', '!=', '<>', 'LIKE', 'IN', 'IS', 'BETWEEN']):
             # Essayer avec sentiment (le plus commun)
@@ -141,14 +141,14 @@ def filter_dataframe(df: DataFrame, condition: str) -> DataFrame:
                 # Essayer avec sentiment par défaut
                 condition_clean = f"sentiment = '{condition_clean}'"
                 print(f"INFO: Condition interpretee comme: {condition_clean}")
-        
+
         # Créer vue temporaire
         df.createOrReplaceTempView("temp_df")
-        
+
         # Exécuter requête SQL
         spark = get_spark_session()
         filtered = spark.sql(f"SELECT * FROM temp_df WHERE {condition_clean}")
-        
+
         print(f"OK: {filtered.count():,} lignes apres filtre")
         return filtered
     except Exception as e:
@@ -186,7 +186,7 @@ def add_column(df: DataFrame, column_name: str, default_value) -> DataFrame:
             if confirm != 'o':
                 print("  Ajout annule")
                 return df
-        
+
         modified = df.withColumn(column_name, lit(default_value))
         print(f"OK: Colonne '{column_name}' ajoutee avec valeur: {default_value}")
         return modified
@@ -201,7 +201,7 @@ def drop_column(df: DataFrame, column_name: str) -> DataFrame:
         if column_name not in df.columns:
             print(f"ERREUR: La colonne '{column_name}' n'existe pas")
             return df
-        
+
         # Afficher quelques infos sur la colonne avant suppression
         try:
             sample_values = df.select(column_name).limit(5).collect()
@@ -210,13 +210,13 @@ def drop_column(df: DataFrame, column_name: str) -> DataFrame:
                 print(f"  {i}. {row[column_name]}")
         except Exception:
             pass
-        
+
         # Confirmation
         confirm = input(f"\nConfirmer suppression de la colonne '{column_name}'? (o/n): ").strip().lower()
         if confirm != 'o':
             print("  Suppression annulee")
             return df
-        
+
         # Supprimer la colonne
         columns_to_keep = [col for col in df.columns if col != column_name]
         modified = df.select(*columns_to_keep)
@@ -232,7 +232,7 @@ def delete_rows(df: DataFrame, condition: str) -> DataFrame:
     try:
         # Détecter si c'est juste une valeur (pas d'opérateur SQL)
         condition_clean = condition.strip()
-        
+
         # Si c'est juste une valeur sans opérateur, essayer de deviner la colonne
         if not any(op in condition_clean for op in ['=', '<', '>', '!=', '<>', 'LIKE', 'IN', 'IS', 'BETWEEN']):
             # Essayer avec sentiment (le plus commun)
@@ -243,14 +243,14 @@ def delete_rows(df: DataFrame, condition: str) -> DataFrame:
                 # Essayer avec sentiment par défaut
                 condition_clean = f"sentiment = '{condition_clean}'"
                 print(f"INFO: Condition interpretee comme: {condition_clean}")
-        
+
         # Créer vue temporaire
         df.createOrReplaceTempView("temp_df")
-        
+
         # Exécuter requête SQL avec NOT condition
         spark = get_spark_session()
         filtered = spark.sql(f"SELECT * FROM temp_df WHERE NOT ({condition_clean})")
-        
+
         deleted_count = df.count() - filtered.count()
         print(f"OK: {deleted_count:,} lignes supprimees")
         return filtered
@@ -263,12 +263,12 @@ def delete_rows(df: DataFrame, condition: str) -> DataFrame:
         return df
 
 
-def save_parquet(df: DataFrame, output_path: str, partition_date: Optional[date] = None):
+def save_parquet(df: DataFrame, output_path: str, partition_date: date | None = None):
     """Sauvegarde un DataFrame en Parquet"""
     try:
         path_obj = Path(output_path)
         path_obj.parent.mkdir(parents=True, exist_ok=True)
-        
+
         if partition_date:
             # Sauvegarder avec partitionnement par date
             partition_path = path_obj.parent / f"date={partition_date:%Y-%m-%d}"
@@ -276,7 +276,7 @@ def save_parquet(df: DataFrame, output_path: str, partition_date: Optional[date]
             final_path = partition_path / path_obj.name
         else:
             final_path = path_obj
-        
+
         df.write.mode("overwrite").parquet(str(final_path))
         print(f"OK: Parquet sauvegarde dans {final_path}")
         print(f"    {df.count():,} lignes, {len(df.columns)} colonnes")
@@ -288,12 +288,12 @@ def interactive_menu():
     """Menu interactif pour manipuler les Parquet"""
     reader = GoldParquetReader()
     processor = GoldDataProcessor()
-    current_df: Optional[DataFrame] = None
-    
+    current_df: DataFrame | None = None
+
     print("\n" + "=" * 70)
     print("GESTION PARQUET GOLD - MENU INTERACTIF")
     print("=" * 70)
-    
+
     while True:
         print("\nOptions disponibles:")
         print("  1. Afficher informations Parquet disponibles")
@@ -308,9 +308,9 @@ def interactive_menu():
         print("  10. Sauvegarder DataFrame en Parquet")
         print("  11. Appliquer traitement (aggregation, statistiques)")
         print("  0. Quitter")
-        
+
         choice = input("\nVotre choix: ").strip()
-        
+
         if choice == "0":
             print("Au revoir!")
             break
@@ -337,20 +337,20 @@ def interactive_menu():
             if current_df is None:
                 print("ERREUR: Aucun DataFrame charge")
                 continue
-            
+
             print("\n" + "=" * 70)
             print("MODIFIER VALEUR DANS DATAFRAME")
             print("=" * 70)
-            
+
             # Afficher les colonnes disponibles
             print("\nColonnes disponibles:")
             for i, col_name in enumerate(current_df.columns, 1):
                 print(f"  {i}. {col_name}")
-            
+
             # Demander la colonne
             print("\nQuelle colonne voulez-vous modifier?")
             column_input = input("  Numero ou nom de colonne: ").strip()
-            
+
             # Si c'est un numéro, convertir en nom de colonne
             try:
                 col_index = int(column_input) - 1
@@ -366,7 +366,7 @@ def interactive_menu():
                 if column not in current_df.columns:
                     print(f"ERREUR: Colonne '{column}' introuvable")
                     continue
-            
+
             # Afficher quelques exemples de valeurs pour cette colonne
             print(f"\nExemples de valeurs dans la colonne '{column}':")
             try:
@@ -381,11 +381,11 @@ def interactive_menu():
                     print("  (Aucune valeur trouvee)")
             except Exception as e:
                 print(f"  (Impossible d'afficher les valeurs: {e})")
-            
+
             # Demander l'ancienne et nouvelle valeur
             print(f"\nQuelle valeur voulez-vous remplacer dans '{column}'?")
             old_value = input("  Ancienne valeur: ").strip()
-            
+
             # Vérifier combien de lignes seront modifiées
             try:
                 count_to_modify = current_df.filter(col(column) == old_value).count()
@@ -398,11 +398,11 @@ def interactive_menu():
                     print(f"  {count_to_modify:,} ligne(s) seront modifiee(s)")
             except Exception:
                 pass  # Ignorer si erreur
-            
+
             new_value = input("  Nouvelle valeur: ").strip()
-            
+
             # Confirmation
-            print(f"\nConfirmation:")
+            print("\nConfirmation:")
             print(f"  Colonne: {column}")
             print(f"  Remplacer: '{old_value}' -> '{new_value}'")
             confirm = input("  Confirmer? (o/n): ").strip().lower()
@@ -414,49 +414,46 @@ def interactive_menu():
             if current_df is None:
                 print("ERREUR: Aucun DataFrame charge")
                 continue
-            
+
             print("\n" + "=" * 70)
             print("AJOUTER COLONNE")
             print("=" * 70)
-            
+
             # Afficher colonnes existantes
             print("\nColonnes existantes:")
             for i, col_name in enumerate(current_df.columns, 1):
                 print(f"  {i}. {col_name}")
-            
+
             column_name = input("\nNom nouvelle colonne: ").strip()
             if not column_name:
                 print("ERREUR: Nom de colonne vide")
                 continue
-            
+
             default_value = input("Valeur par defaut: ").strip()
             # Essayer de convertir en nombre si possible
             try:
-                if '.' in default_value:
-                    default_value = float(default_value)
-                else:
-                    default_value = int(default_value)
+                default_value = float(default_value) if '.' in default_value else int(default_value)
             except ValueError:
                 pass  # Garder comme string
-            
+
             current_df = add_column(current_df, column_name, default_value)
         elif choice == "8":
             if current_df is None:
                 print("ERREUR: Aucun DataFrame charge")
                 continue
-            
+
             print("\n" + "=" * 70)
             print("SUPPRIMER COLONNE")
             print("=" * 70)
-            
+
             # Afficher colonnes disponibles
             print("\nColonnes disponibles:")
             for i, col_name in enumerate(current_df.columns, 1):
                 print(f"  {i}. {col_name}")
-            
+
             print("\nQuelle colonne voulez-vous supprimer?")
             column_input = input("  Numero ou nom de colonne: ").strip()
-            
+
             # Si c'est un numéro, convertir en nom de colonne
             try:
                 col_index = int(column_input) - 1
@@ -472,7 +469,7 @@ def interactive_menu():
                 if column_name not in current_df.columns:
                     print(f"ERREUR: Colonne '{column_name}' introuvable")
                     continue
-            
+
             current_df = drop_column(current_df, column_name)
         elif choice == "9":
             if current_df is None:
@@ -485,21 +482,7 @@ def interactive_menu():
             print("\nAstuce: Vous pouvez aussi entrer juste 'neutre' (sera interprete comme sentiment = 'neutre')")
             condition = input("\nCondition SQL pour supprimer: ").strip()
             current_df = delete_rows(current_df, condition)
-        elif choice == "10":
-            if current_df is None:
-                print("ERREUR: Aucun DataFrame charge")
-                continue
-            output_path = input("Chemin sortie (ex: data/gold/custom/articles.parquet): ").strip()
-            partition_date_str = input("Date partition (YYYY-MM-DD, optionnel): ").strip()
-            partition_date = None
-            if partition_date_str:
-                try:
-                    partition_date = date.fromisoformat(partition_date_str)
-                except ValueError:
-                    print("ERREUR: Format date invalide")
-                    continue
-            save_parquet(current_df, output_path, partition_date)
-        elif choice == "10":
+        elif choice == "10" or choice == "10":
             if current_df is None:
                 print("ERREUR: Aucun DataFrame charge")
                 continue
@@ -548,10 +531,10 @@ if __name__ == "__main__":
         # Initialiser SparkSession
         spark = get_spark_session()
         print(f"SparkSession cree: {spark.sparkContext.master}")
-        
+
         # Lancer menu interactif
         interactive_menu()
-        
+
     except Exception as e:
         print(f"ERREUR: {e}")
         import traceback
