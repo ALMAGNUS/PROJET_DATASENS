@@ -48,6 +48,34 @@ services:
       - datasens-network
     restart: unless-stopped
 
+  # DataSens E2 API (FastAPI)
+  datasens-e2-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: datasens-e2-api
+    volumes:
+      - ./data:/app/data
+      - ./exports:/app/exports
+      - ./sources_config.json:/app/sources_config.json
+    environment:
+      - DB_PATH=/app/data/datasens.db
+      - FASTAPI_HOST=0.0.0.0
+      - FASTAPI_PORT=8001
+      - PYTHONPATH=/app
+    ports:
+      - "8001:8001"  # FastAPI API
+    networks:
+      - datasens-network
+    restart: unless-stopped
+    command: ["python", "run_e2_api.py"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+
   # Grafana - Visualization
   grafana:
     image: grafana/grafana:latest

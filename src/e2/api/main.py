@@ -6,9 +6,11 @@ Application FastAPI principale avec tous les routers
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from src.config import get_settings
 from src.e2.api.routes import auth_router, raw_router, silver_router, gold_router
 from src.e2.api.middleware.audit import AuditMiddleware
+from src.e2.api.middleware.prometheus import PrometheusMiddleware, get_metrics
 
 settings = get_settings()
 
@@ -28,6 +30,9 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         openapi_url="/openapi.json"
     )
+    
+    # Prometheus metrics middleware (première position pour capturer toutes les requêtes)
+    app.add_middleware(PrometheusMiddleware)
     
     # Audit trail middleware (avant CORS pour capturer toutes les requêtes)
     app.add_middleware(AuditMiddleware)
@@ -52,6 +57,12 @@ def create_app() -> FastAPI:
     async def health_check():
         """Health check endpoint"""
         return {"status": "ok", "service": "DataSens E2 API"}
+    
+    # Prometheus metrics endpoint
+    @app.get("/metrics")
+    async def metrics():
+        """Prometheus metrics endpoint"""
+        return Response(content=get_metrics(), media_type="text/plain")
     
     return app
 
