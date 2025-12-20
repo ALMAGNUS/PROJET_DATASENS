@@ -11,6 +11,7 @@ from src.e2.api.schemas.token import TokenData
 from src.e2.api.services.user_service import get_user_service
 from src.e2.auth.security import get_security_service
 from src.config import get_settings
+from src.e2.api.middleware.prometheus import record_auth_success, record_auth_failure
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 settings = get_settings()
@@ -37,11 +38,15 @@ async def login(login_data: LoginRequest):
     # Authentifier l'utilisateur
     user = user_service.authenticate_user(login_data.email, login_data.password)
     if not user:
+        record_auth_failure()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    # Enregistrer succès authentification
+    record_auth_success()
     
     # Créer le token JWT
     access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)

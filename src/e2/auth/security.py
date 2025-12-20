@@ -7,13 +7,10 @@ Service pour JWT tokens et hashage de mots de passe (SRP)
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from src.config import get_settings
 
 settings = get_settings()
-
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class SecurityService:
@@ -38,19 +35,31 @@ class SecurityService:
         Returns:
             True si le mot de passe correspond
         """
-        return pwd_context.verify(plain_password, hashed_password)
+        # Utiliser bcrypt directement pour éviter problème passlib
+        password_bytes = plain_password.encode('utf-8')
+        if len(password_bytes) > 72:
+            password_bytes = password_bytes[:72]
+        return bcrypt.checkpw(password_bytes, hashed_password.encode('utf-8'))
     
     def hash_password(self, password: str) -> str:
         """
         Hash un mot de passe avec bcrypt
         
         Args:
-            password: Mot de passe en clair
+            password: Mot de passe en clair (max 72 bytes pour bcrypt)
         
         Returns:
-            Hash bcrypt
+            Hash bcrypt (string)
         """
-        return pwd_context.hash(password)
+        # Bcrypt limite à 72 bytes, tronquer si nécessaire
+        password_bytes = password.encode('utf-8')
+        if len(password_bytes) > 72:
+            password_bytes = password_bytes[:72]
+        
+        # Utiliser bcrypt directement pour éviter problème passlib
+        salt = bcrypt.gensalt(rounds=12)
+        hashed = bcrypt.hashpw(password_bytes, salt)
+        return hashed.decode('utf-8')
     
     def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None) -> str:
         """
