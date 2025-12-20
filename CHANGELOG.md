@@ -114,6 +114,121 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ---
 
+## [1.2.0] — 2025-12-20
+
+### 🔒 Phase 0: Isolation E1 Complète
+
+#### Architecture Isolée
+- ✅ Package `src/e1/` créé : Pipeline E1 complètement isolé
+- ✅ Packages `src/e2/` et `src/e3/` créés : Prêts pour développement
+- ✅ Package `src/shared/` créé : Interfaces partagées (E1DataReader)
+- ✅ Structure modulaire : E1, E2, E3 séparés et protégés
+
+#### Interface E1DataReader
+- ✅ Interface abstraite `E1DataReader` (ABC) : Contrat immuable pour E2/E3
+- ✅ Implémentation `E1DataReaderImpl` : Lecture seule depuis E1
+- ✅ Méthodes : `read_raw_data()`, `read_silver_data()`, `read_gold_data()`, `get_database_stats()`
+- ✅ Protection E1 : E2/E3 ne peuvent plus modifier E1 directement
+
+#### Refactoring Pipeline E1
+- ✅ `main.py` simplifié : 28 lignes (au lieu de 401)
+- ✅ Classe `E1Pipeline` extraite dans `src/e1/pipeline.py`
+- ✅ Tous les modules E1 déplacés vers `src/e1/` :
+  - `core.py` → `src/e1/core.py`
+  - `repository.py` → `src/e1/repository.py`
+  - `tagger.py` → `src/e1/tagger.py`
+  - `analyzer.py` → `src/e1/analyzer.py`
+  - `aggregator.py` → `src/e1/aggregator.py`
+  - `exporter.py` → `src/e1/exporter.py`
+
+#### Tests de Non-Régression
+- ✅ Suite de tests `tests/test_e1_isolation.py` : 11 tests
+  - 10 tests rapides (imports, schéma, interface, structure)
+  - 1 test complet marqué `@pytest.mark.slow` (exécution pipeline complète)
+- ✅ Configuration `pytest.ini` : Markers personnalisés (slow, integration, unit, e1)
+- ✅ Script `tests/run_e1_isolation_tests.py` : Exécution facilitée
+- ✅ CI/CD mis à jour : Tests automatisés sur push/PR
+
+#### Logique Sources Fondation
+- ✅ Distinction sources fondation figées vs dynamiques
+- ✅ Sources figées après première intégration :
+  - `kaggle_french_opinions` → SKIP après intégration
+  - `gdelt_events` → SKIP après intégration
+  - `zzdb_csv` → SKIP après intégration
+- ✅ Sources GDELT dynamiques (collecte quotidienne) :
+  - `GDELT_Last15_English` → Continue à se collecter
+  - `GDELT_Master_List` → Continue à se collecter
+
+#### Amélioration Messages de Log
+- ✅ Messages clairs et explicites (sans émojis)
+- ✅ Explication détaillée de la déduplication :
+  - Articles traités vs nouveaux vs dédupliqués
+  - Explication du fingerprint SHA256
+- ✅ Résumé après chargement : Statistiques claires
+- ✅ Stats finales : Détails complets avec notes explicatives
+
+#### Documentation Complète
+- ✅ `docs/E1_ISOLATION_COMPLETE.md` : Récapitulatif Phase 0
+- ✅ `docs/QUICK_START_E1_ISOLATED.md` : Guide démarrage rapide
+- ✅ `docs/E1_ISOLATION_STRATEGY.md` : Stratégie d'isolation (déjà existant)
+- ✅ `docs/PLAN_ACTION_E1_E2_E3.md` : Plan d'action détaillé (déjà existant)
+- ✅ `tests/README_E1_ISOLATION.md` : Guide des tests
+- ✅ `README.md` mis à jour : Nouvelle structure documentée
+
+#### CI/CD
+- ✅ Workflow `.github/workflows/test.yml` mis à jour :
+  - Job `test-e1-isolation` : Tests rapides sur push/PR
+  - Job `test-e1-complete` : Tests complets sur push vers `main`
+
+### 📊 Statistiques Phase 0
+
+- **Fichiers créés** : 19 fichiers
+- **Lignes ajoutées** : 2,661 insertions
+- **Lignes supprimées** : 396 suppressions
+- **Tests créés** : 11 tests (10 rapides + 1 complet)
+- **Documentation** : 5 documents créés/mis à jour
+
+### 🔄 Changements Techniques
+
+#### Fichiers Modifiés
+- `main.py` : Simplifié (28 lignes, utilise E1 isolé)
+- `README.md` : Structure isolée documentée
+- `.github/workflows/test.yml` : Tests automatisés E1
+
+#### Nouveaux Fichiers
+- `src/e1/` : 8 fichiers (pipeline isolé)
+- `src/e2/__init__.py` : Package E2
+- `src/e3/__init__.py` : Package E3
+- `src/shared/interfaces.py` : Interface E1DataReader
+- `tests/test_e1_isolation.py` : Suite de tests
+- `tests/README_E1_ISOLATION.md` : Documentation tests
+- `pytest.ini` : Configuration pytest
+
+### 🛡️ Règles d'Isolation
+
+#### ✅ AUTORISÉ
+- Utiliser `E1DataReader` depuis E2/E3
+- Lire depuis `exports/` ou `data/` (lecture seule)
+- Utiliser DB en lecture seule
+- Importer uniquement interfaces publiques (`src/shared/`)
+
+#### ❌ INTERDIT
+- Modifier `src/e1/` depuis E2/E3
+- Importer classes internes E1 depuis E2/E3
+- Écrire dans fichiers E1 depuis E2/E3
+- Modifier schéma DB E1 depuis E2/E3
+
+### ✅ Status: Phase 0 TERMINÉE
+
+**E1 est maintenant complètement isolé et protégé** pour la construction de E2/E3.
+
+**Prochaines étapes** :
+- Phase 1 : Docker & CI/CD
+- Phase 2 : FastAPI + RBAC
+- Phase 3 : PySpark
+
+---
+
 ## [1.1.0] — 2025-12-19
 
 ### 🔧 Corrections & Améliorations
