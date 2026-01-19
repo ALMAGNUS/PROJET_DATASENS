@@ -31,6 +31,7 @@ faker==24.0.0  # ZZDB LAB IA - Génération données synthétiques (isolé dans 
 # ============================================================
 sqlalchemy==2.0.30
 sqlmodel==0.0.21
+pymongo
 
 # ============================================================
 # E2: PySpark Big Data Processing

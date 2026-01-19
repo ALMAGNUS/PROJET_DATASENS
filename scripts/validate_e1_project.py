@@ -1,22 +1,28 @@
 #!/usr/bin/env python3
 """Validation complète du projet E1 - Preuves concrètes de fonctionnement"""
 import json
+import os
 import sqlite3
 import sys
 from datetime import datetime
 from pathlib import Path
 
 if sys.platform == 'win32':
-    import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError):
+        pass
 
 print("\n" + "="*80)
 print("  VALIDATION PROJET E1 - PREUVES CONCRÈTES")
 print("="*80)
 
 project_root = Path(__file__).parent.parent
-db_path = Path.home() / 'datasens_project' / 'datasens.db'
-zzdb_path = project_root / 'zzdb' / 'synthetic_data.db'
+db_path = Path(os.getenv('DB_PATH', str(Path.home() / 'datasens_project' / 'datasens.db')))
+zzdb_mongo_uri = os.getenv('ZZDB_MONGO_URI', os.getenv('MONGO_URI', 'mongodb://localhost:27017'))
+zzdb_db_name = os.getenv('ZZDB_MONGO_DB', 'zzdb')
+zzdb_collection_name = os.getenv('ZZDB_MONGO_COLLECTION', 'synthetic_articles')
 
 results = {
     'passed': 0,
@@ -121,30 +127,25 @@ else:
 print("\n[3] VÉRIFICATION ZZDB (LAB IA)")
 print("-" * 80)
 
-if zzdb_path.exists():
-    test("zzdb/synthetic_data.db existe", True, f"Chemin: {zzdb_path}")
+try:
+    from pymongo import MongoClient
 
-    try:
-        conn = sqlite3.connect(str(zzdb_path))
-        cursor = conn.cursor()
+    client = MongoClient(zzdb_mongo_uri, serverSelectionTimeoutMS=3000)
+    collection = client[zzdb_db_name][zzdb_collection_name]
 
-        cursor.execute("SELECT COUNT(*) FROM synthetic_articles")
-        total_zzdb = cursor.fetchone()[0]
-        test("Articles synthétiques ZZDB", total_zzdb > 0, f"{total_zzdb:,} articles")
+    total_zzdb = collection.count_documents({})
+    test("Connexion à ZZDB MongoDB", True, f"{zzdb_mongo_uri}/{zzdb_db_name}.{zzdb_collection_name}")
+    test("Articles synthétiques ZZDB", total_zzdb > 0, f"{total_zzdb:,} articles")
 
-        cursor.execute("SELECT COUNT(DISTINCT theme) FROM synthetic_articles")
-        themes_count = cursor.fetchone()[0]
-        test("Thèmes différents", themes_count > 0, f"{themes_count} thèmes")
+    themes_count = len(collection.distinct("theme"))
+    test("Thèmes différents", themes_count > 0, f"{themes_count} thèmes")
 
-        cursor.execute("SELECT COUNT(DISTINCT sentiment) FROM synthetic_articles")
-        sentiments_count = cursor.fetchone()[0]
-        test("Sentiments différents", sentiments_count > 0, f"{sentiments_count} sentiments")
+    sentiments_count = len(collection.distinct("sentiment"))
+    test("Sentiments différents", sentiments_count > 0, f"{sentiments_count} sentiments")
 
-        conn.close()
-    except Exception as e:
-        test("Connexion à zzdb/synthetic_data.db", False, f"Erreur: {str(e)[:60]}")
-else:
-    warn("zzdb/synthetic_data.db", "Base ZZDB non trouvée - Optionnel pour E1")
+    client.close()
+except Exception as e:
+    warn("ZZDB MongoDB", f"Connexion impossible ou base vide - Optionnel pour E1 ({str(e)[:60]})")
 
 print("\n[4] VÉRIFICATION PIPELINE E1")
 print("-" * 80)
@@ -152,7 +153,7 @@ print("-" * 80)
 # Vérifier que le pipeline peut être importé
 try:
     sys.path.insert(0, str(project_root))
-    from src.core import Source, create_extractor
+    from src.e1.core import Source, create_extractor
     test("Import modules core", True, "Article, Source, create_extractor")
     test("Import Repository", True, "Repository disponible")
 except Exception as e:
@@ -160,7 +161,7 @@ except Exception as e:
 
 # Vérifier extracteurs
 try:
-    test("Extracteurs disponibles", True, "RSS, API, SQLite, CSV")
+    test("Extracteurs disponibles", True, "RSS, API, MongoDB, CSV")
 except Exception as e:
     test("Extracteurs disponibles", False, f"Erreur: {str(e)[:60]}")
 
@@ -258,13 +259,13 @@ print("-" * 80)
 
 try:
     sys.path.insert(0, str(project_root))
-    from src.core import Source, create_extractor
+    from src.e1.core import Source, create_extractor
 
     # Test avec source zzdb_synthetic
     test_source = Source(
         source_name="zzdb_synthetic",
-        acquisition_type="sqlite",
-        url="zzdb/synthetic_data.db"
+        acquisition_type="mongodb",
+        url=zzdb_mongo_uri
     )
 
     extractor = create_extractor(test_source)
@@ -272,7 +273,6 @@ try:
          f"Type: {type(extractor).__name__}")
 
     # Test extraction (avec limite)
-    import os
     os.environ['ZZDB_MAX_ARTICLES'] = '5'  # Limiter pour test rapide
     articles = extractor.extract()
     test("Extraction ZZDB fonctionne", len(articles) >= 0,

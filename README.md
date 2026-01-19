@@ -127,6 +127,9 @@ python e1_export_correct.py
 | **sources_config.json** | 10 sources configuration | ✅ |
 | **requirements.txt** | All dependencies | ✅ |
 
+> **ZZDB MongoDB** : pour activer la source `zzdb_synthetic`, installer `pymongo`
+> (sinon la validation ZZDB affichera un warning).
+
 ---
 
 ## 🔗 Data Sources (14 sources actives)
@@ -171,7 +174,7 @@ python e1_export_correct.py
 | Kaggle_SentimentLexicons | Dataset | Inactif |
 | Kaggle_InsuranceReviews | Dataset | Inactif |
 | Kaggle_FrenchTweets | Dataset | Inactif |
-| zzdb_synthetic | SQLite | Inactif |
+| zzdb_synthetic | MongoDB | Inactif |
 
 ---
 
