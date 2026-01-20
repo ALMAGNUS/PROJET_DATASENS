@@ -4,6 +4,8 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
+from loguru import logger
+
 from core import Article, DatabaseLoader, Source
 
 
@@ -36,6 +38,7 @@ class Repository(DatabaseLoader):
                 last_sync_date DATETIME,
                 retry_policy VARCHAR(50) DEFAULT 'SKIP',
                 active BOOLEAN DEFAULT 1,
+                is_synthetic BOOLEAN DEFAULT 0,
                 created_at DATETIME
             );
 
@@ -101,11 +104,18 @@ class Repository(DatabaseLoader):
                 self.cursor.executescript(sql_tables)
                 self.conn.commit()
 
+            # Migration: ajouter colonne is_synthetic si manquante
+            self.cursor.execute("PRAGMA table_info(source)")
+            columns = {row[1] for row in self.cursor.fetchall()}
+            if "is_synthetic" not in columns:
+                self.cursor.execute("ALTER TABLE source ADD COLUMN is_synthetic BOOLEAN DEFAULT 0")
+                self.conn.commit()
+
             # Migration : Ajouter table PROFILS si elle n'existe pas (compatible avec schéma existant)
             self._ensure_profils_table()
 
         except Exception as e:
-            print(f"   ⚠️  Schema initialization error: {str(e)[:60]}")
+            logger.error("Schema initialization error: {}", str(e)[:60])
 
     def _ensure_sources(self):
         """Load sources from sources_config.json - Add missing sources even if some exist"""
@@ -131,23 +141,30 @@ class Repository(DatabaseLoader):
                     continue
 
                 try:
+                    is_synthetic = 1 if "zzdb" in source.source_name.lower() else 0
                     self.cursor.execute("""
-                        INSERT INTO source (name, source_type, url, sync_frequency, active, created_at)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                        INSERT INTO source (name, source_type, url, sync_frequency, active, is_synthetic, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
                     """, (
                         source.source_name,
                         source.acquisition_type,
                         source.url,
                         source.refresh_frequency or 'DAILY',
                         1 if source.active else 0,
+                        is_synthetic,
                         datetime.now().isoformat()
                     ))
                 except sqlite3.IntegrityError:
                     pass  # Source already exists
 
+            # Marquer les sources synthétiques existantes (ZZDB)
+            self.cursor.execute(
+                "UPDATE source SET is_synthetic = 1 WHERE lower(name) LIKE 'zzdb%'"
+            )
+
             self.conn.commit()
         except Exception as e:
-            print(f"   ⚠️  Sources initialization error: {str(e)[:60]}")
+            logger.error("Sources initialization error: {}", str(e)[:60])
 
     def load_article_with_id(self, article: Article, source_id: int) -> int | None:
         """Load article and return raw_data_id (or None if duplicate)"""
@@ -178,11 +195,11 @@ class Repository(DatabaseLoader):
             if 'fingerprint' in str(e).lower() or 'unique' in str(e).lower():
                 return None  # Duplicate (silencieux)
             # Autre erreur d'intégrité : afficher
-            print(f"   ⚠️  DB integrity error: {str(e)[:40]}")
+            logger.error("DB integrity error: {}", str(e)[:40])
             return None
         except Exception as e:
             # Autre erreur : afficher
-            print(f"   ⚠️  DB error: {str(e)[:40]}")
+            logger.error("DB error: {}", str(e)[:40])
             return None
 
     def log_foundation_integration(self, source_id: int, source_name: str, source_type: str,
@@ -201,7 +218,7 @@ class Repository(DatabaseLoader):
             self.log_sync(source_id, rows_integrated, 'FOUNDATION_INTEGRATED', notes_full)
             return True
         except Exception as e:
-            print(f"   ⚠️  Foundation log error: {str(e)[:40]}")
+            logger.error("Foundation log error: {}", str(e)[:40])
             return False
 
     def is_foundation_integrated(self, source_name: str) -> bool:
@@ -276,7 +293,7 @@ class Repository(DatabaseLoader):
             self.cursor.executescript(sql_profils)
             self.conn.commit()
         except Exception as e:
-            print(f"   ⚠️  Profils table creation error: {str(e)[:60]}")
+            logger.error("Profils table creation error: {}", str(e)[:60])
 
     def log_user_action(self, profil_id: int, action_type: str,
                        resource_type: str, resource_id: int | None = None,
@@ -291,6 +308,6 @@ class Repository(DatabaseLoader):
             self.conn.commit()
             return True
         except Exception as e:
-            print(f"   ⚠️  Action log error: {str(e)[:60]}")
+            logger.error("Action log error: {}", str(e)[:60])
             return False
 

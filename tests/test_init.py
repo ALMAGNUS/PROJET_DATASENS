@@ -14,8 +14,8 @@ except Exception as e:
 
 print("\n2. Creating sources objects...")
 try:
-    sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
-    from core import Source
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from src.core import Source
     sources = [Source(**s) for s in config['sources']]
     print(f"   [OK] Created {len(sources)} Source objects")
 except Exception as e:
@@ -26,7 +26,7 @@ except Exception as e:
 
 print("\n3. Connecting to DB...")
 try:
-    from core import DatabaseLoader
+    from src.core import DatabaseLoader
     db = DatabaseLoader(str(Path.home() / 'datasens_project' / 'datasens.db'))
     print(f"   [OK] DB connected")
 except Exception as e:

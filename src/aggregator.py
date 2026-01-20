@@ -35,7 +35,7 @@ class DataAggregator:
 
     def aggregate_raw(self) -> pd.DataFrame:
         """RAW: DB + fichiers locaux (sans enrichissement)"""
-        df_db = pd.read_sql_query("SELECT r.raw_data_id as id, s.name as source, r.title, r.content, r.url, r.fingerprint, r.collected_at, r.quality_score FROM raw_data r JOIN source s ON r.source_id = s.source_id ORDER BY r.collected_at DESC", self.conn)
+        df_db = pd.read_sql_query("SELECT r.raw_data_id as id, s.name as source, s.is_synthetic as is_synthetic, r.title, r.content, r.url, r.fingerprint, r.collected_at, r.quality_score FROM raw_data r JOIN source s ON r.source_id = s.source_id ORDER BY r.collected_at DESC", self.conn)
         # Classification des sources : ZZDB = DB non relationnelle, Kaggle = fichiers plats
         def classify_source(x):
             x_lower = str(x).lower()
@@ -52,6 +52,7 @@ class DataAggregator:
             local_df['id'] = range(len(df_db), len(df_db) + len(local_df)) if not df_db.empty else range(len(local_df))
             local_df['fingerprint'] = ''
             local_df['quality_score'] = 0.5
+            local_df['is_synthetic'] = False
             local_df['source_type'] = local_df['source'].apply(classify_source)
             df = pd.concat([df_db, local_df], ignore_index=True)
         else:

@@ -5,6 +5,8 @@ import time
 from datetime import date, datetime
 from pathlib import Path
 
+from loguru import logger
+
 # Imports depuis src/ (utilitaires - peuvent rester en src/ pour l'instant)
 # Note: Quand src/ est dans PYTHONPATH, utiliser imports sans préfixe src.
 try:
@@ -45,21 +47,24 @@ from .aggregator import DataAggregator
 from .analyzer import SentimentAnalyzer
 
 # Imports locaux E1
+from .console import ConsolePrinter
 from .core import ContentTransformer, Source, create_extractor
 from .exporter import GoldExporter
 from .repository import Repository
 from .tagger import TopicTagger
+from .ui_messages import UiMessages
 
 
 class E1Pipeline:
     """Complete E1 Pipeline - ISOLÉ"""
 
-    def __init__(self, metrics_port: int = 8000):
+    def __init__(self, metrics_port: int = 8000, quiet: bool = False):
         # Use environment variable or default path
         db_path = os.getenv('DB_PATH', str(Path.home() / 'datasens_project' / 'datasens.db'))
         # Ensure directory exists
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
+        self.console = ConsolePrinter(quiet=quiet)
         self.db = Repository(db_path)
         self.tagger = TopicTagger(db_path)
         self.analyzer = SentimentAnalyzer(db_path)
@@ -71,7 +76,7 @@ class E1Pipeline:
             port = int(os.getenv('METRICS_PORT', metrics_port))
             start_metrics_server(port)
         except Exception as e:
-            print(f"[WARN] Metrics server failed: {e}")
+            logger.warning("Metrics server failed: {}", e)
 
     def load_sources(self) -> list:
         """Load sources from JSON config"""
@@ -84,9 +89,11 @@ class E1Pipeline:
 
     def extract(self) -> list:
         """Extract from all sources"""
-        print("\n" + "="*70)
-        print("[EXTRACTION] All sources")
-        print("="*70)
+        console_write = self.console.write
+        console_write("\n" + UiMessages.extraction_title()[0])
+        console_write(UiMessages.extraction_title()[1])
+        console_write(UiMessages.extraction_title()[2])
+        logger.info("Extraction start: all sources")
 
         sources = self.load_sources()
         articles = []
@@ -99,14 +106,18 @@ class E1Pipeline:
                 continue
 
             current_source += 1
-            print(f"[{current_source}/{total_sources}] {source.source_name}... ({source.acquisition_type})", end=" ", flush=True)
+            console_write(
+                f"[{current_source}/{total_sources}] {source.source_name}... ({source.acquisition_type})",
+                end=" ",
+                flush=True,
+            )
 
             # Vérifier si source fondation déjà intégrée (à figer)
             is_foundation, _foundation_type, should_freeze = self._is_foundation_source(source.source_name)
             if is_foundation and should_freeze:
                 # Vérifier si déjà intégrée
                 if self.db.is_foundation_integrated(source.source_name):
-                    print("SKIP (fondation déjà intégrée)")
+                    console_write("SKIP (fondation déjà intégrée)")
                     continue  # Skip extraction pour sources fondation déjà intégrées
 
             start_time = time.time()
@@ -127,23 +138,26 @@ class E1Pipeline:
 
                 # Message spécial pour ZZDB
                 if 'zzdb' in source.source_name.lower():
-                    print(f"OK {len(extracted)} articles [ZZDB → DataSens]")
+                    console_write(f"OK {len(extracted)} articles [ZZDB → DataSens]")
                 elif len(extracted) > 1000:
-                    print(f"OK {len(extracted):,} articles (traitement en cours...)")
+                    console_write(f"OK {len(extracted):,} articles (traitement en cours...)")
                 else:
-                    print(f"OK {len(extracted)}")
+                    console_write(f"OK {len(extracted)}")
             except Exception as e:
                 source_errors_total.labels(source=source.source_name).inc()
-                print(f"ERROR: {str(e)[:40]}")
+                logger.error("Extraction error: {}", str(e)[:40])
 
-        print(f"\nOK Total extracted: {self.stats['extracted']}")
+        logger.info("Extraction complete: {} articles", self.stats['extracted'])
+        console_write(f"\nOK Total extracted: {self.stats['extracted']}")
         return articles
 
     def clean(self, articles: list) -> list:
         """Clean and validate articles"""
-        print("\n" + "="*70)
-        print("[CLEANING] Articles validation")
-        print("="*70)
+        console_write = self.console.write
+        console_write("\n" + UiMessages.cleaning_title()[0])
+        console_write(UiMessages.cleaning_title()[1])
+        console_write(UiMessages.cleaning_title()[2])
+        logger.info("Cleaning start: {} articles", len(articles))
 
         cleaned = []
         for article, source_name in articles:
@@ -152,7 +166,8 @@ class E1Pipeline:
                 cleaned.append((article, source_name))
                 self.stats['cleaned'] += 1
 
-        print(f"OK Cleaned: {self.stats['cleaned']}")
+        logger.info("Cleaning complete: {} articles", self.stats['cleaned'])
+        console_write(f"OK Cleaned: {self.stats['cleaned']}")
         return cleaned
 
     def _is_foundation_source(self, source_name: str) -> tuple[bool, str, bool]:
@@ -179,21 +194,25 @@ class E1Pipeline:
         elif source_name == 'gdelt_events' or source_lower == 'gdelt_events':
             return True, 'bigdata', True  # gdelt_events = figé
         elif 'zzdb' in source_lower and 'csv' in source_lower:
-            return True, 'db_non_relational', True  # zzdb_csv = figé
+            # zzdb_csv reste une fondation, mais on autorise la ré-ingestion
+            # (déduplication par fingerprint protège la base)
+            return True, 'db_non_relational', False
 
         return False, 'real_source', False  # Source dynamique (RSS, API, etc.)
 
     def load(self, articles: list):
         """Load to database + tag topics + analyze sentiment"""
-        print("\n" + "="*70)
-        print("[LOADING] Database ingestion + Tagging + Sentiment")
-        print("="*70)
+        console_write = self.console.write
+        console_write("\n" + UiMessages.loading_title()[0])
+        console_write(UiMessages.loading_title()[1])
+        console_write(UiMessages.loading_title()[2])
+        logger.info("Loading start: {} articles", len(articles))
         total_to_process = len(articles)
-        print(f"\n   Articles à traiter: {total_to_process:,}")
-        print("   Vérification des doublons (fingerprint SHA256)...")
+        console_write(f"\n   Articles à traiter: {total_to_process:,}")
+        console_write("   Vérification des doublons (fingerprint SHA256)...")
         if total_to_process > 1000:
-            print(f"   Traitement de {total_to_process:,} articles (cela peut prendre plusieurs minutes)...")
-            print("   Progression: ", end="", flush=True)
+            console_write(f"   Traitement de {total_to_process:,} articles (cela peut prendre plusieurs minutes)...")
+            console_write("   Progression: ", end="", flush=True)
 
         # Create sources partition dir for today
         today = date.today()
@@ -213,7 +232,7 @@ class E1Pipeline:
         for idx, (article, source_name) in enumerate(articles, 1):
             # Afficher progression tous les 100 articles si beaucoup d'articles
             if show_progress and idx % 100 == 0:
-                print(".", end="", flush=True)
+                console_write(".", end="", flush=True)
             source_id = self.db.get_source_id(source_name)
             if source_id:
                 # Load article and get ID
@@ -267,7 +286,7 @@ class E1Pipeline:
                     'published_at': article.published_at,
                 })
             else:
-                print(f"   [WARNING] Source '{source_name}' not found in DB")
+                logger.warning("Source '{}' not found in DB", source_name)
 
         # Write raw_articles.json
         articles_file = sources_dir / 'raw_articles.json'
@@ -315,63 +334,77 @@ class E1Pipeline:
 
                         # Message détaillé pour ZZDB
                         if 'zzdb' in source_name.lower():
-                            print("\n   [ZZDB → DataSens] Connexion validee :")
-                            print(f"      • Source: {source_name}")
-                            print(f"      • Articles transferes: {count}")
-                            print(f"      • Fichier: {file_path or 'N/A'}")
-                            print("      • Base ZZDB: zzdb/synthetic_data.db → CSV → datasens.db")
-                            print("      • Status: INTEGRE (fondation statique)")
+                            for line in UiMessages.zzdb_connection_lines(source_name, count, file_path):
+                                console_write(line)
                         else:
-                            print(f"\n   [FONDATION] {source_name} integree : {count} articles (premiere fois)")
+                            console_write(f"\n   [FONDATION] {source_name} integree : {count} articles (premiere fois)")
 
         if show_progress:
-            print()  # Nouvelle ligne après les points de progression
+            console_write()  # Nouvelle ligne après les points de progression
 
         # Résumé clair de la déduplication
-        print("\n[RESUME] Chargement dans la base de donnees:")
-        print(f"   Articles traites: {total_to_process:,}")
-        print(f"   Nouveaux articles charges: {self.stats['loaded']:,}")
-        print(f"   Articles dedupliques (deja presents): {self.stats['deduplicated']:,}")
-        print(f"\n   Explication: {total_to_process:,} articles extraits et nettoyes")
-        print(f"                {self.stats['deduplicated']:,} etaient deja dans la DB (meme fingerprint)")
-        print(f"                {self.stats['loaded']:,} nouveaux articles ajoutes a la DB")
+        logger.info(
+            "Loading summary: processed={}, loaded={}, deduplicated={}",
+            total_to_process,
+            self.stats['loaded'],
+            self.stats['deduplicated'],
+        )
+        console_write("\n" + UiMessages.resume_title())
+        console_write(f"   Articles traites: {total_to_process:,}")
+        console_write(f"   Nouveaux articles charges: {self.stats['loaded']:,}")
+        console_write(f"   Articles dedupliques (deja presents): {self.stats['deduplicated']:,}")
+        console_write(f"\n   Explication: {total_to_process:,} articles extraits et nettoyes")
+        console_write(f"                {self.stats['deduplicated']:,} etaient deja dans la DB (meme fingerprint)")
+        console_write(f"                {self.stats['loaded']:,} nouveaux articles ajoutes a la DB")
 
         if zzdb_loaded > 0:
-            print(f"\n   [ZZDB → DataSens] {zzdb_loaded} articles charges dans datasens.db")
-        print("\n   Enrichissement:")
-        print(f"   Tagged: {self.stats['tagged']}")
-        print(f"   Analyzed: {self.stats['analyzed']}")
-        print("\n   Fichiers sauvegardes:")
-        print(f"   {articles_file}")
-        print(f"   {articles_csv}")
+            console_write(UiMessages.zzdb_loaded_line(zzdb_loaded))
+        console_write("\n   Enrichissement:")
+        console_write(f"   Tagged: {self.stats['tagged']}")
+        console_write(f"   Analyzed: {self.stats['analyzed']}")
+        console_write("\n   Fichiers sauvegardes:")
+        console_write(f"   {articles_file}")
+        console_write(f"   {articles_csv}")
 
     def show_stats(self):
         """Display final statistics"""
-        print("\n" + "="*70)
-        print("[STATS] Pipeline results")
-        print("="*70)
-        print(f"   Extracted:    {self.stats['extracted']:,} articles (toutes sources)")
-        print(f"   Cleaned:      {self.stats['cleaned']:,} articles (valides)")
-        print(f"   Loaded:       {self.stats['loaded']:,} nouveaux articles (ajoutes a la DB)")
-        print(f"   Deduplicated: {self.stats['deduplicated']:,} articles (deja presents, non ajoutes)")
-        print("\n   Note: Les articles dedupliques sont ceux deja presents dans la base")
-        print("         avec le meme fingerprint (hash SHA256 du titre+contenu)")
+        console_write = self.console.write
+        console_write("\n" + UiMessages.stats_title()[0])
+        console_write(UiMessages.stats_title()[1])
+        console_write(UiMessages.stats_title()[2])
+        logger.info(
+            "Stats: extracted={}, cleaned={}, loaded={}, deduplicated={}, tagged={}, analyzed={}",
+            self.stats['extracted'],
+            self.stats['cleaned'],
+            self.stats['loaded'],
+            self.stats['deduplicated'],
+            self.stats['tagged'],
+            self.stats['analyzed'],
+        )
+        console_write(f"   Extracted:    {self.stats['extracted']:,} articles (toutes sources)")
+        console_write(f"   Cleaned:      {self.stats['cleaned']:,} articles (valides)")
+        console_write(f"   Loaded:       {self.stats['loaded']:,} nouveaux articles (ajoutes a la DB)")
+        console_write(f"   Deduplicated: {self.stats['deduplicated']:,} articles (deja presents, non ajoutes)")
+        console_write("\n   Note: Les articles dedupliques sont ceux deja presents dans la base")
+        console_write("         avec le meme fingerprint (hash SHA256 du titre+contenu)")
 
         stats = self.db.get_stats()
         total = sum(stats.values())
-        print(f"\n   Database: {total:,} total records (tous articles depuis le debut)")
-        print("\n   By source:")
+        console_write(f"\n   Database: {total:,} total records (tous articles depuis le debut)")
+        console_write("\n   By source:")
         for name, count in sorted(stats.items(), key=lambda x: -x[1]):
-            print(f"      • {name}: {count:,}")
-        print("="*70 + "\n")
+            console_write(f"      • {name}: {count:,}")
+        console_write("="*70 + "\n")
 
     def run(self):
         """Run complete pipeline"""
         with MetricsCollector('full_pipeline'):
             pipeline_runs_total.inc()
-            print("\n\n" + "="*70)
-            print("[START] DataSens E1+ - INGESTION + EXTRACTION PIPELINE")
-            print("="*70)
+            console_write = self.console.write
+            console_write("\n\n" + UiMessages.pipeline_start_title()[0])
+            console_write(UiMessages.pipeline_start_title()[1])
+            console_write(UiMessages.pipeline_start_title()[2])
+            logger.info("Pipeline run start")
 
             # ETAPE 1: Extract + Clean + Load (Kaggle/GDELT déjà en local, fusionnés dans GOLD)
             articles = self.extract()
@@ -380,9 +413,10 @@ class E1Pipeline:
             self.show_stats()
 
             # ETAPE 3: Generate RAW/SILVER/GOLD exports
-            print("\n" + "="*70)
-            print("[EXPORTS] RAW/SILVER/GOLD Generation")
-            print("="*70)
+            console_write("\n" + UiMessages.exports_title()[0])
+            console_write(UiMessages.exports_title()[1])
+            console_write(UiMessages.exports_title()[2])
+            logger.info("Exports start: RAW/SILVER/GOLD")
             try:
                 db_path = os.getenv('DB_PATH', str(Path.home() / 'datasens_project' / 'datasens.db'))
                 aggregator = DataAggregator(db_path)
@@ -391,42 +425,45 @@ class E1Pipeline:
                 # RAW
                 df_raw = aggregator.aggregate_raw()
                 r_raw = exporter.export_raw(df_raw)
-                print(f"   OK RAW CSV: {r_raw['csv']} ({r_raw['rows']} rows)")
+                console_write(f"   OK RAW CSV: {r_raw['csv']} ({r_raw['rows']} rows)")
 
                 # SILVER
                 df_silver = aggregator.aggregate_silver()
                 r_silver = exporter.export_silver(df_silver)
-                print(f"   OK SILVER CSV: {r_silver['csv']} ({r_silver['rows']} rows)")
+                console_write(f"   OK SILVER CSV: {r_silver['csv']} ({r_silver['rows']} rows)")
 
                 # GOLD
                 df_gold = aggregator.aggregate()
                 r_gold = exporter.export_all(df_gold, date.today())
-                print(f"   OK GOLD parquet: {r_gold['parquet']}")
-                print(f"   OK GOLD CSV: {r_gold['csv']} ({r_gold['rows']} rows)")
+                console_write(f"   OK GOLD parquet: {r_gold['parquet']}")
+                console_write(f"   OK GOLD CSV: {r_gold['csv']} ({r_gold['rows']} rows)")
 
                 aggregator.close()
+                logger.info("Exports complete")
             except Exception as e:
-                print(f"   ERROR: {str(e)[:100]}")
+                logger.error("Export error: {}", str(e)[:100])
 
             # ETAPE 4: Rapport de collecte session actuelle
             try:
                 db_path = os.getenv('DB_PATH', str(Path.home() / 'datasens_project' / 'datasens.db'))
-                report = CollectionReport(db_path, self.session_start)
+                report = CollectionReport(db_path, self.session_start, self.console)
                 report.collect_session_stats()
                 report.print_report()
                 report.close()
+                logger.info("Report complete")
             except Exception as e:
-                print(f"   ERROR Rapport: {str(e)[:100]}")
+                logger.error("Report error: {}", str(e)[:100])
 
             # ETAPE 5: Dashboard d'enrichissement global
             try:
                 db_path = os.getenv('DB_PATH', str(Path.home() / 'datasens_project' / 'datasens.db'))
-                dashboard = DataSensDashboard(db_path)
+                dashboard = DataSensDashboard(db_path, self.console)
                 dashboard.collect_stats()
                 dashboard.print_dashboard()
                 dashboard.close()
+                logger.info("Dashboard complete")
             except Exception as e:
-                print(f"   ERROR Dashboard: {str(e)[:100]}")
+                logger.error("Dashboard error: {}", str(e)[:100])
 
             # Update database stats for metrics
             try:
@@ -441,6 +478,7 @@ class E1Pipeline:
                     WHERE mo.model_name = 'sentiment_keyword'
                 """).fetchone()[0]
                 update_database_stats(total, enriched)
+                logger.info("Metrics database stats updated")
             except:
                 pass
 

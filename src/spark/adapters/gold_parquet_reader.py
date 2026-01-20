@@ -7,6 +7,7 @@ Lecteur Parquet GOLD depuis E1 (isolation E1)
 from datetime import date as date_type
 from pathlib import Path
 
+from loguru import logger
 from pyspark.sql import DataFrame
 
 # Gérer imports dans différents contextes (test vs normal)
@@ -121,11 +122,11 @@ class GoldParquetReader(DataReader):
                     dfs.append(df)
                 except (ConnectionRefusedError, OSError) as e:
                     # Erreur de connexion réseau - skip cette partition
-                    print(f"Warning: Connection error reading partition {partition}: {e}")
+                    logger.warning("Connection error reading partition {}: {}", partition, e)
                     continue
                 except Exception as e:
                     # Autres erreurs - skip cette partition
-                    print(f"Warning: Failed to read partition {partition}: {e}")
+                    logger.warning("Failed to read partition {}: {}", partition, e)
                     continue
 
             if not dfs:
@@ -148,7 +149,7 @@ class GoldParquetReader(DataReader):
                         result = result.unionByName(df, allowMissingColumns=True)
                     except Exception as union_error:
                         # Si même unionByName échoue, on skip cette partition
-                        print(f"Warning: Cannot union partition (schema/connection issue): {union_error}")
+                        logger.warning("Cannot union partition (schema/connection issue): {}", union_error)
                         continue
 
             return result
@@ -210,7 +211,7 @@ class GoldParquetReader(DataReader):
                     result = result.unionByName(df, allowMissingColumns=True)
                 except Exception as e:
                     # Si même unionByName échoue, on skip cette partition
-                    print(f"Warning: Cannot union partition (schema mismatch): {e}")
+                    logger.warning("Cannot union partition (schema mismatch): {}", e)
                     continue
 
         return result

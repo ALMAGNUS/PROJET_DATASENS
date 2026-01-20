@@ -177,6 +177,28 @@
       "active": true
     },
     {
+      "source_name": "monavis_citoyen",
+      "description": "Avis citoyens - monaviscitoyen.fr",
+      "acquisition_type": "scraping",
+      "theme": "society",
+      "url": "https://www.monaviscitoyen.fr/",
+      "partition_path": "/data/raw/monavis_citoyen/date=YYYY-MM-DD/",
+      "file_naming": "monavis_citoyen_france_YYYYMMDD_HHMMSS.parquet",
+      "refresh_frequency": "Daily",
+      "active": false
+    },
+    {
+      "source_name": "agora_consultations",
+      "description": "Consultations citoyennes (Agora) - participation-citoyenne.gouv.fr",
+      "acquisition_type": "api_scraping",
+      "theme": "society",
+      "url": "https://api.agora.gouv.fr/consultations",
+      "partition_path": "/data/raw/agora_consultations/date=YYYY-MM-DD/",
+      "file_naming": "agora_consultations_france_YYYYMMDD_HHMMSS.parquet",
+      "refresh_frequency": "Daily",
+      "active": true
+    },
+    {
       "source_name": "GDELT_Last15_English",
       "description": "GDELT Last 15 minutes events (English)",
       "acquisition_type": "bigdata",
@@ -212,9 +234,9 @@
     {
       "source_name": "zzdb_synthetic",
       "description": "Synthetic data specialized in French sentiment, social, political, economic and financial climate - WITH SAFEGUARDS (max 50 articles/run, quality_score=0.3)",
-      "acquisition_type": "sqlite",
+      "acquisition_type": "mongodb",
       "theme": "synthetic",
-      "url": "zzdb/synthetic_data.db",
+      "url": "mongodb://localhost:27017/zzdb",
       "partition_path": "/data/raw/zzdb_synthetic/date=YYYY-MM-DD/",
       "file_naming": "zzdb_synthetic_YYYYMMDD_HHMMSS.parquet",
       "refresh_frequency": "Daily",
