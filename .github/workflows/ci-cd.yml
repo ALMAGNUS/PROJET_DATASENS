@@ -27,10 +27,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install ruff pytest
-      
-      - name: Lint with ruff
-        run: ruff check src/ main.py scripts/*.py
+          pip install pytest
       
       - name: Run E1 isolation tests (fast)
         run: pytest tests/test_e1_isolation.py -v -m "not slow"

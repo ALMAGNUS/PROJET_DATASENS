@@ -2,18 +2,23 @@
 # -*- coding: utf-8 -*-
 """Test rapide : Vérifier que Kaggle est bien dans la DB"""
 import sys
-import io
 from pathlib import Path
 
-# Fix encoding
+# Fix encoding (avoid replacing pytest capture streams)
 if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError):
+        pass
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.repository import Repository
 import sqlite3
+import pytest
 
 def test_kaggle_in_db():
     """Vérifier que Kaggle est dans la DB"""
@@ -26,12 +31,17 @@ def test_kaggle_in_db():
     if not db_path.exists():
         db_path = Path.home() / 'datasens_project' / 'datasens.db'
     if not db_path.exists():
-        print(f"\n[ERREUR] Base de donnees non trouvee : {db_path}")
-        return
+        pytest.skip(f"Base de donnees non trouvee: {db_path}")
     
     conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
     
+    # Vérifier que la table source existe
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='source'")
+    if cursor.fetchone() is None:
+        conn.close()
+        pytest.skip(f"Table 'source' absente dans {db_path}")
+
     # Vérifier sources Kaggle
     print("\n1. Sources Kaggle dans la DB :")
     cursor.execute("""

@@ -1,0 +1,190 @@
+{
+  "timestamp": "2026-01-19T22:34:39.949734",
+  "summary": {
+    "passed": 36,
+    "failed": 0,
+    "warnings": 1
+  },
+  "details": [
+    {
+      "name": "main.py existe",
+      "status": "✅ PASS",
+      "details": "Point d'entrée du pipeline"
+    },
+    {
+      "name": "src/core.py existe",
+      "status": "✅ PASS",
+      "details": "Extracteurs et modèles"
+    },
+    {
+      "name": "src/repository.py existe",
+      "status": "✅ PASS",
+      "details": "Gestion base de données"
+    },
+    {
+      "name": "sources_config.json existe",
+      "status": "✅ PASS",
+      "details": "Configuration des sources"
+    },
+    {
+      "name": "requirements.txt existe",
+      "status": "✅ PASS",
+      "details": "Dépendances Python"
+    },
+    {
+      "name": "src/aggregator.py existe",
+      "status": "✅ PASS",
+      "details": "Agrégation RAW/SILVER/GOLD"
+    },
+    {
+      "name": "src/exporter.py existe",
+      "status": "✅ PASS",
+      "details": "Export CSV/Parquet"
+    },
+    {
+      "name": "src/tagger.py existe",
+      "status": "✅ PASS",
+      "details": "Tagging topics"
+    },
+    {
+      "name": "src/analyzer.py existe",
+      "status": "✅ PASS",
+      "details": "Analyse sentiment"
+    },
+    {
+      "name": "datasens.db existe",
+      "status": "✅ PASS",
+      "details": "Chemin: C:\\Users\\Utilisateur\\datasens_project\\datasens.db"
+    },
+    {
+      "name": "Table source existe",
+      "status": "✅ PASS",
+      "details": ""
+    },
+    {
+      "name": "Table raw_data existe",
+      "status": "✅ PASS",
+      "details": ""
+    },
+    {
+      "name": "Table sync_log existe",
+      "status": "✅ PASS",
+      "details": ""
+    },
+    {
+      "name": "Table topic existe",
+      "status": "✅ PASS",
+      "details": ""
+    },
+    {
+      "name": "Table document_topic existe",
+      "status": "✅ PASS",
+      "details": ""
+    },
+    {
+      "name": "Table model_output existe",
+      "status": "✅ PASS",
+      "details": ""
+    },
+    {
+      "name": "Articles dans raw_data",
+      "status": "✅ PASS",
+      "details": "43,849 articles"
+    },
+    {
+      "name": "Sources différentes",
+      "status": "✅ PASS",
+      "details": "14 sources"
+    },
+    {
+      "name": "Articles taggés (topics)",
+      "status": "✅ PASS",
+      "details": "85,127 tags"
+    },
+    {
+      "name": "Articles analysés (sentiment)",
+      "status": "✅ PASS",
+      "details": "43,838 analyses"
+    },
+    {
+      "name": "Articles avec titre valide",
+      "status": "✅ PASS",
+      "details": "43849/43849"
+    },
+    {
+      "name": "Articles avec contenu valide",
+      "status": "✅ PASS",
+      "details": "43849/43849"
+    },
+    {
+      "name": "Déduplication active (fingerprint)",
+      "status": "✅ PASS",
+      "details": "43,849 fingerprints uniques"
+    },
+    {
+      "name": "Import modules core",
+      "status": "✅ PASS",
+      "details": "Article, Source, create_extractor"
+    },
+    {
+      "name": "Import Repository",
+      "status": "✅ PASS",
+      "details": "Repository disponible"
+    },
+    {
+      "name": "Extracteurs disponibles",
+      "status": "✅ PASS",
+      "details": "RSS, API, MongoDB, CSV"
+    },
+    {
+      "name": "sources_config.json valide",
+      "status": "✅ PASS",
+      "details": "21 sources configurées"
+    },
+    {
+      "name": "Source ZZDB configurée",
+      "status": "✅ PASS",
+      "details": "2 source(s) ZZDB"
+    },
+    {
+      "name": "Dossier exports/ existe",
+      "status": "✅ PASS",
+      "details": ""
+    },
+    {
+      "name": "gold.csv existe et contient des données",
+      "status": "✅ PASS",
+      "details": "44,357 lignes"
+    },
+    {
+      "name": "gold.parquet existe",
+      "status": "✅ PASS",
+      "details": "Taille: 0.00 MB"
+    },
+    {
+      "name": "Articles enrichis (topics + sentiment)",
+      "status": "✅ PASS",
+      "details": "43,838 articles enrichis"
+    },
+    {
+      "name": "Distribution sentiment",
+      "status": "✅ PASS",
+      "details": "3 catégories: neutre, négatif, positif"
+    },
+    {
+      "name": "Quality score ZZDB (garde-fou)",
+      "status": "✅ PASS",
+      "details": "Score: 0.3 (attendu: 0.3)"
+    },
+    {
+      "name": "Création extractor ZZDB",
+      "status": "✅ PASS",
+      "details": "Type: MongoExtractor"
+    },
+    {
+      "name": "Extraction ZZDB fonctionne",
+      "status": "✅ PASS",
+      "details": "0 articles extraits (max 5 pour test)"
+    }
+  ]
+}

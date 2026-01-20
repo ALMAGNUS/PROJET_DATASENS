@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """DataSens E1+ - MAIN ENTRY (Pipeline SOLID/DRY)"""
+import argparse
 import io
 import sys
 from pathlib import Path
@@ -18,8 +19,17 @@ if sys.platform == 'win32':
 
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 # Import E1 isolé depuis package e1
+from loguru import logger
+
 from e1.pipeline import E1Pipeline
+from logging_config import setup_logging
 
 if __name__ == "__main__":
-    pipeline = E1Pipeline()
+    parser = argparse.ArgumentParser(description="DataSens E1 pipeline")
+    parser.add_argument("--quiet", action="store_true", help="Disable console output")
+    args = parser.parse_args()
+
+    setup_logging()
+    logger.info("Starting E1 pipeline")
+    pipeline = E1Pipeline(quiet=args.quiet)
     pipeline.run()

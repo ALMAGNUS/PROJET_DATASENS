@@ -6,49 +6,51 @@ import sys
 from pathlib import Path
 
 if sys.platform == 'win32':
-    import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError):
+        pass
 
 print("\n" + "="*80)
 print("  TEST ZZDB - Base de Données Synthétiques")
 print("="*80)
 
+zzdb_mongo_uri = os.getenv('ZZDB_MONGO_URI', os.getenv('MONGO_URI', 'mongodb://localhost:27017'))
+zzdb_db_name = os.getenv('ZZDB_MONGO_DB', 'zzdb')
+zzdb_collection_name = os.getenv('ZZDB_MONGO_COLLECTION', 'synthetic_articles')
+
 # 1. Vérifier la base
 print("\n[1/6] Vérification de la base de données...")
-db_path = Path('zzdb/synthetic_data.db')
-if db_path.exists():
-    size = db_path.stat().st_size
-    print(f"   ✅ Base trouvée: {db_path}")
-    print(f"   📊 Taille: {size:,} bytes")
-else:
-    print(f"   ❌ Base introuvable: {db_path}")
-    print("   💡 Lancez: python zzdb/generate_synthetic_data.py")
+client = None
+try:
+    from pymongo import MongoClient
+
+    client = MongoClient(zzdb_mongo_uri, serverSelectionTimeoutMS=3000)
+    collection = client[zzdb_db_name][zzdb_collection_name]
+    count = collection.count_documents({})
+    print(f"   ✅ MongoDB OK: {zzdb_mongo_uri}/{zzdb_db_name}.{zzdb_collection_name}")
+    print(f"   📊 Documents: {count:,}")
+except Exception as e:
+    print(f"   ❌ MongoDB KO: {str(e)[:80]}")
     sys.exit(1)
 
 # 2. Statistiques de la base
 print("\n[2/6] Statistiques de la base...")
-conn = sqlite3.connect(str(db_path))
-c = conn.cursor()
-
-c.execute("SELECT COUNT(*) FROM synthetic_articles")
-total = c.fetchone()[0]
-
-c.execute("SELECT sentiment, COUNT(*) FROM synthetic_articles GROUP BY sentiment")
-sentiments = dict(c.fetchall())
-
-c.execute("SELECT theme, COUNT(*) FROM synthetic_articles GROUP BY theme")
-themes = dict(c.fetchall())
+total = collection.count_documents({})
+sentiments = {k: collection.count_documents({"sentiment": k}) for k in collection.distinct("sentiment")}
+themes = {k: collection.count_documents({"theme": k}) for k in collection.distinct("theme")}
 
 print(f"   Total articles: {total}")
 print(f"   Sentiments: {sentiments}")
 print(f"   Thèmes: {themes}")
 
 # 3. Test extraction
-print("\n[3/6] Test extraction SQLiteExtractor...")
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
-from core import Source, create_extractor
+print("\n[3/6] Test extraction MongoExtractor...")
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from src.core import Source, create_extractor
 
-s = Source(source_name='zzdb_synthetic', acquisition_type='sqlite', url='zzdb/synthetic_data.db')
+s = Source(source_name='zzdb_synthetic', acquisition_type='mongodb', url=zzdb_mongo_uri)
 e = create_extractor(s)
 articles = e.extract()
 
@@ -94,7 +96,7 @@ else:
 # 6. Test exports
 print("\n[6/6] Test exports (GOLD)...")
 try:
-    from aggregator import DataAggregator
+    from src.aggregator import DataAggregator
     main_db_path = main_db if Path(main_db).exists() else None
     if main_db_path:
         agg = DataAggregator(main_db_path)
@@ -118,7 +120,8 @@ try:
 except Exception as e:
     print(f"   ⚠️  Erreur exports: {str(e)[:60]}")
 
-conn.close()
+if client is not None:
+    client.close()
 
 print("\n" + "="*80)
 print("  RÉSUMÉ")

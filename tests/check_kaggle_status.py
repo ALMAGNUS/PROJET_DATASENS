@@ -6,9 +6,15 @@ import io
 import sqlite3
 from pathlib import Path
 
-# Fix encoding
+# Fix encoding (avoid replacing pytest capture streams)
 if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError):
+        pass
 
 def check_kaggle():
     """Vérifier Kaggle dans la DB"""

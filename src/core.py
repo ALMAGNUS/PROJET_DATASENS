@@ -12,6 +12,7 @@ from io import StringIO
 import feedparser
 import requests
 from bs4 import BeautifulSoup
+from loguru import logger
 
 # Suppress BeautifulSoup warnings
 warnings.filterwarnings('ignore', category=UserWarning, module='bs4')
@@ -54,7 +55,7 @@ class RSSExtractor(BaseExtractor):
         try:
             feed = feedparser.parse(self.url)
             if feed.bozo and feed.bozo_exception:
-                print(f"   ⚠️  {self.name}: RSS parse error - {str(feed.bozo_exception)[:40]}")
+                logger.warning("RSS parse error for {}: {}", self.name, str(feed.bozo_exception)[:40])
             for entry in feed.entries[:50]:
                 title = entry.get('title', '').strip()
                 content = entry.get('summary', '') or entry.get('description', '')
@@ -64,7 +65,7 @@ class RSSExtractor(BaseExtractor):
                                url=url, source_name=self.name, published_at=entry.get('published', ''))
                     if a.is_valid(): articles.append(a)
         except Exception as e:
-            print(f"   ❌ {self.name}: {str(e)[:40]}")
+            logger.error("RSS extraction error for {}: {}", self.name, str(e)[:40])
         return articles
 
 class APIExtractor(BaseExtractor):
@@ -101,7 +102,7 @@ class APIExtractor(BaseExtractor):
                                                    url=f"https://www.reddit.com{href}" if href.startswith('/') else href, source_name=self.name)
                                         if a.is_valid(): articles.append(a)
                     except Exception as e:
-                        print(f"   ⚠️  Reddit {sr}: {str(e)[:40]}")
+                        logger.warning("Reddit {} extraction error: {}", sr, str(e)[:40])
             elif 'insee' in src_low or 'citoyen' in src_low:
                 soup = BeautifulSoup(requests.get('https://www.monaviscitoyen.fr/',
                                                  headers={'User-Agent': 'Mozilla/5.0'}, timeout=10).text, 'html.parser')
@@ -126,12 +127,29 @@ class APIExtractor(BaseExtractor):
             else:
                 resp = requests.get(self.url, timeout=5)
                 if resp.status_code == 200 and 'json' in resp.headers.get('content-type', ''):
-                    for item in (resp.json().get('articles') or resp.json().get('items') or resp.json().get('results') or [])[:50]:
-                        a = Article(title=item.get('title', '')[:500], content=item.get('content', '')[:2000],
-                                   url=item.get('url', ''), source_name=self.name)
-                        if a.is_valid(): articles.append(a)
+                    payload = resp.json()
+
+                    # Source Agora (consultations citoyennes)
+                    if 'agora' in self.name.lower() or 'agora' in self.url.lower():
+                        for item in (payload.get('ongoing') or []) + (payload.get('finished') or []):
+                            title = item.get('title', '')
+                            theme = (item.get('thematique') or {}).get('label', '')
+                            territory = item.get('territory', '')
+                            end_date = item.get('endDate', '')
+                            slug = item.get('slug', '')
+                            url = f"https://www.participation-citoyenne.gouv.fr/consultations/{slug}" if slug else self.url
+                            content = f"Theme: {theme}. Territoire: {territory}. Fin: {end_date}."
+                            a = Article(title=f"[AGORA] {title}"[:500], content=content[:2000],
+                                        url=url, source_name=self.name)
+                            if a.is_valid():
+                                articles.append(a)
+                    else:
+                        for item in (payload.get('articles') or payload.get('items') or payload.get('results') or [])[:50]:
+                            a = Article(title=item.get('title', '')[:500], content=item.get('content', '')[:2000],
+                                       url=item.get('url', ''), source_name=self.name)
+                            if a.is_valid(): articles.append(a)
         except Exception as e:
-            print(f"   ❌ {self.name}: {str(e)[:40]}")
+            logger.error("API extraction error for {}: {}", self.name, str(e)[:40])
         return articles[:50]
 
 class ScrapingExtractor(BaseExtractor):
@@ -155,6 +173,99 @@ class ScrapingExtractor(BaseExtractor):
                         a = Article(title=f"[IFOP] {title_e.get_text().strip()}"[:500], content=item.get_text().strip()[:2000],
                                    url=title_e.get('href', '') if title_e.name == 'a' else 'https://www.ifop.com', source_name=self.name)
                         if a.is_valid(): articles.append(a)
+            elif 'monaviscitoyen' in src_low:
+                base_url = "https://www.monaviscitoyen.fr"
+                seen = set()
+
+                def add_item(title_text: str, content_text: str, link: str):
+                    if not link:
+                        return
+                    if link.startswith('/'):
+                        link = f"{base_url}{link}"
+                    if link in seen:
+                        return
+                    seen.add(link)
+                    a = Article(
+                        title=f"[MONAVIS] {title_text}"[:500],
+                        content=content_text[:2000],
+                        url=link,
+                        source_name=self.name
+                    )
+                    if a.is_valid():
+                        articles.append(a)
+
+                def parse_from_soup(soup):
+                    for item in soup.find_all(['article', 'div', 'li']):
+                        title_e = item.find(['h1', 'h2', 'h3'])
+                        link_e = item.find('a', href=True)
+                        if title_e and link_e:
+                            content_text = item.get_text(" ", strip=True)
+                            add_item(title_e.get_text().strip(), content_text, link_e.get('href', ''))
+                        if len(articles) >= 30:
+                            break
+                    if len(articles) < 10:
+                        for link_e in soup.find_all('a', href=True):
+                            text = link_e.get_text(" ", strip=True)
+                            if len(text) < 20:
+                                continue
+                            href = link_e.get('href', '')
+                            if 'monaviscitoyen' not in href and not href.startswith('/'):
+                                continue
+                            add_item(text, text, href)
+                            if len(articles) >= 30:
+                                break
+
+                # Try Botasaurus first (if installed)
+                try:
+                    from botasaurus.request import Request, request
+                    from botasaurus.soupify import soupify
+
+                    @request
+                    def _botasaurus_request(req: Request, _data):
+                        resp = req.get(self.url)
+                        return {"status": getattr(resp, "status_code", None), "text": getattr(resp, "text", "")}
+
+                    payload = _botasaurus_request()
+                    if isinstance(payload, list):
+                        payload = payload[0] if payload else {}
+                    if payload and payload.get("status") == 200:
+                        soup = soupify(payload.get("text", ""))
+                        parse_from_soup(soup)
+                except Exception as e:
+                    logger.warning("Botasaurus request failed for {}: {}", self.name, str(e)[:40])
+
+                # Try Botasaurus browser (JS/anti-bot)
+                if not articles:
+                    try:
+                        import time as _time
+
+                        from botasaurus.browser import Driver, browser
+
+                        @browser
+                        def _botasaurus_browser(driver: Driver, _data):
+                            driver.get(self.url)
+                            _time.sleep(2)
+                            return driver.page_source
+
+                        html = _botasaurus_browser()
+                        if isinstance(html, list):
+                            html = html[0] if html else ""
+                        if html:
+                            soup = BeautifulSoup(html, 'html.parser')
+                            parse_from_soup(soup)
+                    except Exception as e:
+                        logger.warning("Botasaurus browser failed for {}: {}", self.name, str(e)[:40])
+
+                # Fallback: classic requests
+                if not articles:
+                    resp = requests.get(self.url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+                    if resp.status_code != 200:
+                        logger.warning("Scraping blocked for {}: HTTP {}", self.name, resp.status_code)
+                        return articles
+                    if not resp.text or len(resp.text) < 10:
+                        return articles
+                    soup = BeautifulSoup(resp.text, 'html.parser')
+                    parse_from_soup(soup)
             else:
                 resp = requests.get(self.url, timeout=5, headers={'User-Agent': 'Mozilla/5.0'})
                 if not resp.text or len(resp.text) < 10:
@@ -168,7 +279,7 @@ class ScrapingExtractor(BaseExtractor):
                                    url=title_e.get('href', '') if title_e.name == 'a' else '', source_name=self.name)
                         if a.is_valid(): articles.append(a)
         except Exception as e:
-            print(f"   ❌ {self.name}: {str(e)[:40]}")
+            logger.error("Scraping extraction error for {}: {}", self.name, str(e)[:40])
         return articles[:50]
 
 class GDELTExtractor(BaseExtractor):
@@ -189,7 +300,7 @@ class GDELTExtractor(BaseExtractor):
                             if a.is_valid(): articles.append(a)
                 except: pass
         except Exception as e:
-            print(f"   ❌ {self.name}: {str(e)[:40]}")
+            logger.error("GDELT extraction error for {}: {}", self.name, str(e)[:40])
         return articles[:50]
 
 class GDELTFileExtractor(BaseExtractor):
@@ -211,93 +322,80 @@ class GDELTFileExtractor(BaseExtractor):
                                 if a.is_valid(): articles.append(a)
                     except: pass
         except Exception as e:
-            print(f"   ❌ {self.name}: {str(e)[:40]}")
+            logger.error("GDELT file extraction error for {}: {}", self.name, str(e)[:40])
         return articles[:100]
 
-class SQLiteExtractor(BaseExtractor):
-    """Extract articles from SQLite database (ZZDB synthetic data) - WITH SAFEGUARDS"""
+class MongoExtractor(BaseExtractor):
+    """Extract articles from MongoDB (ZZDB synthetic data) - WITH SAFEGUARDS"""
     def extract(self) -> list[Article]:
         articles = []
         try:
             import os
-            from pathlib import Path
+            from datetime import timedelta
+
+            from pymongo import MongoClient
 
             # GARDE-FOU 1: Vérifier variable d'environnement pour désactiver ZZDB
             if os.getenv('DISABLE_ZZDB', 'false').lower() == 'true':
                 return articles
 
             # GARDE-FOU 2: Limite max d'articles synthétiques par exécution
-            MAX_SYNTHETIC_PER_RUN = int(os.getenv('ZZDB_MAX_ARTICLES', '50'))
+            max_synth = int(os.getenv('ZZDB_MAX_ARTICLES', '50'))
 
-            # ZZDB database path - try multiple locations
-            possible_paths = [
-                Path(__file__).parent.parent.parent / 'zzdb' / 'synthetic_data.db',
-                Path.cwd() / 'zzdb' / 'synthetic_data.db',
-                Path(self.url) if Path(self.url).is_absolute() else Path.cwd() / self.url
-            ]
+            mongo_uri = os.getenv('ZZDB_MONGO_URI', os.getenv('MONGO_URI', 'mongodb://localhost:27017'))
+            db_name = os.getenv('ZZDB_MONGO_DB', 'zzdb')
+            collection_name = os.getenv('ZZDB_MONGO_COLLECTION', 'synthetic_articles')
 
-            db_path = None
-            for p in possible_paths:
-                if p.exists():
-                    db_path = p
-                    break
+            client = MongoClient(mongo_uri)
+            coll = client[db_name][collection_name]
 
-            if not db_path or not db_path.exists():
-                return articles
+            cutoff = datetime.now() - timedelta(hours=1)
+            sample = coll.find_one({}, {"published_at": 1})
+            if sample and "published_at" in sample:
+                query = {"published_at": {"$lt": cutoff}}
+                sort_field = "published_at"
+            else:
+                query = {}
+                sort_field = "_id"
 
-            conn = sqlite3.connect(str(db_path))
-            cursor = conn.cursor()
+            cursor = coll.find(
+                query,
+                {"title": 1, "content": 1, "url": 1, "sentiment": 1, "theme": 1, "published_at": 1}
+            ).sort(sort_field, -1).limit(max_synth)
 
-            # GARDE-FOU 3: Vérifier si des articles ont déjà été collectés récemment (dans les 24h)
-            # On sélectionne seulement les articles non récemment collectés
-            cursor.execute("""
-                SELECT title, content, url, sentiment, theme, published_at
-                FROM synthetic_articles
-                WHERE published_at < datetime('now', '-1 hour')
-                ORDER BY published_at DESC
-                LIMIT ?
-            """, (MAX_SYNTHETIC_PER_RUN,))
+            for doc in cursor:
+                title = (doc.get("title") or "").strip()
+                content = (doc.get("content") or "").strip()
+                url = doc.get("url")
+                published_at = doc.get("published_at")
 
-            for row in cursor.fetchall():
-                title, content, url, _sentiment, _theme, published_at = row
-
-                # GARDE-FOU 4: Validation stricte du contenu
                 if not title or not content:
                     continue
-
-                # GARDE-FOU 5: Vérifier longueur minimale et maximale
-                title_clean = title.strip()
-                content_clean = content.strip()
-
-                if len(title_clean) < 10 or len(title_clean) > 500:
+                if len(title) < 10 or len(title) > 500:
                     continue
-                if len(content_clean) < 50 or len(content_clean) > 5000:
+                if len(content) < 50 or len(content) > 5000:
                     continue
 
-                # GARDE-FOU 6: Vérifier que le contenu n'est pas trop répétitif
-                words = content_clean.split()
-                if len(set(words)) < len(words) * 0.3:  # Moins de 30% de mots uniques = trop répétitif
+                words = content.split()
+                if words and len(set(words)) < len(words) * 0.3:
                     continue
 
                 a = Article(
-                    title=title_clean[:500],
-                    content=content_clean[:2000],
+                    title=title[:500],
+                    content=content[:2000],
                     url=url or self.url,
                     source_name=self.name,
-                    published_at=published_at or datetime.now().isoformat()
+                    published_at=str(published_at) if published_at else datetime.now().isoformat()
                 )
 
-                # GARDE-FOU 7: Validation finale avec is_valid()
                 if a.is_valid():
                     articles.append(a)
-
-                    # GARDE-FOU 8: Limite absolue par exécution
-                    if len(articles) >= MAX_SYNTHETIC_PER_RUN:
+                    if len(articles) >= max_synth:
                         break
 
-            conn.close()
+            client.close()
         except Exception as e:
-            print(f"   ⚠️  {self.name}: {str(e)[:40]}")
+            logger.warning("{}: {}", self.name, str(e)[:40])
         return articles
 
 class CSVExtractor(BaseExtractor):
@@ -433,7 +531,7 @@ class CSVExtractor(BaseExtractor):
                     if a.is_valid():
                         articles.append(a)
         except Exception as e:
-            print(f"   ⚠️  {self.name}: {str(e)[:40]}")
+            logger.warning("{}: {}", self.name, str(e)[:40])
         return articles
 
 class KaggleExtractor(BaseExtractor):
@@ -520,7 +618,7 @@ class KaggleExtractor(BaseExtractor):
                     except Exception:
                         pass
         except Exception as e:
-            print(f"   ⚠️  {self.name}: {str(e)[:40]}")
+            logger.warning("Mongo extraction error for {}: {}", self.name, str(e)[:40])
         return articles  # Retourner TOUS les articles (pas de limite artificielle)
 
 def create_extractor(source: Source) -> BaseExtractor:
@@ -528,7 +626,7 @@ def create_extractor(source: Source) -> BaseExtractor:
     acq_type, src_low = source.acquisition_type.lower(), source.source_name.lower()
     if acq_type == "rss": return RSSExtractor(source.source_name, source.url)
     elif acq_type == "bigdata": return GDELTFileExtractor(source.source_name, source.url)
-    elif acq_type == "sqlite" or ('zzdb' in src_low and 'csv' not in src_low): return SQLiteExtractor(source.source_name, source.url)
+    elif acq_type == "mongodb" or ('zzdb' in src_low and 'csv' not in src_low): return MongoExtractor(source.source_name, source.url)
     elif acq_type == "csv" or ('zzdb' in src_low and 'csv' in src_low): return CSVExtractor(source.source_name, source.url)
     elif acq_type == "dataset":
         if 'kaggle' in src_low: return KaggleExtractor(source.source_name, source.url)
@@ -579,7 +677,7 @@ class DatabaseLoader:
             self.conn.commit()
             return True
         except Exception as e:
-            print(f"   ⚠️  DB error: {str(e)[:40]}")
+            logger.error("DB error: {}", str(e)[:40])
             return False
 
     def get_stats(self) -> dict:
@@ -596,5 +694,5 @@ class DatabaseLoader:
             self.conn.commit()
             return True
         except Exception as e:
-            print(f"   ⚠️  Sync log error: {str(e)[:40]}")
+            logger.warning("Sync log error: {}", str(e)[:40])
             return False

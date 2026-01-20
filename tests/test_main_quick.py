@@ -5,10 +5,15 @@ import sys
 import io
 from pathlib import Path
 
-# Fix encoding
+# Fix encoding (avoid replacing pytest capture streams)
 if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError):
+        pass
 
 # Add project root
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -19,33 +24,23 @@ print("="*70)
 
 try:
     print("\n1. Test imports...")
-    sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
-    
-    from core import ContentTransformer, Source, create_extractor
+    from src.core import ContentTransformer, Source, create_extractor
     print("   OK: core")
-    
-    from repository import Repository
+    from src.repository import Repository
     print("   OK: repository")
-    
-    from tagger import TopicTagger
+    from src.tagger import TopicTagger
     print("   OK: tagger")
-    
-    from analyzer import SentimentAnalyzer
+    from src.analyzer import SentimentAnalyzer
     print("   OK: analyzer")
-    
-    from aggregator import DataAggregator
+    from src.aggregator import DataAggregator
     print("   OK: aggregator")
-    
-    from exporter import GoldExporter
+    from src.exporter import GoldExporter
     print("   OK: exporter")
-    
-    from dashboard import DataSensDashboard
+    from src.dashboard import DataSensDashboard
     print("   OK: dashboard")
-    
-    from collection_report import CollectionReport
+    from src.collection_report import CollectionReport
     print("   OK: collection_report")
-    
-    from metrics import MetricsCollector
+    from src.metrics import MetricsCollector
     print("   OK: metrics")
     
     print("\n2. Test initialisation pipeline...")
