@@ -9,7 +9,7 @@ class GoldDatasetManager:
 
     def __init__(self, gold_path: str) -> None:
         self.gold_path = Path(gold_path)
-        self.export_dir = Path(__file__).parent.parent / 'exports'
+        self.export_dir = Path(__file__).parent.parent / "exports"
         self.export_dir.mkdir(exist_ok=True)
 
     def export_for_download(self) -> str:
@@ -41,14 +41,17 @@ class GoldDatasetManager:
         print(f"Initial GOLD:    {initial} articles")
         print(f"New collection:  {new_records} articles")
         print(f"After merge:     {len(enriched)} articles")
-        print(f"Growth:          +{len(enriched) - initial} ({100*(len(enriched)-initial)/initial:.1f}%)")
+        print(
+            f"Growth:          +{len(enriched) - initial} ({100*(len(enriched)-initial)/initial:.1f}%)"
+        )
 
 
 if __name__ == "__main__":
-    gold_path = Path(__file__).parent.parent / 'data' / 'gold' / 'date=2025-12-18' / 'articles.parquet'
+    gold_path = (
+        Path(__file__).parent.parent / "data" / "gold" / "date=2025-12-18" / "articles.parquet"
+    )
     if gold_path.exists():
         mgr = GoldDatasetManager(str(gold_path))
         mgr.show_stats()
     else:
         print(f"[ERROR] Gold file not found: {gold_path}")
-

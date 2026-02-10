@@ -10,8 +10,8 @@ class ScheduledPipeline:
 
     def __init__(self, exports_dir: str | None = None, lake_dir: str | None = None) -> None:
         base = Path(__file__).parent.parent
-        self.exports_dir = Path(exports_dir) if exports_dir else base / 'exports'
-        self.lake_dir = Path(lake_dir) if lake_dir else base / 'data' / 'lake'
+        self.exports_dir = Path(exports_dir) if exports_dir else base / "exports"
+        self.lake_dir = Path(lake_dir) if lake_dir else base / "data" / "lake"
         self.lake_dir.mkdir(parents=True, exist_ok=True)
         self.log_file = self.lake_dir / "collection_log.txt"
 
@@ -38,7 +38,9 @@ class ScheduledPipeline:
         consolidated = self.lake_dir / "consolidated.parquet"
         if consolidated.exists():
             existing = pd.read_parquet(consolidated)
-            combined = pd.concat([existing, df], ignore_index=True).drop_duplicates(subset=['id'], keep='last')
+            combined = pd.concat([existing, df], ignore_index=True).drop_duplicates(
+                subset=["id"], keep="last"
+            )
             combined.to_parquet(consolidated, index=False)
         else:
             df.to_parquet(consolidated, index=False)
@@ -55,4 +57,3 @@ if __name__ == "__main__":
     # Example usage
     scheduler = ScheduledPipeline()
     scheduler.run_collection("daily_09:00")
-

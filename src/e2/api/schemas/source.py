@@ -26,4 +26,3 @@ class SourceUpdate(SourceBase):
 
 class SourceResponse(SourceBase):
     source_id: int
-

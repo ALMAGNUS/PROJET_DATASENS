@@ -56,8 +56,10 @@ class GoldAIMetadataManager:
 
     def get_new_dates(self, gold_dates: list[date], metadata: dict) -> list[date]:
         """Identifie les nouvelles dates à fusionner"""
-        included = {date.fromisoformat(d) if isinstance(d, str) else d
-                   for d in metadata.get("dates_included", [])}
+        included = {
+            date.fromisoformat(d) if isinstance(d, str) else d
+            for d in metadata.get("dates_included", [])
+        }
         return sorted([d for d in gold_dates if d not in included])
 
 
@@ -77,17 +79,19 @@ class GoldAIDeduplicator:
         order_col = (
             coalesce(
                 to_timestamp(col("collected_at"), "yyyy-MM-dd HH:mm:ss"),
-                to_timestamp(lit("1970-01-01 00:00:00"), "yyyy-MM-dd HH:mm:ss")
-            ) if "collected_at" in df.columns else lit(1)
+                to_timestamp(lit("1970-01-01 00:00:00"), "yyyy-MM-dd HH:mm:ss"),
+            )
+            if "collected_at" in df.columns
+            else lit(1)
         )
 
         window = Window.partitionBy(by).orderBy(order_col.desc())
-        result = df.withColumn("_rn", row_number().over(window)) \
-                  .filter(col("_rn") == 1) \
-                  .drop("_rn")
+        result = df.withColumn("_rn", row_number().over(window)).filter(col("_rn") == 1).drop("_rn")
 
         after_count = result.count()
-        print(f"{before_count - after_count:,} doublons supprimés ({before_count:,} -> {after_count:,} lignes)")
+        print(
+            f"{before_count - after_count:,} doublons supprimés ({before_count:,} -> {after_count:,} lignes)"
+        )
         return result
 
 
@@ -203,16 +207,22 @@ class GoldAIMerger:
         print("=" * 70)
 
         metadata = self.metadata_mgr.load()
-        print(f"\nMetadonnees GoldAI: {len(metadata.get('dates_included', []))} dates, "
-              f"{metadata.get('total_rows', 0):,} lignes, version {metadata.get('version', 0)}")
+        print(
+            f"\nMetadonnees GoldAI: {len(metadata.get('dates_included', []))} dates, "
+            f"{metadata.get('total_rows', 0):,} lignes, version {metadata.get('version', 0)}"
+        )
 
         gold_dates = self.gold_reader.get_available_dates()
         print(f"\nDates GOLD disponibles: {len(gold_dates)}")
         for d in gold_dates:
             print(f"  - {d:%Y-%m-%d}")
 
-        new_dates = gold_dates if force_full else self.metadata_mgr.get_new_dates(gold_dates, metadata)
-        print(f"\n{'Mode FORCE FULL' if force_full else 'Nouvelles dates a fusionner'}: {len(new_dates)}")
+        new_dates = (
+            gold_dates if force_full else self.metadata_mgr.get_new_dates(gold_dates, metadata)
+        )
+        print(
+            f"\n{'Mode FORCE FULL' if force_full else 'Nouvelles dates a fusionner'}: {len(new_dates)}"
+        )
         for d in new_dates:
             print(f"  - {d:%Y-%m-%d}")
 
@@ -236,18 +246,22 @@ class GoldAIMerger:
         total_rows = merged_df.count()
 
         # Sauvegarde
-        latest_date = max(new_dates) if new_dates else gold_dates[-1] if gold_dates else date.today()
+        latest_date = (
+            max(new_dates) if new_dates else gold_dates[-1] if gold_dates else date.today()
+        )
         new_version = metadata.get("version", 0) + 1
         self.saver.save(merged_df, latest_date, version=new_version)
 
         # Mise à jour métadonnées
-        all_dates = sorted(set(metadata.get("dates_included", [])) | {d.isoformat() for d in gold_dates})
+        all_dates = sorted(
+            set(metadata.get("dates_included", [])) | {d.isoformat() for d in gold_dates}
+        )
         new_metadata = {
             "dates_included": all_dates,
             "total_rows": total_rows,
             "last_merge": datetime.now().isoformat(),
             "version": new_version,
-            "last_date_merged": latest_date.isoformat()
+            "last_date_merged": latest_date.isoformat(),
         }
         self.metadata_mgr.save(new_metadata)
 
@@ -270,7 +284,9 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Fusion incrémentale Parquet GOLD -> GoldAI")
-    parser.add_argument("--force-full", action="store_true", help="Refaire fusion complète depuis zéro")
+    parser.add_argument(
+        "--force-full", action="store_true", help="Refaire fusion complète depuis zéro"
+    )
     parser.add_argument("--gold-path", type=str, default=None, help="Chemin vers Parquet GOLD")
     parser.add_argument("--goldai-path", type=str, default=None, help="Chemin vers GoldAI")
 
@@ -287,6 +303,7 @@ def main():
     except Exception as e:
         print(f"\nERREUR: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
     finally:

@@ -104,9 +104,7 @@ class GoldParquetReader(DataReader):
             partitions = list(self.base_path.glob("date=*/articles.parquet"))
 
             if not partitions:
-                raise FileNotFoundError(
-                    f"No Parquet GOLD partitions found in {self.base_path}"
-                )
+                raise FileNotFoundError(f"No Parquet GOLD partitions found in {self.base_path}")
 
             # Lire toutes les partitions et les unionner explicitement
             # (évite les problèmes de connexion avec wildcard sur Windows)
@@ -149,16 +147,14 @@ class GoldParquetReader(DataReader):
                         result = result.unionByName(df, allowMissingColumns=True)
                     except Exception as union_error:
                         # Si même unionByName échoue, on skip cette partition
-                        logger.warning("Cannot union partition (schema/connection issue): {}", union_error)
+                        logger.warning(
+                            "Cannot union partition (schema/connection issue): {}", union_error
+                        )
                         continue
 
             return result
 
-    def read_gold_date_range(
-        self,
-        start_date: date_type,
-        end_date: date_type
-    ) -> DataFrame:
+    def read_gold_date_range(self, start_date: date_type, end_date: date_type) -> DataFrame:
         """
         Lit Parquet GOLD pour une plage de dates
 

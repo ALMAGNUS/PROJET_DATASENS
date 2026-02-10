@@ -11,7 +11,7 @@ from pathlib import Path
 
 # Project root
 PROJECT_ROOT = Path(__file__).parent.parent
-DATA_ROOT = Path.home() / 'datasens_project'
+DATA_ROOT = Path.home() / "datasens_project"
 
 # Ensure data directories exist
 DATA_ROOT.mkdir(parents=True, exist_ok=True)

@@ -10,53 +10,48 @@ IMPORTANT :
 # ---------------------------------------------------------------------------
 # C1 - Extraction (RSS)
 # ---------------------------------------------------------------------------
-EXEMPLE_RSS = """
 from src.e1.core import RSSExtractor
 
 extractor = RSSExtractor(name="rss_french_news", url="https://www.france24.com/fr/rss")
 articles = extractor.extract()
 print(f"RSS articles: {len(articles)}")
-""".strip()
+
 
 # ---------------------------------------------------------------------------
 # C1 - Extraction (API)
 # ---------------------------------------------------------------------------
-EXEMPLE_API = """
 from src.e1.core import APIExtractor
 
 extractor = APIExtractor(name="reddit_france", url="https://www.reddit.com/r/france/")
 articles = extractor.extract()
 print(f"API articles: {len(articles)}")
-""".strip()
+
 
 # ---------------------------------------------------------------------------
 # C1 - Extraction (Scraping)
 # ---------------------------------------------------------------------------
-EXEMPLE_SCRAPING = """
 from src.e1.core import ScrapingExtractor
 
 extractor = ScrapingExtractor(name="trustpilot_reviews", url="https://www.trustpilot.com")
 articles = extractor.extract()
 print(f"Scraped articles: {len(articles)}")
-""".strip()
 
 # ---------------------------------------------------------------------------
 # C1 - Extraction fichiers (CSV/JSON/XML)
 # ---------------------------------------------------------------------------
-EXEMPLE_AGGREGATE_RAW = """
+import os
+from pathlib import Path
 from src.e1.aggregator import DataAggregator
 
-DB_PATH = "datasens.db"
+DB_PATH = os.getenv("DB_PATH", str(Path.home() / "datasens_project" / "datasens.db"))
 aggregator = DataAggregator(DB_PATH)
 df = aggregator.aggregate_raw()
 aggregator.close()
 print(df.head(3))
-""".strip()
 
 # ---------------------------------------------------------------------------
 # C1 - Web scraping simple (BeautifulSoup)
 # ---------------------------------------------------------------------------
-EXEMPLE_SCRAPE_TITLES = """
 import requests
 from bs4 import BeautifulSoup
 
@@ -65,28 +60,28 @@ html = requests.get(URL, timeout=15, headers={"User-Agent": "Mozilla/5.0"}).text
 soup = BeautifulSoup(html, "lxml")
 titles = [h.get_text(strip=True) for h in soup.select("h1, h2")]
 print(titles[:10])
-""".strip()
 
 # ---------------------------------------------------------------------------
 # C1 - Connexion SQLite (lecture simple)
 # ---------------------------------------------------------------------------
-EXEMPLE_SQLITE_READ = """
+import os
 import sqlite3
+from pathlib import Path
 
-DB_PATH = "datasens.db"
+DB_PATH = os.getenv("DB_PATH", str(Path.home() / "datasens_project" / "datasens.db"))
 conn = sqlite3.connect(DB_PATH)
 rows = conn.execute("SELECT raw_data_id, title FROM raw_data").fetchall()
 conn.close()
 print(rows[:5])
-""".strip()
 
 # ---------------------------------------------------------------------------
 # C4 - CRUD SQLite (exemple pédagogique)
 # ---------------------------------------------------------------------------
-EXEMPLE_CRUD_SQLITE = """
+import os
 import sqlite3
+from pathlib import Path
 
-DB_PATH = "datasens.db"
+DB_PATH = os.getenv("DB_PATH", str(Path.home() / "datasens_project" / "datasens.db"))
 conn = sqlite3.connect(DB_PATH)
 cur = conn.cursor()
 
@@ -113,49 +108,46 @@ cur.execute("DELETE FROM source WHERE name = ?", ("demo_source",))
 conn.commit()
 
 conn.close()
-""".strip()
 
 # ---------------------------------------------------------------------------
 # C3 - PySpark lecture Parquet (GOLD)
 # ---------------------------------------------------------------------------
-EXEMPLE_SPARK_READ = """
 from pyspark.sql import SparkSession
 
 PATH = "data/gold/date=2025-12-20"
 spark = SparkSession.builder.master("local[*]").getOrCreate()
 df = spark.read.parquet(PATH)
 df.select("id", "source", "sentiment").show(5, truncate=False)
-""".strip()
 
 # ---------------------------------------------------------------------------
 # C2 - SQL (SQLite) : requetes de base
 # ---------------------------------------------------------------------------
 EXEMPLE_SQL_LIST_SOURCES = """
-SELECT source_id, name, source_type, is_active
+SELECT source_id, name, source_type, active
 FROM source
-ORDER BY name;
-""".strip()
+ORDER BY name
+"""
 
 EXEMPLE_SQL_COUNT_BY_SOURCE = """
 SELECT s.name, COUNT(*) AS nb_articles
 FROM raw_data r
 JOIN source s ON s.source_id = r.source_id
 GROUP BY s.name
-ORDER BY nb_articles DESC;
-""".strip()
+ORDER BY nb_articles DESC
+"""
 
 EXEMPLE_SQL_FILTER_BY_DATE = """
 SELECT r.raw_data_id, r.title, r.collected_at
 FROM raw_data r
 WHERE r.collected_at >= '2025-12-20'
 ORDER BY r.collected_at DESC
-LIMIT 50;
-""".strip()
+LIMIT 50
+"""
 
 EXEMPLE_SQL_GOLD_VIEW = """
 SELECT r.title,
        s.name AS source,
-       t.label AS topic,
+       t.name AS topic,
        mo.label AS sentiment,
        mo.score AS sentiment_score
 FROM raw_data r
@@ -165,55 +157,57 @@ LEFT JOIN topic t ON t.topic_id = dt.topic_id
 LEFT JOIN model_output mo ON mo.raw_data_id = r.raw_data_id
 WHERE mo.model_name = 'sentiment_keyword'
 ORDER BY r.collected_at DESC
-LIMIT 100;
-""".strip()
+LIMIT 100
+"""
 
 EXEMPLE_SQL_EXPLAIN = """
 EXPLAIN QUERY PLAN
 SELECT raw_data_id, title
 FROM raw_data
-WHERE collected_at >= '2025-12-01';
-""".strip()
+WHERE collected_at >= '2025-12-01'
+"""
 
 EXEMPLE_SQL_AGGREGATE_RAW = """
 SELECT r.raw_data_id as id, s.name as source, s.is_synthetic as is_synthetic, r.title, r.content, r.url,
        r.fingerprint, r.collected_at, r.quality_score
 FROM raw_data r
 JOIN source s ON r.source_id = s.source_id
-ORDER BY r.collected_at DESC;
-""".strip()
+ORDER BY r.collected_at DESC
+"""
 
 EXEMPLE_SQL_AGGREGATE_SILVER = """
 SELECT dt.raw_data_id, t.name as topic_name, dt.confidence_score,
        ROW_NUMBER() OVER (PARTITION BY dt.raw_data_id ORDER BY dt.confidence_score DESC) as rn
 FROM document_topic dt
-JOIN topic t ON dt.topic_id = t.topic_id;
-""".strip()
+JOIN topic t ON dt.topic_id = t.topic_id
+"""
 
 EXEMPLE_SQL_AGGREGATE_GOLD = """
 SELECT raw_data_id, label as sentiment, score as sentiment_score
 FROM model_output
-WHERE model_name = 'sentiment_keyword';
-""".strip()
+WHERE model_name = 'sentiment_keyword'
+"""
 
 # ---------------------------------------------------------------------------
 # C3 - Nettoyage minimal (pandas)
 # ---------------------------------------------------------------------------
-EXEMPLE_MINIMAL_CLEANING = """
+# EXEMPLE_MINIMAL_CLEANING
+from typing import cast
+
 import pandas as pd
 
 def minimal_cleaning(df: pd.DataFrame) -> pd.DataFrame:
     df["title"] = df["title"].fillna("").str.strip()
     df["content"] = df["content"].fillna("").str.strip()
-    df = df[(df["title"].str.len() > 3) & (df["content"].str.len() > 20)]
+    df = cast(pd.DataFrame, df.loc[(df["title"].str.len() > 3) & (df["content"].str.len() > 10)])
     df["collected_at"] = pd.to_datetime(df["collected_at"], errors="coerce")
     return df
-""".strip()
+
 
 # ---------------------------------------------------------------------------
 # C2/C3 - PySpark requetes (DataFrame + SQL)
 # ---------------------------------------------------------------------------
-EXEMPLE_SPARK_QUERIES = """
+# EXEMPLE_SPARK_QUERIES
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col
 
@@ -234,41 +228,40 @@ result = spark.sql(
     '''
 )
 result.show(20, truncate=False)
-""".strip()
+
 
 # ---------------------------------------------------------------------------
 # C3 - GoldParquetReader
 # ---------------------------------------------------------------------------
-EXEMPLE_GOLD_PARQUET_READER = """
+# EXEMPLE_GOLD_PARQUET_READER
 from datetime import date
 from src.spark.adapters import GoldParquetReader
 
 reader = GoldParquetReader()
 df = reader.read_gold(date=date(2025, 12, 20))
 df.show(5, truncate=False)
-""".strip()
 
 # ---------------------------------------------------------------------------
 # C3 - GoldDataProcessor
 # ---------------------------------------------------------------------------
-EXEMPLE_GOLD_PROCESSOR = """
+EXEMPLE_GOLD_PROCESSOR
 from src.spark.processors import GoldDataProcessor
 
 processor = GoldDataProcessor()
 # Exemple: processor.get_statistics(df_gold)
-""".strip()
+
 
 # ---------------------------------------------------------------------------
 # A2 - API : exemples JSON (documentation)
 # ---------------------------------------------------------------------------
-EXEMPLE_SOURCES_JSON = """
+EXEMPLE_SOURCES_JSON
 [
   {"source_id": 1, "name": "google_news_rss", "source_type": "rss", "is_active": true},
   {"source_id": 2, "name": "reddit_france", "source_type": "api", "is_active": true}
 ]
-""".strip()
 
-EXEMPLE_RAW_DATA_JSON = """
+
+EXEMPLE_RAW_DATA_JSON
 [
   {
     "raw_data_id": 1201,
@@ -285,23 +278,23 @@ EXEMPLE_RAW_DATA_JSON = """
     "collected_at": "2025-12-20T10:06:00"
   }
 ]
-""".strip()
 
-EXEMPLE_MODEL_OUTPUT_JSON = """
-{
+
+EXEMPLE_MODEL_OUTPUT_JSON
+[
+  {
   "raw_data_id": 1201,
   "model_name": "sentiment_keyword",
   "label": "neutre",
   "score": 0.52,
   "confidence": 0.58,
   "created_at": "2025-12-20T10:05:12"
-}
-""".strip()
-
+    }
+]
 # ---------------------------------------------------------------------------
 # A2 - CRUD FastAPI (exemple REST, base SQLite)
 # ---------------------------------------------------------------------------
-EXEMPLE_FASTAPI_CRUD = """
+EXEMPLE_FASTAPI_CRUD
 import sqlite3
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -431,4 +424,4 @@ def delete_source(source_id: int):
     if cur.rowcount == 0:
         raise HTTPException(status_code=404, detail="Source not found")
     return {"status": "deleted", "source_id": source_id}
-""".strip()
+

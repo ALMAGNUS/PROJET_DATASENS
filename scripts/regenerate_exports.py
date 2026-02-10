@@ -6,21 +6,22 @@ from datetime import date
 from pathlib import Path
 
 # Fix encoding for Windows console
-if sys.platform == 'win32':
+if sys.platform == "win32":
     import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from aggregator import DataAggregator
 from exporter import GoldExporter
 
 if __name__ == "__main__":
-    db_path = os.getenv('DB_PATH', str(Path.home() / 'datasens_project' / 'datasens.db'))
+    db_path = os.getenv("DB_PATH", str(Path.home() / "datasens_project" / "datasens.db"))
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("[RÉGÉNÉRATION] EXPORTS RAW/SILVER/GOLD")
-    print("="*80)
+    print("=" * 80)
 
     agg = DataAggregator(db_path)
     exp = GoldExporter()
@@ -45,15 +46,15 @@ if __name__ == "__main__":
     print(f"   OK CSV: {r_gold['csv']} ({r_gold['rows']} rows)")
 
     # Statistiques sentiment
-    if 'sentiment' in df_gold.columns:
-        sentiment_counts = df_gold['sentiment'].value_counts()
+    if "sentiment" in df_gold.columns:
+        sentiment_counts = df_gold["sentiment"].value_counts()
         print("\n[SENTIMENT] Distribution dans GOLD:")
         for sent, count in sentiment_counts.items():
             pct = (count / len(df_gold)) * 100
-            emoji = {'positif': '✅', 'neutre': '⚪', 'négatif': '❌'}.get(sent, '📊')
+            emoji = {"positif": "✅", "neutre": "⚪", "négatif": "❌"}.get(sent, "📊")
             print(f"   {emoji} {sent:10s}: {count:4d} articles ({pct:5.1f}%)")
 
     agg.close()
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("[OK] EXPORTS RÉGÉNÉRÉS")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")

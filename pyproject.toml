@@ -2,6 +2,8 @@
 # DataSens E1 - Code Quality Configuration
 target-version = "py312"
 line-length = 100
+# Exemples à copier-coller (pas du code exécutable)
+exclude = ["scripts/dossier_e1_examples.py"]
 
 [tool.ruff.lint]
 select = [

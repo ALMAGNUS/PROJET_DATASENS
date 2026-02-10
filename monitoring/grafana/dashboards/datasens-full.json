@@ -1,0 +1,164 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 3, "w": 4, "x": 0, "y": 0 },
+      "id": 10,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "sum(increase(datasens_e2_api_requests_total[24h]))", "legendFormat": "Requêtes 24h", "refId": "A" }],
+      "title": "Requêtes API (24h)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 3, "w": 4, "x": 4, "y": 0 },
+      "id": 11,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "sum(rate(datasens_e2_api_requests_total[5m])) * 60", "legendFormat": "req/min", "refId": "A" }],
+      "title": "Requêtes / min",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 3, "w": 4, "x": 8, "y": 0 },
+      "id": 12,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "datasens_e2_api_active_connections", "legendFormat": "Connexions", "refId": "A" }],
+      "title": "Connexions actives",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 3, "w": 4, "x": 12, "y": 0 },
+      "id": 13,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "sum(rate(datasens_e2_api_errors_total[5m])) * 60", "legendFormat": "err/min", "refId": "A" }],
+      "title": "Erreurs / min",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 3 },
+      "id": 20,
+      "targets": [
+        { "expr": "sum(rate(datasens_e2_api_requests_total[5m])) by (endpoint)", "legendFormat": "{{endpoint}}", "refId": "A" }
+      ],
+      "title": "Requêtes par endpoint",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 3 },
+      "id": 21,
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum(rate(datasens_e2_api_request_duration_seconds_bucket[5m])) by (le, endpoint))", "legendFormat": "p95 {{endpoint}}", "refId": "A" },
+        { "expr": "histogram_quantile(0.50, sum(rate(datasens_e2_api_request_duration_seconds_bucket[5m])) by (le, endpoint))", "legendFormat": "p50 {{endpoint}}", "refId": "B" }
+      ],
+      "title": "Latence API (p50, p95)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 11 },
+      "id": 30,
+      "targets": [
+        { "expr": "sum(rate(datasens_e2_api_authentications_total[5m])) by (status)", "legendFormat": "{{status}}", "refId": "A" }
+      ],
+      "title": "Authentifications (succès / échec)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 11 },
+      "id": 31,
+      "targets": [
+        { "expr": "sum(rate(datasens_e2_api_zone_access_total[5m])) by (zone)", "legendFormat": "{{zone}}", "refId": "A" }
+      ],
+      "title": "Accès par zone (raw / silver / gold)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 17 },
+      "id": 40,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "datasens_drift_sentiment_entropy", "legendFormat": "Entropy", "refId": "A" }],
+      "title": "Drift – Entropy sentiment",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 17 },
+      "id": 41,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "datasens_drift_topic_dominance", "legendFormat": "Dominance", "refId": "A" }],
+      "title": "Drift – Dominance topic",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 17 },
+      "id": 42,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "datasens_drift_score", "legendFormat": "Score", "refId": "A" }],
+      "title": "Drift – Score composite",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 17 },
+      "id": 43,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "datasens_drift_articles_total", "legendFormat": "Articles", "refId": "A" }],
+      "title": "Drift – Articles (base)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 21 },
+      "id": 50,
+      "targets": [
+        { "expr": "datasens_drift_sentiment_entropy", "legendFormat": "Entropy sentiment", "refId": "A" },
+        { "expr": "datasens_drift_topic_dominance", "legendFormat": "Dominance topic", "refId": "B" },
+        { "expr": "datasens_drift_score", "legendFormat": "Score drift", "refId": "C" }
+      ],
+      "title": "Courbes de drift (appeler GET /api/v1/analytics/drift-metrics pour mettre à jour)",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["datasens", "e2", "drift", "prometheus"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": true, "text": "Prometheus", "value": "Prometheus" },
+        "hide": 0,
+        "includeAll": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "DataSens – Métriques & Drift",
+  "version": 1,
+  "weekStart": ""
+}

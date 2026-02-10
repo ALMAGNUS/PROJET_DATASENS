@@ -7,67 +7,79 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-if sys.platform == 'win32':
+if sys.platform == "win32":
     try:
         if hasattr(sys.stdout, "reconfigure"):
             sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except (AttributeError, OSError):
         pass
 
-print("\n" + "="*80)
+print("\n" + "=" * 80)
 print("  VALIDATION PROJET E1 - PREUVES CONCRÈTES")
-print("="*80)
+print("=" * 80)
 
 project_root = Path(__file__).parent.parent
-db_path = Path(os.getenv('DB_PATH', str(Path.home() / 'datasens_project' / 'datasens.db')))
-zzdb_mongo_uri = os.getenv('ZZDB_MONGO_URI', os.getenv('MONGO_URI', 'mongodb://localhost:27017'))
-zzdb_db_name = os.getenv('ZZDB_MONGO_DB', 'zzdb')
-zzdb_collection_name = os.getenv('ZZDB_MONGO_COLLECTION', 'synthetic_articles')
+db_path = Path(os.getenv("DB_PATH", str(Path.home() / "datasens_project" / "datasens.db")))
+zzdb_mongo_uri = os.getenv("ZZDB_MONGO_URI", os.getenv("MONGO_URI", "mongodb://localhost:27017"))
+zzdb_db_name = os.getenv("ZZDB_MONGO_DB", "zzdb")
+zzdb_collection_name = os.getenv("ZZDB_MONGO_COLLECTION", "synthetic_articles")
 
-results = {
-    'passed': 0,
-    'failed': 0,
-    'warnings': 0,
-    'details': []
-}
+results = {"passed": 0, "failed": 0, "warnings": 0, "details": []}
+
 
 def test(name, condition, details=""):
     """Test unitaire avec rapport"""
     if condition:
-        results['passed'] += 1
+        results["passed"] += 1
         status = "✅ PASS"
         print(f"   {status} : {name}")
         if details:
             print(f"      → {details}")
     else:
-        results['failed'] += 1
+        results["failed"] += 1
         status = "❌ FAIL"
         print(f"   {status} : {name}")
         if details:
             print(f"      → {details}")
-    results['details'].append({'name': name, 'status': status, 'details': details})
+    results["details"].append({"name": name, "status": status, "details": details})
+
 
 def warn(name, message):
     """Avertissement"""
-    results['warnings'] += 1
+    results["warnings"] += 1
     print(f"   ⚠️  WARN : {name}")
     print(f"      → {message}")
+
 
 print("\n[1] VÉRIFICATION STRUCTURE PROJET")
 print("-" * 80)
 
 # Fichiers essentiels
-test("main.py existe", (project_root / 'main.py').exists(), "Point d'entrée du pipeline")
-test("src/core.py existe", (project_root / 'src' / 'core.py').exists(), "Extracteurs et modèles")
-test("src/repository.py existe", (project_root / 'src' / 'repository.py').exists(), "Gestion base de données")
-test("sources_config.json existe", (project_root / 'sources_config.json').exists(), "Configuration des sources")
-test("requirements.txt existe", (project_root / 'requirements.txt').exists(), "Dépendances Python")
+test("main.py existe", (project_root / "main.py").exists(), "Point d'entrée du pipeline")
+test("src/core.py existe", (project_root / "src" / "core.py").exists(), "Extracteurs et modèles")
+test(
+    "src/repository.py existe",
+    (project_root / "src" / "repository.py").exists(),
+    "Gestion base de données",
+)
+test(
+    "sources_config.json existe",
+    (project_root / "sources_config.json").exists(),
+    "Configuration des sources",
+)
+test("requirements.txt existe", (project_root / "requirements.txt").exists(), "Dépendances Python")
 
 # Modules essentiels
-test("src/aggregator.py existe", (project_root / 'src' / 'aggregator.py').exists(), "Agrégation RAW/SILVER/GOLD")
-test("src/exporter.py existe", (project_root / 'src' / 'exporter.py').exists(), "Export CSV/Parquet")
-test("src/tagger.py existe", (project_root / 'src' / 'tagger.py').exists(), "Tagging topics")
-test("src/analyzer.py existe", (project_root / 'src' / 'analyzer.py').exists(), "Analyse sentiment")
+test(
+    "src/aggregator.py existe",
+    (project_root / "src" / "aggregator.py").exists(),
+    "Agrégation RAW/SILVER/GOLD",
+)
+test(
+    "src/exporter.py existe", (project_root / "src" / "exporter.py").exists(), "Export CSV/Parquet"
+)
+test("src/tagger.py existe", (project_root / "src" / "tagger.py").exists(), "Tagging topics")
+test("src/analyzer.py existe", (project_root / "src" / "analyzer.py").exists(), "Analyse sentiment")
 
 print("\n[2] VÉRIFICATION BASE DE DONNÉES DataSens")
 print("-" * 80)
@@ -82,7 +94,14 @@ if db_path.exists():
         # Vérifier schéma
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = [r[0] for r in cursor.fetchall()]
-        required_tables = ['source', 'raw_data', 'sync_log', 'topic', 'document_topic', 'model_output']
+        required_tables = [
+            "source",
+            "raw_data",
+            "sync_log",
+            "topic",
+            "document_topic",
+            "model_output",
+        ]
 
         for table in required_tables:
             test(f"Table {table} existe", table in tables)
@@ -107,16 +126,30 @@ if db_path.exists():
         # Vérifier qualité des données
         cursor.execute("SELECT COUNT(*) FROM raw_data WHERE title IS NOT NULL AND title != ''")
         valid_titles = cursor.fetchone()[0]
-        test("Articles avec titre valide", valid_titles == total_articles, f"{valid_titles}/{total_articles}")
+        test(
+            "Articles avec titre valide",
+            valid_titles == total_articles,
+            f"{valid_titles}/{total_articles}",
+        )
 
         cursor.execute("SELECT COUNT(*) FROM raw_data WHERE content IS NOT NULL AND content != ''")
         valid_content = cursor.fetchone()[0]
-        test("Articles avec contenu valide", valid_content == total_articles, f"{valid_content}/{total_articles}")
+        test(
+            "Articles avec contenu valide",
+            valid_content == total_articles,
+            f"{valid_content}/{total_articles}",
+        )
 
         # Vérifier déduplication (fingerprint)
-        cursor.execute("SELECT COUNT(DISTINCT fingerprint) FROM raw_data WHERE fingerprint IS NOT NULL")
+        cursor.execute(
+            "SELECT COUNT(DISTINCT fingerprint) FROM raw_data WHERE fingerprint IS NOT NULL"
+        )
         unique_fp = cursor.fetchone()[0]
-        test("Déduplication active (fingerprint)", unique_fp > 0, f"{unique_fp:,} fingerprints uniques")
+        test(
+            "Déduplication active (fingerprint)",
+            unique_fp > 0,
+            f"{unique_fp:,} fingerprints uniques",
+        )
 
         conn.close()
     except Exception as e:
@@ -134,7 +167,9 @@ try:
     collection = client[zzdb_db_name][zzdb_collection_name]
 
     total_zzdb = collection.count_documents({})
-    test("Connexion à ZZDB MongoDB", True, f"{zzdb_mongo_uri}/{zzdb_db_name}.{zzdb_collection_name}")
+    test(
+        "Connexion à ZZDB MongoDB", True, f"{zzdb_mongo_uri}/{zzdb_db_name}.{zzdb_collection_name}"
+    )
     test("Articles synthétiques ZZDB", total_zzdb > 0, f"{total_zzdb:,} articles")
 
     themes_count = len(collection.distinct("theme"))
@@ -154,6 +189,7 @@ print("-" * 80)
 try:
     sys.path.insert(0, str(project_root))
     from src.e1.core import Source, create_extractor
+
     test("Import modules core", True, "Article, Source, create_extractor")
     test("Import Repository", True, "Repository disponible")
 except Exception as e:
@@ -167,13 +203,15 @@ except Exception as e:
 
 # Vérifier sources config
 try:
-    with open(project_root / 'sources_config.json', encoding='utf-8') as f:
+    with open(project_root / "sources_config.json", encoding="utf-8") as f:
         config = json.load(f)
-        sources_count = len(config.get('sources', []))
-        test("sources_config.json valide", sources_count > 0, f"{sources_count} sources configurées")
+        sources_count = len(config.get("sources", []))
+        test(
+            "sources_config.json valide", sources_count > 0, f"{sources_count} sources configurées"
+        )
 
         # Vérifier source zzdb
-        zzdb_sources = [s for s in config['sources'] if 'zzdb' in s.get('source_name', '').lower()]
+        zzdb_sources = [s for s in config["sources"] if "zzdb" in s.get("source_name", "").lower()]
         test("Source ZZDB configurée", len(zzdb_sources) > 0, f"{len(zzdb_sources)} source(s) ZZDB")
 except Exception as e:
     test("sources_config.json valide", False, f"Erreur: {str(e)[:60]}")
@@ -181,17 +219,17 @@ except Exception as e:
 print("\n[5] VÉRIFICATION EXPORTS")
 print("-" * 80)
 
-exports_dir = project_root / 'exports'
+exports_dir = project_root / "exports"
 if exports_dir.exists():
     test("Dossier exports/ existe", True)
 
-    gold_csv = exports_dir / 'gold.csv'
-    gold_parquet = exports_dir / 'gold.parquet'
+    gold_csv = exports_dir / "gold.csv"
+    gold_parquet = exports_dir / "gold.parquet"
 
     if gold_csv.exists():
         # Compter lignes
         try:
-            with open(gold_csv, encoding='utf-8') as f:
+            with open(gold_csv, encoding="utf-8") as f:
                 lines = sum(1 for _ in f) - 1  # -1 pour header
             test("gold.csv existe et contient des données", lines > 0, f"{lines:,} lignes")
         except:
@@ -216,39 +254,54 @@ if db_path.exists():
         cursor = conn.cursor()
 
         # Vérifier enrichissement (topics + sentiment)
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT COUNT(DISTINCT r.raw_data_id)
             FROM raw_data r
             WHERE EXISTS (SELECT 1 FROM document_topic dt WHERE dt.raw_data_id = r.raw_data_id)
             AND EXISTS (SELECT 1 FROM model_output mo WHERE mo.raw_data_id = r.raw_data_id
                         AND mo.model_name = 'sentiment_keyword')
-        """)
+        """
+        )
         enriched_count = cursor.fetchone()[0]
-        test("Articles enrichis (topics + sentiment)", enriched_count > 0,
-             f"{enriched_count:,} articles enrichis")
+        test(
+            "Articles enrichis (topics + sentiment)",
+            enriched_count > 0,
+            f"{enriched_count:,} articles enrichis",
+        )
 
         # Vérifier distribution sentiment
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT label, COUNT(*) as count
             FROM model_output
             WHERE model_name = 'sentiment_keyword'
             GROUP BY label
-        """)
+        """
+        )
         sentiments = cursor.fetchall()
-        test("Distribution sentiment", len(sentiments) > 0,
-             f"{len(sentiments)} catégories: {', '.join([s[0] for s in sentiments])}")
+        test(
+            "Distribution sentiment",
+            len(sentiments) > 0,
+            f"{len(sentiments)} catégories: {', '.join([s[0] for s in sentiments])}",
+        )
 
         # Vérifier quality_score pour ZZDB
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT AVG(quality_score)
             FROM raw_data r
             JOIN source s ON r.source_id = s.source_id
             WHERE s.name LIKE '%zzdb%'
-        """)
+        """
+        )
         zzdb_quality = cursor.fetchone()[0]
         if zzdb_quality is not None:
-            test("Quality score ZZDB (garde-fou)", zzdb_quality == 0.3,
-                 f"Score: {zzdb_quality} (attendu: 0.3)")
+            test(
+                "Quality score ZZDB (garde-fou)",
+                zzdb_quality == 0.3,
+                f"Score: {zzdb_quality} (attendu: 0.3)",
+            )
 
         conn.close()
     except Exception as e:
@@ -263,20 +316,20 @@ try:
 
     # Test avec source zzdb_synthetic
     test_source = Source(
-        source_name="zzdb_synthetic",
-        acquisition_type="mongodb",
-        url=zzdb_mongo_uri
+        source_name="zzdb_synthetic", acquisition_type="mongodb", url=zzdb_mongo_uri
     )
 
     extractor = create_extractor(test_source)
-    test("Création extractor ZZDB", extractor is not None,
-         f"Type: {type(extractor).__name__}")
+    test("Création extractor ZZDB", extractor is not None, f"Type: {type(extractor).__name__}")
 
     # Test extraction (avec limite)
-    os.environ['ZZDB_MAX_ARTICLES'] = '5'  # Limiter pour test rapide
+    os.environ["ZZDB_MAX_ARTICLES"] = "5"  # Limiter pour test rapide
     articles = extractor.extract()
-    test("Extraction ZZDB fonctionne", len(articles) >= 0,
-         f"{len(articles)} articles extraits (max 5 pour test)")
+    test(
+        "Extraction ZZDB fonctionne",
+        len(articles) >= 0,
+        f"{len(articles)} articles extraits (max 5 pour test)",
+    )
 
 except Exception as e:
     test("Test extraction réelle", False, f"Erreur: {str(e)[:60]}")
@@ -288,31 +341,36 @@ print(f"   ❌ Tests échoués    : {results['failed']}")
 print(f"   ⚠️  Avertissements : {results['warnings']}")
 print(f"   📊 Score           : {results['passed']}/{results['passed'] + results['failed']}")
 
-if results['failed'] == 0:
+if results["failed"] == 0:
     print("\n   🎉 PROJET E1 VALIDÉ - TOUS LES TESTS PASSENT")
     print("   Le projet est fonctionnel et prêt pour la démonstration.")
-elif results['failed'] <= 2:
+elif results["failed"] <= 2:
     print("\n   ⚠️  PROJET E1 QUASI-VALIDÉ - Quelques ajustements nécessaires")
     print("   La plupart des fonctionnalités sont opérationnelles.")
 else:
     print("\n   ❌ PROJET E1 NÉCESSITE DES CORRECTIONS")
     print("   Plusieurs tests ont échoué. Vérifier les erreurs ci-dessus.")
 
-print("\n" + "="*80)
+print("\n" + "=" * 80)
 print("  FIN DE LA VALIDATION")
-print("="*80 + "\n")
+print("=" * 80 + "\n")
 
 # Générer rapport JSON
-report_path = project_root / 'validation_report.json'
-with open(report_path, 'w', encoding='utf-8') as f:
-    json.dump({
-        'timestamp': datetime.now().isoformat(),
-        'summary': {
-            'passed': results['passed'],
-            'failed': results['failed'],
-            'warnings': results['warnings']
+report_path = project_root / "validation_report.json"
+with open(report_path, "w", encoding="utf-8") as f:
+    json.dump(
+        {
+            "timestamp": datetime.now().isoformat(),
+            "summary": {
+                "passed": results["passed"],
+                "failed": results["failed"],
+                "warnings": results["warnings"],
+            },
+            "details": results["details"],
         },
-        'details': results['details']
-    }, f, indent=2, ensure_ascii=False)
+        f,
+        indent=2,
+        ensure_ascii=False,
+    )
 
 print(f"   📄 Rapport détaillé sauvegardé : {report_path}")

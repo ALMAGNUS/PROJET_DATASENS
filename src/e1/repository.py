@@ -22,7 +22,9 @@ class Repository(DatabaseLoader):
         """Create database schema if it doesn't exist"""
         try:
             # Check if tables exist
-            self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='source'")
+            self.cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='source'"
+            )
             schema_exists = self.cursor.fetchone()
 
             if not schema_exists:
@@ -122,11 +124,11 @@ class Repository(DatabaseLoader):
         try:
             # Load from config file
             # sources_config.json is at project root (../.. from src/e1)
-            config_path = Path(__file__).parent.parent.parent / 'sources_config.json'
+            config_path = Path(__file__).parent.parent.parent / "sources_config.json"
             if not config_path.exists():
                 return  # Config file doesn't exist
 
-            with open(config_path, encoding='utf-8') as f:
+            with open(config_path, encoding="utf-8") as f:
                 config = json.load(f)
 
             # Get existing source names
@@ -134,7 +136,7 @@ class Repository(DatabaseLoader):
             existing_names = {row[0] for row in self.cursor.fetchall()}
 
             # Insert missing sources
-            for source_data in config.get('sources', []):
+            for source_data in config.get("sources", []):
                 source = Source(**source_data)
 
                 # Skip if source already exists
@@ -143,25 +145,26 @@ class Repository(DatabaseLoader):
 
                 try:
                     is_synthetic = 1 if "zzdb" in source.source_name.lower() else 0
-                    self.cursor.execute("""
+                    self.cursor.execute(
+                        """
                         INSERT INTO source (name, source_type, url, sync_frequency, active, is_synthetic, created_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        source.source_name,
-                        source.acquisition_type,
-                        source.url,
-                        source.refresh_frequency or 'DAILY',
-                        1 if source.active else 0,
-                        is_synthetic,
-                        datetime.now().isoformat()
-                    ))
+                    """,
+                        (
+                            source.source_name,
+                            source.acquisition_type,
+                            source.url,
+                            source.refresh_frequency or "DAILY",
+                            1 if source.active else 0,
+                            is_synthetic,
+                            datetime.now().isoformat(),
+                        ),
+                    )
                 except sqlite3.IntegrityError:
                     pass  # Source already exists
 
             # Marquer les sources synthétiques existantes (ZZDB)
-            self.cursor.execute(
-                "UPDATE source SET is_synthetic = 1 WHERE lower(name) LIKE 'zzdb%'"
-            )
+            self.cursor.execute("UPDATE source SET is_synthetic = 1 WHERE lower(name) LIKE 'zzdb%'")
 
             self.conn.commit()
         except Exception as e:
@@ -177,13 +180,26 @@ class Repository(DatabaseLoader):
                 return None  # Duplicate (déduplication normale)
 
             # GARDE-FOU ZZDB: Qualité réduite pour données synthétiques (0.3 au lieu de 0.5)
-            quality_score = 0.3 if article.source_name and 'zzdb' in article.source_name.lower() else 0.5
+            quality_score = (
+                0.3 if article.source_name and "zzdb" in article.source_name.lower() else 0.5
+            )
 
-            self.cursor.execute("""
+            self.cursor.execute(
+                """
                 INSERT INTO raw_data (source_id, title, content, url, fingerprint, published_at, collected_at, quality_score)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (source_id, article.title, article.content, article.url, fp,
-                  article.published_at, datetime.now().isoformat(), quality_score))
+            """,
+                (
+                    source_id,
+                    article.title,
+                    article.content,
+                    article.url,
+                    fp,
+                    article.published_at,
+                    datetime.now().isoformat(),
+                    quality_score,
+                ),
+            )
             self.conn.commit()
 
             # Get inserted ID
@@ -193,7 +209,7 @@ class Repository(DatabaseLoader):
         except sqlite3.IntegrityError as e:
             # UNIQUE constraint failed sur fingerprint = déduplication normale (race condition)
             # Ne pas afficher l'erreur, c'est attendu
-            if 'fingerprint' in str(e).lower() or 'unique' in str(e).lower():
+            if "fingerprint" in str(e).lower() or "unique" in str(e).lower():
                 return None  # Duplicate (silencieux)
             # Autre erreur d'intégrité : afficher
             logger.error("DB integrity error: {}", str(e)[:40])
@@ -203,10 +219,17 @@ class Repository(DatabaseLoader):
             logger.error("DB error: {}", str(e)[:40])
             return None
 
-    def log_foundation_integration(self, source_id: int, source_name: str, source_type: str,
-                                   file_path: str | None = None, file_size: int | None = None,
-                                   rows_integrated: int = 0, status: str = 'INTEGRATED',
-                                   notes: str | None = None) -> bool:
+    def log_foundation_integration(
+        self,
+        source_id: int,
+        source_name: str,
+        source_type: str,
+        file_path: str | None = None,
+        file_size: int | None = None,
+        rows_integrated: int = 0,
+        status: str = "INTEGRATED",
+        notes: str | None = None,
+    ) -> bool:
         """Log l'intégration d'une source statique (fondation) via sync_log (table E1)"""
         try:
             # Utiliser sync_log avec status='FOUNDATION_INTEGRATED' pour les fondations
@@ -216,7 +239,7 @@ class Repository(DatabaseLoader):
             if notes:
                 notes_full += f" | {notes}"
 
-            self.log_sync(source_id, rows_integrated, 'FOUNDATION_INTEGRATED', notes_full)
+            self.log_sync(source_id, rows_integrated, "FOUNDATION_INTEGRATED", notes_full)
             return True
         except Exception as e:
             logger.error("Foundation log error: {}", str(e)[:40])
@@ -225,23 +248,29 @@ class Repository(DatabaseLoader):
     def is_foundation_integrated(self, source_name: str) -> bool:
         """Vérifie si une source statique (fondation) a déjà été intégrée via sync_log"""
         try:
-            self.cursor.execute("""
+            self.cursor.execute(
+                """
                 SELECT COUNT(*)
                 FROM sync_log sl
                 JOIN source s ON sl.source_id = s.source_id
                 WHERE s.name = ? AND sl.status = 'FOUNDATION_INTEGRATED'
-            """, (source_name,))
+            """,
+                (source_name,),
+            )
             count = self.cursor.fetchone()[0]
             return count > 0
         except:
             # Fallback: vérifier si des articles existent déjà pour cette source
             try:
-                self.cursor.execute("""
+                self.cursor.execute(
+                    """
                     SELECT COUNT(*)
                     FROM raw_data r
                     JOIN source s ON r.source_id = s.source_id
                     WHERE s.name = ?
-                """, (source_name,))
+                """,
+                    (source_name,),
+                )
                 count = self.cursor.fetchone()[0]
                 return count > 0
             except:
@@ -251,7 +280,9 @@ class Repository(DatabaseLoader):
         """Create PROFILS table if it doesn't exist (migration-safe, isolated from E1 tables)"""
         try:
             # Check if profils table already exists
-            self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='profils'")
+            self.cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='profils'"
+            )
             if self.cursor.fetchone():
                 return  # Table already exists
 
@@ -296,19 +327,27 @@ class Repository(DatabaseLoader):
         except Exception as e:
             logger.error("Profils table creation error: {}", str(e)[:60])
 
-    def log_user_action(self, profil_id: int, action_type: str,
-                       resource_type: str, resource_id: int | None = None,
-                       ip_address: str | None = None, details: str | None = None) -> bool:
+    def log_user_action(
+        self,
+        profil_id: int,
+        action_type: str,
+        resource_type: str,
+        resource_id: int | None = None,
+        ip_address: str | None = None,
+        details: str | None = None,
+    ) -> bool:
         """Log user action in USER_ACTION_LOG (audit trail) - Isolated from E1 tables"""
         try:
-            self.cursor.execute("""
+            self.cursor.execute(
+                """
                 INSERT INTO user_action_log
                 (profil_id, action_type, resource_type, resource_id, ip_address, details)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (profil_id, action_type, resource_type, resource_id, ip_address, details))
+            """,
+                (profil_id, action_type, resource_type, resource_id, ip_address, details),
+            )
             self.conn.commit()
             return True
         except Exception as e:
             logger.error("Action log error: {}", str(e)[:60])
             return False
-

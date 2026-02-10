@@ -46,12 +46,15 @@ class UserService:
         cursor = conn.cursor()
 
         try:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT profil_id, email, password_hash, firstname, lastname,
                        role, active, created_at, updated_at, last_login, username
                 FROM profils
                 WHERE email = ?
-            """, (email,))
+            """,
+                (email,),
+            )
 
             row = cursor.fetchone()
             if row:
@@ -66,7 +69,7 @@ class UserService:
                     created_at=row["created_at"],
                     updated_at=row["updated_at"],
                     last_login=row["last_login"],
-                    username=row["username"]
+                    username=row["username"],
                 )
             return None
         finally:
@@ -87,12 +90,15 @@ class UserService:
         cursor = conn.cursor()
 
         try:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT profil_id, email, password_hash, firstname, lastname,
                        role, active, created_at, updated_at, last_login, username
                 FROM profils
                 WHERE profil_id = ?
-            """, (profil_id,))
+            """,
+                (profil_id,),
+            )
 
             row = cursor.fetchone()
             if row:
@@ -107,7 +113,7 @@ class UserService:
                     created_at=row["created_at"],
                     updated_at=row["updated_at"],
                     last_login=row["last_login"],
-                    username=row["username"]
+                    username=row["username"],
                 )
             return None
         finally:
@@ -147,11 +153,14 @@ class UserService:
         cursor = conn.cursor()
 
         try:
-            cursor.execute("""
+            cursor.execute(
+                """
                 UPDATE profils
                 SET last_login = CURRENT_TIMESTAMP
                 WHERE profil_id = ?
-            """, (profil_id,))
+            """,
+                (profil_id,),
+            )
             conn.commit()
         finally:
             conn.close()
