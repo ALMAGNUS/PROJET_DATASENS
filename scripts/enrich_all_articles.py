@@ -3,18 +3,19 @@
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 import sqlite3
 
 from analyzer import SentimentAnalyzer
 from tagger import TopicTagger
 
-db_path = str(Path.home() / 'datasens_project' / 'datasens.db')
+db_path = str(Path.home() / "datasens_project" / "datasens.db")
 conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 
 # Récupérer tous les articles non enrichis
-cursor.execute("""
+cursor.execute(
+    """
     SELECT r.raw_data_id, r.title, r.content
     FROM raw_data r
     WHERE NOT EXISTS (
@@ -24,7 +25,8 @@ cursor.execute("""
         WHERE mo.raw_data_id = r.raw_data_id AND mo.model_name = 'sentiment_keyword'
     )
     ORDER BY r.collected_at DESC
-""")
+"""
+)
 articles = cursor.fetchall()
 
 if len(articles) == 0:
@@ -45,11 +47,11 @@ for i, (raw_id, title, content) in enumerate(articles, 1):
         print(f"   Progression: {i}/{len(articles)}...")
 
     # Tag topics
-    if tagger.tag(raw_id, title or '', content or ''):
+    if tagger.tag(raw_id, title or "", content or ""):
         tagged += 1
 
     # Analyze sentiment
-    if analyzer.save(raw_id, title or '', content or ''):
+    if analyzer.save(raw_id, title or "", content or ""):
         analyzed += 1
 
 tagger.close()
@@ -60,4 +62,3 @@ print("\n[OK] Enrichissement terminé:")
 print(f"   Articles taggés: {tagged}")
 print(f"   Articles analysés: {analyzed}")
 print(f"   Total traités: {len(articles)}\n")
-

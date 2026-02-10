@@ -96,7 +96,7 @@ def create_source(payload: SourceCreate, _user=Depends(require_writer)):
     conn.commit()
     source_id = cur.lastrowid
     conn.close()
-    return SourceResponse(source_id=source_id, **payload.dict())
+    return SourceResponse(source_id=source_id, **payload.model_dump())
 
 
 @router.put("/{source_id}", response_model=SourceResponse)
@@ -124,7 +124,7 @@ def update_source(source_id: int, payload: SourceUpdate, _user=Depends(require_w
         conn.close()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source not found")
     conn.close()
-    return SourceResponse(source_id=source_id, **payload.dict())
+    return SourceResponse(source_id=source_id, **payload.model_dump())
 
 
 @router.delete("/{source_id}")

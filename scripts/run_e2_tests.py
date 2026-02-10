@@ -19,7 +19,7 @@ def main():
         result = subprocess.run(
             [sys.executable, "-m", "pytest", "tests/test_e2_api.py", "-v", "--tb=short"],
             capture_output=False,
-            text=True
+            text=True,
         )
 
         # Retourner le code de sortie
@@ -28,6 +28,7 @@ def main():
     except Exception as e:
         print(f"ERREUR: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

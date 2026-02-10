@@ -9,7 +9,7 @@ import pandas as pd
 def view_csv(file_path: Path, max_rows: int = 20):
     """Affiche un aperçu du CSV"""
     try:
-        df = pd.read_csv(file_path, encoding='utf-8')
+        df = pd.read_csv(file_path, encoding="utf-8")
         print(f"\n{'='*80}")
         print(f"[CSV] {file_path.name}")
         print(f"{'='*80}")
@@ -23,9 +23,9 @@ def view_csv(file_path: Path, max_rows: int = 20):
 
         print(f"\n   Aperçu (premières {min(max_rows, len(df))} lignes):")
         print(f"   {'-'*80}")
-        pd.set_option('display.max_columns', None)
-        pd.set_option('display.width', None)
-        pd.set_option('display.max_colwidth', 50)
+        pd.set_option("display.max_columns", None)
+        pd.set_option("display.width", None)
+        pd.set_option("display.max_colwidth", 50)
         print(df.head(max_rows).to_string(index=False))
 
         if len(df) > max_rows:
@@ -35,22 +35,19 @@ def view_csv(file_path: Path, max_rows: int = 20):
     except Exception as e:
         print(f"   ERREUR: {e!s}")
 
+
 if __name__ == "__main__":
-    exports_dir = Path(__file__).parent.parent / 'exports'
+    exports_dir = Path(__file__).parent.parent / "exports"
 
     if not exports_dir.exists():
         print("[ERREUR] Le dossier 'exports' n'existe pas")
         sys.exit(1)
 
-    csv_files = {
-        '1': 'raw.csv',
-        '2': 'silver.csv',
-        '3': 'gold.csv'
-    }
+    csv_files = {"1": "raw.csv", "2": "silver.csv", "3": "gold.csv"}
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("[EXPORTS] VISUALISATION DES FICHIERS CSV")
-    print("="*80)
+    print("=" * 80)
     print("\nFichiers disponibles dans exports/:")
     for key, filename in csv_files.items():
         file_path = exports_dir / filename
@@ -67,9 +64,9 @@ if __name__ == "__main__":
 
     choice = input("\nVotre choix: ").strip().lower()
 
-    if choice == 'q':
+    if choice == "q":
         sys.exit(0)
-    elif choice == 'all':
+    elif choice == "all":
         for filename in csv_files.values():
             file_path = exports_dir / filename
             if file_path.exists():
@@ -83,4 +80,3 @@ if __name__ == "__main__":
             print(f"[ERREUR] {filename} n'existe pas")
     else:
         print("[ERREUR] Choix invalide")
-

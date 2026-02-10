@@ -7,14 +7,14 @@ Creates ONLY 6 tables using raw SQL, bypassing SQLAlchemy metadata registry
 import sqlite3
 from pathlib import Path
 
-print("\n" + "="*70)
+print("\n" + "=" * 70)
 print("[OK] DataSens E1 - Direct SQL Setup")
-print("="*70)
+print("=" * 70)
 
 # Setup paths
-DATA_PATH = Path.home() / 'datasens_project'
+DATA_PATH = Path.home() / "datasens_project"
 DATA_PATH.mkdir(parents=True, exist_ok=True)
-RAW_DB_PATH = DATA_PATH / 'datasens.db'
+RAW_DB_PATH = DATA_PATH / "datasens.db"
 
 # Try to delete if exists, but skip if locked by Jupyter
 try:
@@ -23,7 +23,7 @@ try:
         print("\n[OK] Deleted old database")
 except PermissionError:
     print("\n[WARN] Database file locked (Jupyter session), will recreate with new name")
-    RAW_DB_PATH = DATA_PATH / 'datasens_fresh.db'
+    RAW_DB_PATH = DATA_PATH / "datasens_fresh.db"
 
 print("\n1. Creating RAW database with SQL...")
 conn = sqlite3.connect(str(RAW_DB_PATH))
@@ -117,17 +117,17 @@ for t in sorted(tables):
 # Insert 11 sources
 print("\n2. Inserting 11 news sources...")
 sources = [
-    ('rss_french_news', 'rss', 'https://www.france24.com/fr/rss'),
-    ('gdelt_events', 'bigdata', 'https://blog.gdeltproject.org/'),
-    ('reddit_france', 'api_scraping', 'https://www.reddit.com/r/france'),
-    ('trustpilot_reviews', 'scraping', 'https://fr.trustpilot.com'),
-    ('openweather_api', 'api', 'https://openweathermap.org/api'),
-    ('insee_indicators', 'api', 'https://api.insee.fr'),
-    ('datagouv_datasets', 'dataset', 'https://www.data.gouv.fr'),
-    ('kaggle_french_opinions', 'dataset', 'https://www.kaggle.com'),
-    ('google_news_rss', 'rss', 'https://news.google.com/rss'),
-    ('ifop_barometers', 'scraping', 'https://www.ifop.com/publications/'),
-    ('yahoo_finance', 'rss', 'https://finance.yahoo.com/news/rss'),
+    ("rss_french_news", "rss", "https://www.france24.com/fr/rss"),
+    ("gdelt_events", "bigdata", "https://blog.gdeltproject.org/"),
+    ("reddit_france", "api_scraping", "https://www.reddit.com/r/france"),
+    ("trustpilot_reviews", "scraping", "https://fr.trustpilot.com"),
+    ("openweather_api", "api", "https://openweathermap.org/api"),
+    ("insee_indicators", "api", "https://api.insee.fr"),
+    ("datagouv_datasets", "dataset", "https://www.data.gouv.fr"),
+    ("kaggle_french_opinions", "dataset", "https://www.kaggle.com"),
+    ("google_news_rss", "rss", "https://news.google.com/rss"),
+    ("ifop_barometers", "scraping", "https://www.ifop.com/publications/"),
+    ("yahoo_finance", "rss", "https://finance.yahoo.com/news/rss"),
 ]
 
 insert_sql = "INSERT INTO source (name, source_type, url) VALUES (?, ?, ?)"
@@ -144,12 +144,11 @@ print(f"\n   [OK] {count} sources inserted")
 
 conn.close()
 
-print("\n" + "="*70)
+print("\n" + "=" * 70)
 print("[OK] DATABASE READY FOR E1")
-print("="*70)
+print("=" * 70)
 print(f"Database: {RAW_DB_PATH}")
 print("Tables: 6 core")
 print(f"Sources: {count}")
 print("[OK] Ready for data ingestion pipeline")
-print("="*70 + "\n")
-
+print("=" * 70 + "\n")

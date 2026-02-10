@@ -62,21 +62,24 @@ try:
     try:
         # Essayer IPython si disponible (meilleure expérience)
         import IPython
+
         IPython.embed()
     except ImportError:
         # Fallback vers code.interact standard
         import code
+
         shell_vars = {
-            'spark': spark,
-            'reader': reader,
-            'processor': processor,
-            'date': date,
+            "spark": spark,
+            "reader": reader,
+            "processor": processor,
+            "date": date,
         }
         code.interact(local=shell_vars, banner="")
 
 except Exception as e:
     print(f"ERREUR: {e}")
     import traceback
+
     traceback.print_exc()
     sys.exit(1)
 finally:

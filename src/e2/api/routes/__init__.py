@@ -4,6 +4,7 @@ E2 API Routes - Endpoints
 Routers FastAPI par zone (RAW, SILVER, GOLD) et auth
 """
 
+from .ai import router as ai_router
 from .analytics import router as analytics_router
 from .auth import router as auth_router
 from .gold import router as gold_router
@@ -18,4 +19,5 @@ __all__ = [
     "raw_router",
     "silver_router",
     "sources_router",
+    "ai_router",
 ]

@@ -60,7 +60,7 @@ class E1Pipeline:
 
     def __init__(self, metrics_port: int = 8000, quiet: bool = False):
         # Use environment variable or default path
-        db_path = os.getenv('DB_PATH', str(Path.home() / 'datasens_project' / 'datasens.db'))
+        db_path = os.getenv("DB_PATH", str(Path.home() / "datasens_project" / "datasens.db"))
         # Ensure directory exists
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -68,23 +68,30 @@ class E1Pipeline:
         self.db = Repository(db_path)
         self.tagger = TopicTagger(db_path)
         self.analyzer = SentimentAnalyzer(db_path)
-        self.stats = {'extracted': 0, 'cleaned': 0, 'loaded': 0, 'deduplicated': 0, 'tagged': 0, 'analyzed': 0}
+        self.stats = {
+            "extracted": 0,
+            "cleaned": 0,
+            "loaded": 0,
+            "deduplicated": 0,
+            "tagged": 0,
+            "analyzed": 0,
+        }
         self.session_start = datetime.now().isoformat()
 
         # Start Prometheus metrics server
         try:
-            port = int(os.getenv('METRICS_PORT', metrics_port))
+            port = int(os.getenv("METRICS_PORT", metrics_port))
             start_metrics_server(port)
         except Exception as e:
             logger.warning("Metrics server failed: {}", e)
 
     def load_sources(self) -> list:
         """Load sources from JSON config"""
-        config_path = Path(__file__).parent.parent.parent / 'sources_config.json'
+        config_path = Path(__file__).parent.parent.parent / "sources_config.json"
         if config_path.exists():
             with open(config_path) as f:
                 config = json.load(f)
-                return [Source(**s) for s in config['sources']]
+                return [Source(**s) for s in config["sources"]]
         return []
 
     def extract(self) -> list:
@@ -113,7 +120,9 @@ class E1Pipeline:
             )
 
             # Vérifier si source fondation déjà intégrée (à figer)
-            is_foundation, _foundation_type, should_freeze = self._is_foundation_source(source.source_name)
+            is_foundation, _foundation_type, should_freeze = self._is_foundation_source(
+                source.source_name
+            )
             if is_foundation and should_freeze:
                 # Vérifier si déjà intégrée
                 if self.db.is_foundation_integrated(source.source_name):
@@ -127,17 +136,17 @@ class E1Pipeline:
                 duration = time.time() - start_time
                 extraction_duration_seconds.labels(source=source.source_name).observe(duration)
 
-                self.stats['extracted'] += len(extracted)
+                self.stats["extracted"] += len(extracted)
                 articles_extracted_total.labels(source=source.source_name).inc(len(extracted))
                 articles.extend([(a, source.source_name) for a in extracted])
 
                 # Log sync to database
                 source_id = self.db.get_source_id(source.source_name)
                 if source_id:
-                    self.db.log_sync(source_id, len(extracted), 'OK')
+                    self.db.log_sync(source_id, len(extracted), "OK")
 
                 # Message spécial pour ZZDB
-                if 'zzdb' in source.source_name.lower():
+                if "zzdb" in source.source_name.lower():
                     console_write(f"OK {len(extracted)} articles [ZZDB → DataSens]")
                 elif len(extracted) > 1000:
                     console_write(f"OK {len(extracted):,} articles (traitement en cours...)")
@@ -147,7 +156,7 @@ class E1Pipeline:
                 source_errors_total.labels(source=source.source_name).inc()
                 logger.error("Extraction error: {}", str(e)[:40])
 
-        logger.info("Extraction complete: {} articles", self.stats['extracted'])
+        logger.info("Extraction complete: {} articles", self.stats["extracted"])
         console_write(f"\nOK Total extracted: {self.stats['extracted']}")
         return articles
 
@@ -164,9 +173,9 @@ class E1Pipeline:
             article = ContentTransformer.transform(article)
             if article.is_valid():
                 cleaned.append((article, source_name))
-                self.stats['cleaned'] += 1
+                self.stats["cleaned"] += 1
 
-        logger.info("Cleaning complete: {} articles", self.stats['cleaned'])
+        logger.info("Cleaning complete: {} articles", self.stats["cleaned"])
         console_write(f"OK Cleaned: {self.stats['cleaned']}")
         return cleaned
 
@@ -183,22 +192,22 @@ class E1Pipeline:
         source_lower = source_name.lower()
 
         # Fondations DYNAMIQUES (collecte quotidienne) - Vérifier EN PREMIER
-        if 'gdelt_last15' in source_lower or source_name == 'GDELT_Last15_English':
-            return True, 'bigdata', False  # GDELT Last15 = dynamique (collecte quotidienne)
-        elif 'gdelt_master' in source_lower or source_name == 'GDELT_Master_List':
-            return True, 'bigdata', False  # GDELT Master = dynamique (collecte quotidienne)
+        if "gdelt_last15" in source_lower or source_name == "GDELT_Last15_English":
+            return True, "bigdata", False  # GDELT Last15 = dynamique (collecte quotidienne)
+        elif "gdelt_master" in source_lower or source_name == "GDELT_Master_List":
+            return True, "bigdata", False  # GDELT Master = dynamique (collecte quotidienne)
 
         # Fondations à FIGER après première intégration
-        elif 'kaggle' in source_lower:
-            return True, 'flat_files', True  # Kaggle = figé
-        elif source_name == 'gdelt_events' or source_lower == 'gdelt_events':
-            return True, 'bigdata', True  # gdelt_events = figé
-        elif 'zzdb' in source_lower and 'csv' in source_lower:
+        elif "kaggle" in source_lower:
+            return True, "flat_files", True  # Kaggle = figé
+        elif source_name == "gdelt_events" or source_lower == "gdelt_events":
+            return True, "bigdata", True  # gdelt_events = figé
+        elif "zzdb" in source_lower and "csv" in source_lower:
             # zzdb_csv reste une fondation, mais on autorise la ré-ingestion
             # (déduplication par fingerprint protège la base)
-            return True, 'db_non_relational', False
+            return True, "db_non_relational", False
 
-        return False, 'real_source', False  # Source dynamique (RSS, API, etc.)
+        return False, "real_source", False  # Source dynamique (RSS, API, etc.)
 
     def load(self, articles: list):
         """Load to database + tag topics + analyze sentiment"""
@@ -211,13 +220,15 @@ class E1Pipeline:
         console_write(f"\n   Articles à traiter: {total_to_process:,}")
         console_write("   Vérification des doublons (fingerprint SHA256)...")
         if total_to_process > 1000:
-            console_write(f"   Traitement de {total_to_process:,} articles (cela peut prendre plusieurs minutes)...")
+            console_write(
+                f"   Traitement de {total_to_process:,} articles (cela peut prendre plusieurs minutes)..."
+            )
             console_write("   Progression: ", end="", flush=True)
 
         # Create sources partition dir for today
         today = date.today()
         project_root = Path(__file__).parent.parent.parent
-        sources_dir = project_root / 'data' / 'raw' / f'sources_{today:%Y-%m-%d}'
+        sources_dir = project_root / "data" / "raw" / f"sources_{today:%Y-%m-%d}"
         sources_dir.mkdir(parents=True, exist_ok=True)
 
         # Track foundation integrations (première fois)
@@ -238,67 +249,80 @@ class E1Pipeline:
                 # Load article and get ID
                 raw_data_id = self.db.load_article_with_id(article, source_id)
                 if raw_data_id:
-                    self.stats['loaded'] += 1
+                    self.stats["loaded"] += 1
                     articles_loaded_total.inc()
 
                     # Compteur ZZDB
-                    if 'zzdb' in source_name.lower():
+                    if "zzdb" in source_name.lower():
                         zzdb_loaded += 1
 
                     # Track foundation sources (statiques) pour logging
-                    is_foundation, foundation_type, _should_freeze = self._is_foundation_source(source_name)
+                    is_foundation, foundation_type, _should_freeze = self._is_foundation_source(
+                        source_name
+                    )
                     if is_foundation:
                         if source_name not in foundation_sources:
                             foundation_sources[source_name] = [0, foundation_type, None]
                         foundation_sources[source_name][0] += 1
                     # Tag topics (max 2)
                     if self.tagger.tag(raw_data_id, article.title, article.content):
-                        self.stats['tagged'] += 1
+                        self.stats["tagged"] += 1
                         # Get topics for metrics
                         c = self.db.conn.cursor()
-                        topics = c.execute("""
+                        topics = c.execute(
+                            """
                             SELECT t.name FROM document_topic dt
                             JOIN topic t ON dt.topic_id = t.topic_id
                             WHERE dt.raw_data_id = ?
-                        """, (raw_data_id,)).fetchall()
+                        """,
+                            (raw_data_id,),
+                        ).fetchall()
                         for (topic_name,) in topics:
                             articles_tagged_total.labels(topic=topic_name).inc()
                     # Analyze sentiment
                     if self.analyzer.save(raw_data_id, article.title, article.content):
-                        self.stats['analyzed'] += 1
+                        self.stats["analyzed"] += 1
                         # Get sentiment for metrics
                         c = self.db.conn.cursor()
-                        sent = c.execute("""
+                        sent = c.execute(
+                            """
                             SELECT label FROM model_output
                             WHERE raw_data_id = ? AND model_name = 'sentiment_keyword'
-                        """, (raw_data_id,)).fetchone()
+                        """,
+                            (raw_data_id,),
+                        ).fetchone()
                         if sent:
                             articles_analyzed_total.labels(sentiment=sent[0]).inc()
                 else:
-                    self.stats['deduplicated'] += 1
+                    self.stats["deduplicated"] += 1
                     articles_deduplicated_total.inc()
 
-                articles_data.append({
-                    'source': source_name,
-                    'title': article.title,
-                    'content': article.content,
-                    'url': article.url,
-                    'published_at': article.published_at,
-                })
+                articles_data.append(
+                    {
+                        "source": source_name,
+                        "title": article.title,
+                        "content": article.content,
+                        "url": article.url,
+                        "published_at": article.published_at,
+                    }
+                )
             else:
                 logger.warning("Source '{}' not found in DB", source_name)
 
         # Write raw_articles.json
-        articles_file = sources_dir / 'raw_articles.json'
-        with open(articles_file, 'w', encoding='utf-8') as f:
+        articles_file = sources_dir / "raw_articles.json"
+        with open(articles_file, "w", encoding="utf-8") as f:
             json.dump(articles_data, f, ensure_ascii=False, indent=2)
 
         # Also write raw_articles.csv for easy viewing
-        articles_csv = sources_dir / 'raw_articles.csv'
+        articles_csv = sources_dir / "raw_articles.csv"
         import csv as csv_lib
-        with open(articles_csv, 'w', newline='', encoding='utf-8') as f:
+
+        with open(articles_csv, "w", newline="", encoding="utf-8") as f:
             if articles_data:
-                w = csv_lib.DictWriter(f, fieldnames=['source', 'title', 'content', 'url', 'published_at'])
+                w = csv_lib.DictWriter(
+                    f, fieldnames=["source", "title", "content", "url", "published_at"]
+                )
                 w.writeheader()
                 w.writerows(articles_data)
 
@@ -312,10 +336,12 @@ class E1Pipeline:
                         # Trouver le chemin du fichier source
                         file_path = None
                         file_size = None
-                        if 'zzdb' in source_name.lower() and 'csv' in source_name.lower():
-                            csv_path = project_root / 'data' / 'raw' / 'zzdb_csv' / 'zzdb_dataset.csv'
+                        if "zzdb" in source_name.lower() and "csv" in source_name.lower():
+                            csv_path = (
+                                project_root / "data" / "raw" / "zzdb_csv" / "zzdb_dataset.csv"
+                            )
                             if not csv_path.exists():
-                                csv_path = project_root / 'zzdb' / 'export' / 'zzdb_dataset.csv'
+                                csv_path = project_root / "zzdb" / "export" / "zzdb_dataset.csv"
                             if csv_path.exists():
                                 file_path = str(csv_path)
                                 file_size = csv_path.stat().st_size
@@ -328,16 +354,20 @@ class E1Pipeline:
                             file_path=file_path,
                             file_size=file_size,
                             rows_integrated=count,
-                            status='INTEGRATED',
-                            notes='Première intégration - Source statique (fondation) pour structurer le dataset'
+                            status="INTEGRATED",
+                            notes="Première intégration - Source statique (fondation) pour structurer le dataset",
                         )
 
                         # Message détaillé pour ZZDB
-                        if 'zzdb' in source_name.lower():
-                            for line in UiMessages.zzdb_connection_lines(source_name, count, file_path):
+                        if "zzdb" in source_name.lower():
+                            for line in UiMessages.zzdb_connection_lines(
+                                source_name, count, file_path
+                            ):
                                 console_write(line)
                         else:
-                            console_write(f"\n   [FONDATION] {source_name} integree : {count} articles (premiere fois)")
+                            console_write(
+                                f"\n   [FONDATION] {source_name} integree : {count} articles (premiere fois)"
+                            )
 
         if show_progress:
             console_write()  # Nouvelle ligne après les points de progression
@@ -346,15 +376,17 @@ class E1Pipeline:
         logger.info(
             "Loading summary: processed={}, loaded={}, deduplicated={}",
             total_to_process,
-            self.stats['loaded'],
-            self.stats['deduplicated'],
+            self.stats["loaded"],
+            self.stats["deduplicated"],
         )
         console_write("\n" + UiMessages.resume_title())
         console_write(f"   Articles traites: {total_to_process:,}")
         console_write(f"   Nouveaux articles charges: {self.stats['loaded']:,}")
         console_write(f"   Articles dedupliques (deja presents): {self.stats['deduplicated']:,}")
         console_write(f"\n   Explication: {total_to_process:,} articles extraits et nettoyes")
-        console_write(f"                {self.stats['deduplicated']:,} etaient deja dans la DB (meme fingerprint)")
+        console_write(
+            f"                {self.stats['deduplicated']:,} etaient deja dans la DB (meme fingerprint)"
+        )
         console_write(f"                {self.stats['loaded']:,} nouveaux articles ajoutes a la DB")
 
         if zzdb_loaded > 0:
@@ -374,17 +406,21 @@ class E1Pipeline:
         console_write(UiMessages.stats_title()[2])
         logger.info(
             "Stats: extracted={}, cleaned={}, loaded={}, deduplicated={}, tagged={}, analyzed={}",
-            self.stats['extracted'],
-            self.stats['cleaned'],
-            self.stats['loaded'],
-            self.stats['deduplicated'],
-            self.stats['tagged'],
-            self.stats['analyzed'],
+            self.stats["extracted"],
+            self.stats["cleaned"],
+            self.stats["loaded"],
+            self.stats["deduplicated"],
+            self.stats["tagged"],
+            self.stats["analyzed"],
         )
         console_write(f"   Extracted:    {self.stats['extracted']:,} articles (toutes sources)")
         console_write(f"   Cleaned:      {self.stats['cleaned']:,} articles (valides)")
-        console_write(f"   Loaded:       {self.stats['loaded']:,} nouveaux articles (ajoutes a la DB)")
-        console_write(f"   Deduplicated: {self.stats['deduplicated']:,} articles (deja presents, non ajoutes)")
+        console_write(
+            f"   Loaded:       {self.stats['loaded']:,} nouveaux articles (ajoutes a la DB)"
+        )
+        console_write(
+            f"   Deduplicated: {self.stats['deduplicated']:,} articles (deja presents, non ajoutes)"
+        )
         console_write("\n   Note: Les articles dedupliques sont ceux deja presents dans la base")
         console_write("         avec le meme fingerprint (hash SHA256 du titre+contenu)")
 
@@ -394,11 +430,11 @@ class E1Pipeline:
         console_write("\n   By source:")
         for name, count in sorted(stats.items(), key=lambda x: -x[1]):
             console_write(f"      • {name}: {count:,}")
-        console_write("="*70 + "\n")
+        console_write("=" * 70 + "\n")
 
     def run(self):
         """Run complete pipeline"""
-        with MetricsCollector('full_pipeline'):
+        with MetricsCollector("full_pipeline"):
             pipeline_runs_total.inc()
             console_write = self.console.write
             console_write("\n\n" + UiMessages.pipeline_start_title()[0])
@@ -418,7 +454,9 @@ class E1Pipeline:
             console_write(UiMessages.exports_title()[2])
             logger.info("Exports start: RAW/SILVER/GOLD")
             try:
-                db_path = os.getenv('DB_PATH', str(Path.home() / 'datasens_project' / 'datasens.db'))
+                db_path = os.getenv(
+                    "DB_PATH", str(Path.home() / "datasens_project" / "datasens.db")
+                )
                 aggregator = DataAggregator(db_path)
                 exporter = GoldExporter()
 
@@ -445,7 +483,9 @@ class E1Pipeline:
 
             # ETAPE 4: Rapport de collecte session actuelle
             try:
-                db_path = os.getenv('DB_PATH', str(Path.home() / 'datasens_project' / 'datasens.db'))
+                db_path = os.getenv(
+                    "DB_PATH", str(Path.home() / "datasens_project" / "datasens.db")
+                )
                 report = CollectionReport(db_path, self.session_start, self.console)
                 report.collect_session_stats()
                 report.print_report()
@@ -456,7 +496,9 @@ class E1Pipeline:
 
             # ETAPE 5: Dashboard d'enrichissement global
             try:
-                db_path = os.getenv('DB_PATH', str(Path.home() / 'datasens_project' / 'datasens.db'))
+                db_path = os.getenv(
+                    "DB_PATH", str(Path.home() / "datasens_project" / "datasens.db")
+                )
                 dashboard = DataSensDashboard(db_path, self.console)
                 dashboard.collect_stats()
                 dashboard.print_dashboard()
@@ -468,15 +510,17 @@ class E1Pipeline:
             # Update database stats for metrics
             try:
                 stats = self.db.get_stats()
-                total = stats.get('total', 0)
+                total = stats.get("total", 0)
                 # Count enriched articles
                 c = self.db.conn.cursor()
-                enriched = c.execute("""
+                enriched = c.execute(
+                    """
                     SELECT COUNT(DISTINCT dt.raw_data_id)
                     FROM document_topic dt
                     JOIN model_output mo ON dt.raw_data_id = mo.raw_data_id
                     WHERE mo.model_name = 'sentiment_keyword'
-                """).fetchone()[0]
+                """
+                ).fetchone()[0]
                 update_database_stats(total, enriched)
                 logger.info("Metrics database stats updated")
             except:
