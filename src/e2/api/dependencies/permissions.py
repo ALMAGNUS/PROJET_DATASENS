@@ -21,9 +21,8 @@ def require_role(allowed_roles: list[str]):
     Returns:
         Dépendance FastAPI
     """
-    async def role_checker(
-        current_user: UserInDB = Depends(get_current_active_user)
-    ) -> UserInDB:
+
+    async def role_checker(current_user: UserInDB = Depends(get_current_active_user)) -> UserInDB:
         """
         Vérifie que l'utilisateur a un des rôles autorisés
 
@@ -39,7 +38,7 @@ def require_role(allowed_roles: list[str]):
         if current_user.role not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Access denied. Required roles: {', '.join(allowed_roles)}"
+                detail=f"Access denied. Required roles: {', '.join(allowed_roles)}",
             )
         return current_user
 

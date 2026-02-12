@@ -6,6 +6,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Configuration centralisée pour E1, E2, E3"""
+
     model_config = SettingsConfigDict(
         protected_namespaces=("settings_",),  # Évite le conflit model_device / model_
         env_file=".env",
@@ -13,7 +15,6 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
     )
-    """Configuration centralisée pour E1, E2, E3"""
 
     # ============================================================
     # E1: Database Configuration
@@ -39,7 +40,9 @@ class Settings(BaseSettings):
     spark_executor_memory: str = Field(default="2g", description="Spark executor memory")
     parquet_base_path: str = Field(default="data/gold", description="Base path for Parquet files")
     parquet_partition_column: str = Field(default="date", description="Partition column name")
-    goldai_base_path: str = Field(default="data/goldai", description="Base path for GoldAI merged Parquet files")
+    goldai_base_path: str = Field(
+        default="data/goldai", description="Base path for GoldAI merged Parquet files"
+    )
 
     # ============================================================
     # E3: FastAPI Configuration
@@ -53,8 +56,7 @@ class Settings(BaseSettings):
     # E3: Security & Authentication (RBAC)
     # ============================================================
     secret_key: str = Field(
-        default="your-secret-key-change-in-production",
-        description="JWT secret key"
+        default="your-secret-key-change-in-production", description="JWT secret key"
     )
     algorithm: str = Field(default="HS256", description="JWT algorithm")
     access_token_expire_minutes: int = Field(default=30, description="Access token expiration")
@@ -79,10 +81,16 @@ class Settings(BaseSettings):
     # ============================================================
     # E3: ML Models Configuration
     # ============================================================
-    transformers_cache_dir: str = Field(default=".cache/transformers", description="Transformers cache")
+    transformers_cache_dir: str = Field(
+        default=".cache/transformers", description="Transformers cache"
+    )
     model_device: str = Field(default="cpu", description="Model device (cpu/cuda)")
-    flaubert_model_path: str = Field(default="models/flaubert-base-uncased", description="FlauBERT model path")
-    camembert_model_path: str = Field(default="models/camembert-base", description="CamemBERT model path")
+    flaubert_model_path: str = Field(
+        default="models/flaubert-base-uncased", description="FlauBERT model path"
+    )
+    camembert_model_path: str = Field(
+        default="models/camembert-base", description="CamemBERT model path"
+    )
 
     # ============================================================
     # E3: Monitoring & Logging
@@ -103,14 +111,20 @@ class Settings(BaseSettings):
     # ============================================================
     # E3: Celery (Optional)
     # ============================================================
-    celery_broker_url: str = Field(default="redis://localhost:6379/0", description="Celery broker URL")
-    celery_result_backend: str = Field(default="redis://localhost:6379/0", description="Celery result backend")
+    celery_broker_url: str = Field(
+        default="redis://localhost:6379/0", description="Celery broker URL"
+    )
+    celery_result_backend: str = Field(
+        default="redis://localhost:6379/0", description="Celery result backend"
+    )
 
     # ============================================================
     # Development
     # ============================================================
     debug: bool = Field(default=False, description="Debug mode")
-    environment: str = Field(default="development", description="Environment (development/staging/production)")
+    environment: str = Field(
+        default="development", description="Environment (development/staging/production)"
+    )
 
 # Singleton instance
 _settings: Settings | None = None

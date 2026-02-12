@@ -32,7 +32,9 @@ try:
     # Vérifier si la table PROFILS existe
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='profils'")
     if not cursor.fetchone():
-        print("ERREUR: Table PROFILS n'existe pas. Executez d'abord le pipeline E1 pour creer la table.")
+        print(
+            "ERREUR: Table PROFILS n'existe pas. Executez d'abord le pipeline E1 pour creer la table."
+        )
         sys.exit(1)
 
     # Créer utilisateur admin de test
@@ -44,17 +46,23 @@ try:
     cursor.execute("SELECT profil_id FROM profils WHERE email = ?", (email,))
     if cursor.fetchone():
         print(f"ATTENTION: Utilisateur {email} existe deja. Mise a jour du mot de passe...")
-        cursor.execute("""
+        cursor.execute(
+            """
             UPDATE profils
             SET password_hash = ?, role = 'admin', active = 1
             WHERE email = ?
-        """, (password_hash, email))
+        """,
+            (password_hash, email),
+        )
     else:
         print(f"OK: Creation utilisateur {email}...")
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO profils (email, password_hash, firstname, lastname, role, active, username)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (email, password_hash, "Admin", "Test", "admin", 1, "admin"))
+        """,
+            (email, password_hash, "Admin", "Test", "admin", 1, "admin"),
+        )
 
     conn.commit()
 
@@ -66,17 +74,23 @@ try:
     cursor.execute("SELECT profil_id FROM profils WHERE email = ?", (email_reader,))
     if cursor.fetchone():
         print(f"ATTENTION: Utilisateur {email_reader} existe deja. Mise a jour...")
-        cursor.execute("""
+        cursor.execute(
+            """
             UPDATE profils
             SET password_hash = ?, role = 'reader', active = 1
             WHERE email = ?
-        """, (password_hash_reader, email_reader))
+        """,
+            (password_hash_reader, email_reader),
+        )
     else:
         print(f"OK: Creation utilisateur {email_reader}...")
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO profils (email, password_hash, firstname, lastname, role, active, username)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (email_reader, password_hash_reader, "Reader", "Test", "reader", 1, "reader"))
+        """,
+            (email_reader, password_hash_reader, "Reader", "Test", "reader", 1, "reader"),
+        )
 
     conn.commit()
 

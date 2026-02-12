@@ -15,15 +15,15 @@ from pathlib import Path
 
 # Ajouter racine projet au path
 project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root / 'src'))
+sys.path.insert(0, str(project_root / "src"))
 
 try:
     from pyspark.sql import DataFrame
     from pyspark.sql.functions import col, lit, when
-
     from spark.adapters import GoldParquetReader
     from spark.processors import GoldDataProcessor
     from spark.session import close_spark_session, get_spark_session
+
     print("OK Imports reussis")
 except ImportError as e:
     print(f"ERREUR Import: {e}")
@@ -42,6 +42,7 @@ def show_parquet_info(reader: GoldParquetReader):
         partition_path = reader.base_path / f"date={d:%Y-%m-%d}" / "articles.parquet"
         if partition_path.exists():
             import pyarrow.parquet as pq
+
             try:
                 num_rows = pq.ParquetFile(partition_path).metadata.num_rows
                 size_mb = partition_path.stat().st_size / (1024 * 1024)
@@ -96,7 +97,7 @@ def show_dataframe_info(df: DataFrame):
 
     # Sélectionner seulement quelques colonnes importantes pour l'affichage
     important_cols = []
-    for col_name in ['id', 'source', 'title', 'sentiment', 'sentiment_score', 'topic_1', 'topic_2']:
+    for col_name in ["id", "source", "title", "sentiment", "sentiment_score", "topic_1", "topic_2"]:
         if col_name in df.columns:
             important_cols.append(col_name)
 
@@ -115,7 +116,7 @@ def show_dataframe_info(df: DataFrame):
     print("\nPour voir toutes les colonnes (avec troncature):")
     print("  Tapez 'all' pour afficher toutes les colonnes")
     choice = input("  Votre choix (Enter pour continuer): ").strip().lower()
-    if choice == 'all':
+    if choice == "all":
         df.show(5, truncate=50)
 
 
@@ -127,9 +128,19 @@ def filter_dataframe(df: DataFrame, condition: str) -> DataFrame:
         condition_clean = condition.strip()
 
         # Si c'est juste une valeur sans opérateur, essayer de deviner la colonne
-        if not any(op in condition_clean for op in ['=', '<', '>', '!=', '<>', 'LIKE', 'IN', 'IS', 'BETWEEN']):
+        if not any(
+            op in condition_clean
+            for op in ["=", "<", ">", "!=", "<>", "LIKE", "IN", "IS", "BETWEEN"]
+        ):
             # Essayer avec sentiment (le plus commun)
-            if condition_clean.lower() in ['positif', 'negatif', 'neutre', 'positive', 'negative', 'neutral']:
+            if condition_clean.lower() in [
+                "positif",
+                "negatif",
+                "neutre",
+                "positive",
+                "negative",
+                "neutral",
+            ]:
                 condition_clean = f"sentiment = '{condition_clean}'"
                 print(f"INFO: Condition interpretee comme: {condition_clean}")
             # Essayer avec source
@@ -165,9 +176,7 @@ def modify_dataframe(df: DataFrame, column: str, old_value: str, new_value: str)
     """Modifie une valeur dans un DataFrame"""
     try:
         modified = df.withColumn(
-            column,
-            when(col(column) == old_value, lit(new_value))
-            .otherwise(col(column))
+            column, when(col(column) == old_value, lit(new_value)).otherwise(col(column))
         )
         print(f"OK: Modification appliquee (colonne: {column})")
         return modified
@@ -183,7 +192,7 @@ def add_column(df: DataFrame, column_name: str, default_value) -> DataFrame:
         if column_name in df.columns:
             print(f"ATTENTION: La colonne '{column_name}' existe deja")
             confirm = input("  Remplacer? (o/n): ").strip().lower()
-            if confirm != 'o':
+            if confirm != "o":
                 print("  Ajout annule")
                 return df
 
@@ -212,8 +221,10 @@ def drop_column(df: DataFrame, column_name: str) -> DataFrame:
             pass
 
         # Confirmation
-        confirm = input(f"\nConfirmer suppression de la colonne '{column_name}'? (o/n): ").strip().lower()
-        if confirm != 'o':
+        confirm = (
+            input(f"\nConfirmer suppression de la colonne '{column_name}'? (o/n): ").strip().lower()
+        )
+        if confirm != "o":
             print("  Suppression annulee")
             return df
 
@@ -234,9 +245,19 @@ def delete_rows(df: DataFrame, condition: str) -> DataFrame:
         condition_clean = condition.strip()
 
         # Si c'est juste une valeur sans opérateur, essayer de deviner la colonne
-        if not any(op in condition_clean for op in ['=', '<', '>', '!=', '<>', 'LIKE', 'IN', 'IS', 'BETWEEN']):
+        if not any(
+            op in condition_clean
+            for op in ["=", "<", ">", "!=", "<>", "LIKE", "IN", "IS", "BETWEEN"]
+        ):
             # Essayer avec sentiment (le plus commun)
-            if condition_clean.lower() in ['positif', 'negatif', 'neutre', 'positive', 'negative', 'neutral']:
+            if condition_clean.lower() in [
+                "positif",
+                "negatif",
+                "neutre",
+                "positive",
+                "negative",
+                "neutral",
+            ]:
                 condition_clean = f"sentiment = '{condition_clean}'"
                 print(f"INFO: Condition interpretee comme: {condition_clean}")
             else:
@@ -392,7 +413,7 @@ def interactive_menu():
                 if count_to_modify == 0:
                     print(f"  ATTENTION: Aucune ligne avec valeur '{old_value}' trouvee")
                     confirm = input("  Continuer quand meme? (o/n): ").strip().lower()
-                    if confirm != 'o':
+                    if confirm != "o":
                         continue
                 else:
                     print(f"  {count_to_modify:,} ligne(s) seront modifiee(s)")
@@ -406,7 +427,7 @@ def interactive_menu():
             print(f"  Colonne: {column}")
             print(f"  Remplacer: '{old_value}' -> '{new_value}'")
             confirm = input("  Confirmer? (o/n): ").strip().lower()
-            if confirm == 'o':
+            if confirm == "o":
                 current_df = modify_dataframe(current_df, column, old_value, new_value)
             else:
                 print("  Modification annulee")
@@ -432,7 +453,7 @@ def interactive_menu():
             default_value = input("Valeur par defaut: ").strip()
             # Essayer de convertir en nombre si possible
             try:
-                default_value = float(default_value) if '.' in default_value else int(default_value)
+                default_value = float(default_value) if "." in default_value else int(default_value)
             except ValueError:
                 pass  # Garder comme string
 
@@ -479,7 +500,9 @@ def interactive_menu():
             print("  - sentiment = 'neutre'")
             print("  - sentiment_score < 0.3")
             print("  - source = 'zzdb_csv'")
-            print("\nAstuce: Vous pouvez aussi entrer juste 'neutre' (sera interprete comme sentiment = 'neutre')")
+            print(
+                "\nAstuce: Vous pouvez aussi entrer juste 'neutre' (sera interprete comme sentiment = 'neutre')"
+            )
             condition = input("\nCondition SQL pour supprimer: ").strip()
             current_df = delete_rows(current_df, condition)
         elif choice == "10" or choice == "10":
@@ -538,6 +561,7 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"ERREUR: {e}")
         import traceback
+
         traceback.print_exc()
     finally:
         # Fermer SparkSession

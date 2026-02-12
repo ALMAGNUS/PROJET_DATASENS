@@ -6,9 +6,10 @@ Endpoints pour authentification (login)
 
 from datetime import timedelta
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Request, HTTPException, status
 
 from src.config import get_settings
+from src.e2.api.middleware.audit import log_login
 from src.e2.api.middleware.prometheus import record_auth_failure, record_auth_success
 from src.e2.api.schemas.auth import LoginRequest, LoginResponse
 from src.e2.api.schemas.token import TokenData
@@ -22,7 +23,7 @@ user_service = get_user_service()
 
 
 @router.post("/login", response_model=LoginResponse, status_code=status.HTTP_200_OK)
-async def login(login_data: LoginRequest):
+async def login(login_data: LoginRequest, request: Request):
     """
     Endpoint de login
 
@@ -52,18 +53,18 @@ async def login(login_data: LoginRequest):
 
     # Créer le token JWT
     access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
-    token_data = TokenData(
-        profil_id=user.profil_id,
-        email=user.email,
-        role=user.role
-    )
+    token_data = TokenData(profil_id=user.profil_id, email=user.email, role=user.role)
     access_token = security_service.create_access_token(
         data={"sub": str(token_data.profil_id), "email": token_data.email, "role": token_data.role},
-        expires_delta=access_token_expires
+        expires_delta=access_token_expires,
     )
 
     # Mettre à jour last_login
     user_service.update_last_login(user.profil_id)
+
+    # Audit : enregistrer la connexion dans user_action_log
+    ip_address = request.client.host if request.client else None
+    log_login(user.profil_id, ip_address)
 
     return LoginResponse(
         access_token=access_token,
@@ -72,5 +73,5 @@ async def login(login_data: LoginRequest):
         email=user.email,
         role=user.role,
         firstname=user.firstname,
-        lastname=user.lastname
+        lastname=user.lastname,
     )

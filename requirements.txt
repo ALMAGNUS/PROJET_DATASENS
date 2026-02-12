@@ -25,12 +25,14 @@ lxml>=5.3,<6
 httpx==0.27.0
 kagglehub==0.2.5
 faker==24.0.0  # ZZDB LAB IA - Génération données synthétiques (isolé dans zzdb/)
+botasaurus
 
 # ============================================================
 # E1: Database & ORM
 # ============================================================
 sqlalchemy==2.0.30
 sqlmodel==0.0.21
+pymongo
 
 # ============================================================
 # E2: PySpark Big Data Processing

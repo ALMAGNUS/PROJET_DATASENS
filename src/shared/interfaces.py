@@ -103,10 +103,10 @@ class E1DataReaderImpl(E1DataReader):
         """Lit RAW depuis data/raw/sources_YYYY-MM-DD/raw_articles.csv"""
         date_str = date_module.today().isoformat() if date is None else date
 
-        csv_path = self.base_path / 'raw' / f'sources_{date_str}' / 'raw_articles.csv'
+        csv_path = self.base_path / "raw" / f"sources_{date_str}" / "raw_articles.csv"
         if not csv_path.exists():
             # Fallback: lire depuis exports/raw.csv
-            csv_path = self.base_path.parent / 'exports' / 'raw.csv'
+            csv_path = self.base_path.parent / "exports" / "raw.csv"
             if not csv_path.exists():
                 raise FileNotFoundError(f"RAW data not found for date {date_str}")
 
@@ -116,10 +116,10 @@ class E1DataReaderImpl(E1DataReader):
         """Lit SILVER depuis data/silver/v_YYYY-MM-DD/silver_articles.parquet"""
         date_str = date_module.today().isoformat() if date is None else date
 
-        parquet_path = self.base_path / 'silver' / f'v_{date_str}' / 'silver_articles.parquet'
+        parquet_path = self.base_path / "silver" / f"v_{date_str}" / "silver_articles.parquet"
         if not parquet_path.exists():
             # Fallback: lire depuis exports/silver.csv
-            csv_path = self.base_path.parent / 'exports' / 'silver.csv'
+            csv_path = self.base_path.parent / "exports" / "silver.csv"
             if not csv_path.exists():
                 raise FileNotFoundError(f"SILVER data not found for date {date_str}")
             return pd.read_csv(csv_path)
@@ -130,10 +130,10 @@ class E1DataReaderImpl(E1DataReader):
         """Lit GOLD depuis data/gold/date=YYYY-MM-DD/articles.parquet"""
         date_str = date_module.today().isoformat() if date is None else date
 
-        parquet_path = self.base_path / 'gold' / f'date={date_str}' / 'articles.parquet'
+        parquet_path = self.base_path / "gold" / f"date={date_str}" / "articles.parquet"
         if not parquet_path.exists():
             # Fallback: lire depuis exports/gold.csv
-            csv_path = self.base_path.parent / 'exports' / 'gold.csv'
+            csv_path = self.base_path.parent / "exports" / "gold.csv"
             if not csv_path.exists():
                 raise FileNotFoundError(f"GOLD data not found for date {date_str}")
             return pd.read_csv(csv_path)
@@ -160,30 +160,34 @@ class E1DataReaderImpl(E1DataReader):
             total_sources = cursor.fetchone()[0]
 
             # Articles par source
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT s.name, COUNT(r.raw_data_id) as count
                 FROM source s
                 LEFT JOIN raw_data r ON s.source_id = r.source_id
                 WHERE s.active = 1
                 GROUP BY s.name
                 ORDER BY count DESC
-            """)
+            """
+            )
             articles_by_source = {row[0]: row[1] for row in cursor.fetchall()}
 
             # Articles enrichis (topics + sentiment)
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT COUNT(DISTINCT dt.raw_data_id)
                 FROM document_topic dt
                 JOIN model_output mo ON dt.raw_data_id = mo.raw_data_id
                 WHERE mo.model_name = 'sentiment_keyword'
-            """)
+            """
+            )
             enriched_articles = cursor.fetchone()[0]
 
             return {
-                'total_articles': total_articles,
-                'total_sources': total_sources,
-                'articles_by_source': articles_by_source,
-                'enriched_articles': enriched_articles,
+                "total_articles": total_articles,
+                "total_sources": total_sources,
+                "articles_by_source": articles_by_source,
+                "enriched_articles": enriched_articles,
             }
         finally:
             conn.close()

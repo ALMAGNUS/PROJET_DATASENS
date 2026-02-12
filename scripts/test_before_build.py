@@ -8,25 +8,27 @@ def test_imports():
     """Test que tous les imports fonctionnent"""
     print("[TEST] Vérification des imports...")
     try:
-        sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
         print("   [OK] Tous les imports OK")
         return True
     except Exception as e:
         print(f"   [ERROR] Erreur import: {e}")
         return False
 
+
 def test_metrics():
     """Test que les métriques peuvent être créées"""
     print("[TEST] Vérification des métriques...")
     try:
-        sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
         from metrics import (
             MetricsCollector,
             pipeline_runs_total,
             update_database_stats,
         )
+
         # Test création
-        with MetricsCollector('test'):
+        with MetricsCollector("test"):
             pipeline_runs_total.inc()
         update_database_stats(100, 50)
         print("   [OK] Metriques fonctionnelles")
@@ -35,18 +37,19 @@ def test_metrics():
         print(f"   [ERROR] Erreur metriques: {e}")
         return False
 
+
 def test_files():
     """Test que les fichiers nécessaires existent"""
     print("[TEST] Vérification des fichiers...")
     required = [
-        'Dockerfile',
-        'docker-compose.yml',
-        'requirements.txt',
-        'sources_config.json',
-        'main.py',
-        'src/metrics.py',
-        'monitoring/prometheus.yml',
-        'monitoring/prometheus_rules.yml',
+        "Dockerfile",
+        "docker-compose.yml",
+        "requirements.txt",
+        "sources_config.json",
+        "main.py",
+        "src/metrics.py",
+        "monitoring/prometheus.yml",
+        "monitoring/prometheus_rules.yml",
     ]
     missing = []
     for f in required:
@@ -60,13 +63,14 @@ def test_files():
         print("   [OK] Tous les fichiers presents")
         return True
 
+
 def test_dockerfile():
     """Test que le Dockerfile est valide"""
     print("[TEST] Vérification Dockerfile...")
     try:
-        with open('Dockerfile') as f:
+        with open("Dockerfile") as f:
             content = f.read()
-            if 'FROM python' in content and 'COPY requirements.txt' in content:
+            if "FROM python" in content and "COPY requirements.txt" in content:
                 print("   [OK] Dockerfile semble valide")
                 return True
             else:
@@ -76,10 +80,11 @@ def test_dockerfile():
         print(f"   [ERROR] Erreur lecture Dockerfile: {e}")
         return False
 
+
 def main():
-    print("="*70)
+    print("=" * 70)
     print("TEST AVANT BUILD - DataSens E1")
-    print("="*70)
+    print("=" * 70)
     print()
 
     results = []
@@ -89,9 +94,9 @@ def main():
     results.append(("Dockerfile", test_dockerfile()))
 
     print()
-    print("="*70)
+    print("=" * 70)
     print("RÉSUMÉ")
-    print("="*70)
+    print("=" * 70)
     for name, result in results:
         status = "[OK]" if result else "[ECHEC]"
         print(f"   {name:20s}: {status}")
@@ -106,6 +111,6 @@ def main():
         print("[ERROR] CERTAINS TESTS ECHOUENT - Corriger avant le build")
         return 1
 
+
 if __name__ == "__main__":
     sys.exit(main())
-

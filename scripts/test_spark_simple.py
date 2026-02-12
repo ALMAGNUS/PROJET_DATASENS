@@ -23,6 +23,7 @@ try:
     from src.spark.adapters import GoldParquetReader
     from src.spark.processors import GoldDataProcessor
     from src.spark.session import close_spark_session, get_spark_session
+
     print("   OK Imports OK")
     print()
 
@@ -107,5 +108,6 @@ except Exception as e:
     print(f"ERREUR: {e}")
     print("=" * 70)
     import traceback
+
     traceback.print_exc()
     sys.exit(1)

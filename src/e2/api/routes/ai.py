@@ -1,19 +1,27 @@
 """
-AI Routes - E3 Mistral Integration + ML Inference
-=================================================
+AI Routes - Mistral + ML Inference + Local HF + Chat Insights
+=============================================================
 Endpoints pour chat Mistral, résumé, analyse sentiment,
-et inférence ML sur GoldAI
+inférence ML sur GoldAI, predict LocalHF, et insights assistant.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
+from src.config import get_settings
 from src.e2.api.dependencies.permissions import require_reader
+from src.e2.api.schemas.ai import (
+    AIPredictRequest,
+    AIPredictResponse,
+    InsightRequest,
+    InsightResponse,
+)
 from src.e3.mistral import get_mistral_service
 
 router = APIRouter(prefix="/ai", tags=["AI - Mistral & ML"])
 
 
+# --- Schemas Mistral (chat, summarize, sentiment) ---
 class ChatRequest(BaseModel):
     """Requête chat"""
     message: str = Field(..., min_length=1, max_length=5000, description="Message utilisateur")
@@ -46,6 +54,7 @@ class SentimentResponse(BaseModel):
     label: str = Field(description="positif, négatif ou neutre")
 
 
+# --- Mistral endpoints ---
 @router.get("/status")
 async def ai_status(current_user=Depends(require_reader)):
     """
@@ -170,3 +179,57 @@ async def ml_sentiment_goldai(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"ML inference error: {e!s}"
         )
+
+
+# --- Local HF + Insights (Cockpit Streamlit) ---
+def _insight_reply(theme: str, message: str) -> str:
+    """
+    Genere une reponse pour le chat insights.
+    Peut etre etendue avec Mistral/LLM (config.mistral_api_key).
+    """
+    theme_labels = {
+        "utilisateurs": "insights utilisateurs (comportement, satisfaction, personas)",
+        "financier": "insights financiers (marche, tendances, indicateurs)",
+        "politique": "insights politiques (veille, tendances, analyse)",
+    }
+    label = theme_labels.get(theme.lower(), theme)
+    settings = get_settings()
+    if settings.mistral_api_key:
+        # Placeholder: integration Mistral a implementer
+        return (
+            f"[Theme: {label}]\n\n"
+            f"Votre question : « {message[:500]} »\n\n"
+            "Reponse synthetique (integration Mistral a brancher ici)."
+        )
+    return (
+        f"[Theme: {label}]\n\n"
+        f"Vous avez demande : « {message[:500]} »\n\n"
+        "Reponse synthetique basee sur les donnees DataSens. "
+        "Pour des reponses generees par IA, configurez MISTRAL_API_KEY et branchez le service Mistral."
+    )
+
+
+@router.post("/predict", response_model=AIPredictResponse)
+def predict(payload: AIPredictRequest, _user=Depends(require_reader)):
+    """Inference locale HF (CamemBERT/FlauBERT)."""
+    from src.ml.inference.local_hf_service import LocalHFService
+
+    settings = get_settings()
+    if payload.model == "camembert":
+        model_path = settings.camembert_model_path
+    else:
+        model_path = settings.flaubert_model_path
+
+    service = LocalHFService(model_name=model_path, task=payload.task)
+    result = service.predict(payload.text)
+    return AIPredictResponse(model=payload.model, task=payload.task, result=result)
+
+
+@router.post("/insight", response_model=InsightResponse)
+def insight(payload: InsightRequest, _user=Depends(require_reader)):
+    """
+    Chat insights par theme : utilisateurs, financier, politique.
+    Utilise par le panel Assistant IA du cockpit Streamlit.
+    """
+    reply = _insight_reply(payload.theme, payload.message)
+    return InsightResponse(reply=reply, theme=payload.theme)

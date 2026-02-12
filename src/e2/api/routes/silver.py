@@ -33,7 +33,7 @@ async def list_silver_articles(
     date: str | None = Query(None, description="Date au format YYYY-MM-DD"),
     page: int = Query(1, ge=1, description="Numéro de page"),
     page_size: int = Query(50, ge=1, le=100, description="Taille de page"),
-    current_user: UserInDB = Depends(require_reader)
+    current_user: UserInDB = Depends(require_reader),
 ):
     """
     Liste les articles SILVER (lecture)
@@ -59,19 +59,12 @@ async def list_silver_articles(
     total_pages = (total + page_size - 1) // page_size if total > 0 else 1
 
     return ArticleListResponse(
-        items=articles,
-        total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=total_pages
+        items=articles, total=total, page=page, page_size=page_size, total_pages=total_pages
     )
 
 
 @router.get("/articles/{article_id}", response_model=ArticleResponse)
-async def get_silver_article(
-    article_id: int,
-    current_user: UserInDB = Depends(require_reader)
-):
+async def get_silver_article(article_id: int, current_user: UserInDB = Depends(require_reader)):
     """
     Récupère un article SILVER par ID (lecture)
 
@@ -96,14 +89,13 @@ async def get_silver_article(
 
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Article {article_id} not found in SILVER zone"
+        detail=f"Article {article_id} not found in SILVER zone",
     )
 
 
 @router.post("/articles", response_model=ArticleResponse, status_code=status.HTTP_201_CREATED)
 async def create_silver_article(
-    article: ArticleCreate,
-    current_user: UserInDB = Depends(require_writer)
+    article: ArticleCreate, current_user: UserInDB = Depends(require_writer)
 ):
     """
     Crée un article dans la zone SILVER (écriture)
@@ -126,15 +118,13 @@ async def create_silver_article(
     # Pour l'instant, on respecte l'isolation E1 (pas d'écriture)
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Article creation in SILVER zone not yet implemented (E1 isolation)"
+        detail="Article creation in SILVER zone not yet implemented (E1 isolation)",
     )
 
 
 @router.put("/articles/{article_id}", response_model=ArticleResponse)
 async def update_silver_article(
-    article_id: int,
-    article: ArticleUpdate,
-    current_user: UserInDB = Depends(require_writer)
+    article_id: int, article: ArticleUpdate, current_user: UserInDB = Depends(require_writer)
 ):
     """
     Met à jour un article dans la zone SILVER (écriture)
@@ -156,15 +146,12 @@ async def update_silver_article(
     # TODO: Implémenter mise à jour article SILVER
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Article update in SILVER zone not yet implemented (E1 isolation)"
+        detail="Article update in SILVER zone not yet implemented (E1 isolation)",
     )
 
 
 @router.delete("/articles/{article_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_silver_article(
-    article_id: int,
-    current_user: UserInDB = Depends(require_deleter)
-):
+async def delete_silver_article(article_id: int, current_user: UserInDB = Depends(require_deleter)):
     """
     Supprime un article de la zone SILVER (suppression)
 
@@ -184,5 +171,5 @@ async def delete_silver_article(
     # TODO: Implémenter suppression article SILVER
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Article deletion in SILVER zone not yet implemented (E1 isolation)"
+        detail="Article deletion in SILVER zone not yet implemented (E1 isolation)",
     )
