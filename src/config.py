@@ -2,10 +2,17 @@
 from pathlib import Path
 
 from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        protected_namespaces=("settings_",),  # Évite le conflit model_device / model_
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
     """Configuration centralisée pour E1, E2, E3"""
 
     # ============================================================
@@ -104,13 +111,6 @@ class Settings(BaseSettings):
     # ============================================================
     debug: bool = Field(default=False, description="Debug mode")
     environment: str = Field(default="development", description="Environment (development/staging/production)")
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
-        extra = "ignore"  # Ignorer les champs supplémentaires dans .env
-
 
 # Singleton instance
 _settings: Settings | None = None

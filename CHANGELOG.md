@@ -7,6 +7,37 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ---
 
+## [1.4.2] — 2025-02-10
+
+### ✨ ML Inference sur GoldAI (pas Silver)
+
+- ✅ **GoldAI Loader** : `src/ml/inference/goldai_loader.py` — charge `data/goldai/merged_all_dates.parquet`
+- ✅ **Sentiment Inference** : `src/ml/inference/sentiment.py` — inférence FlauBERT/CamemBERT sur GoldAI
+- ✅ **Endpoint API** : `GET /api/v1/ai/ml/sentiment-goldai?limit=50` — inférence sentiment ML
+- ✅ Source : GoldAI uniquement (pas Silver), via `merge_parquet_goldai.py`
+
+---
+
+## [1.4.1] — 2025-02-10
+
+### 🐛 Corrections de Bugs
+
+#### Nettoyage des fichiers collectés (null + caractères spéciaux)
+- ✅ **sanitize_text()** : Nouvelle fonction dans `src/e1/core.py` pour supprimer les null bytes (`\x00`), caractères de contrôle et caractère de remplacement Unicode (`\ufffd`)
+- ✅ **ContentTransformer** : Nettoie désormais `title` ET `content` (avant : content uniquement)
+- ✅ **_collect_local_files()** : Sanitization des `title` et `content` issus des fichiers JSON GDELT avant ajout au DataFrame
+- ✅ **Lecture JSON** : `encoding='utf-8', errors='replace'` pour éviter les plantages sur encodages invalides
+- ✅ Fichiers modifiés : `src/e1/core.py`, `src/e1/aggregator.py`, `src/aggregator.py`
+
+#### Optimisations nettoyage (vieux codeur rusé)
+- ✅ **BOM** : Suppression du caractère BOM (`\ufeff`) au début des chaînes
+- ✅ **Normalisation Unicode (NFC)** : Évite les doublons de représentation (ex. café avec accent combiné)
+- ✅ **sanitize_url()** : Nettoyage des URLs (null bytes, caractères de contrôle) avant stockage/export
+- ✅ **ContentTransformer** : Sanitize désormais aussi `article.url` dans `transform()`
+- ✅ **_collect_local_files()** : URLs sanitizées avant ajout au DataFrame
+
+---
+
 ## [1.0.0] — 2025-12-15
 
 ### ✨ Nouvelles Fonctionnalités

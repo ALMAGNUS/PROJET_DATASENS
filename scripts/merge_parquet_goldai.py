@@ -148,35 +148,53 @@ class GoldAIDataMerger:
 
 
 class GoldAISaver:
-    """Sauvegarde GoldAI (SRP: écriture uniquement)"""
-    
+    """Sauvegarde GoldAI (SRP: écriture uniquement)
+    Utilise pandas/pyarrow pour l'écriture (évite HADOOP_HOME sous Windows).
+    """
+
     def __init__(self, goldai_base: Path):
         self.goldai_base = goldai_base
         self.goldai_base.mkdir(parents=True, exist_ok=True)
-    
+
+    def _spark_to_pandas(self, df: DataFrame):
+        """Convertit Spark DataFrame en pandas (évite Spark write = Hadoop sur Windows)"""
+        return df.toPandas()
+
     def save(self, df: DataFrame, target_date: date, version: int = 0) -> None:
-        """Sauvegarde partition incrémentale + fusion complète"""
+        """Sauvegarde partition incrémentale + fusion complète (pandas/pyarrow)"""
         import shutil
-        
+
+        pdf = self._spark_to_pandas(df)
+        count = len(pdf)
+
         # Partition incrémentale
         partition_dir = self.goldai_base / f"date={target_date:%Y-%m-%d}"
         partition_dir.mkdir(parents=True, exist_ok=True)
-        partition_path = partition_dir / "goldai.parquet"
-        
+        partition_path = (partition_dir / "goldai.parquet").resolve()
+
+        # Nettoyer résidu d'un échec Spark (Spark crée goldai.parquet/ comme dossier)
+        if partition_path.exists():
+            try:
+                if partition_path.is_dir():
+                    shutil.rmtree(partition_path)
+                else:
+                    partition_path.unlink()
+            except (PermissionError, OSError):
+                pass
+
         print(f"Sauvegarde partition incrémentale: {partition_path}")
-        df.write.mode("overwrite").parquet(str(partition_path))
-        count = df.count()
+        pdf.to_parquet(str(partition_path), index=False)
         print(f"{count:,} lignes sauvegardées")
-        
+
         # Fusion complète avec backup
         merged_path = self.goldai_base / "merged_all_dates.parquet"
         if merged_path.exists() and version > 0:
             backup_path = self.goldai_base / f"merged_all_dates_v{version}.parquet"
             print(f"Backup version précédente: {backup_path}")
             shutil.copy2(merged_path, backup_path)
-        
+
         print(f"Sauvegarde fusion complète: {merged_path}")
-        df.write.mode("overwrite").parquet(str(merged_path))
+        pdf.to_parquet(str(merged_path.resolve()), index=False)
         print(f"{count:,} lignes sauvegardées")
 
 
