@@ -1,0 +1,32 @@
+# Prometheus - Configuration LOCALE (Windows/Mac/Linux)
+# Usage: prometheus --config.file=prometheus.local.yml
+# Depuis la racine du projet: prometheus --config.file=monitoring/prometheus.local.yml
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'datasens-local'
+    environment: 'development'
+
+scrape_configs:
+  # API E2 (FastAPI) - métriques HTTP, auth, drift
+  - job_name: 'datasens-e2-api'
+    static_configs:
+      - targets: ['localhost:8001']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # Pipeline E1 (métriques collecte, enrichissement) - si le pipeline a démarré le serveur métriques
+  - job_name: 'datasens-e1'
+    static_configs:
+      - targets: ['localhost:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # Prometheus lui-même
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

@@ -127,11 +127,14 @@ python e1_export_correct.py
 | **sources_config.json** | 10 sources configuration | ✅ |
 | **requirements.txt** | All dependencies | ✅ |
 
+> **ZZDB MongoDB** : pour activer la source `zzdb_synthetic`, installer `pymongo`
+> (sinon la validation ZZDB affichera un warning).
+
 ---
 
-## 🔗 Data Sources (14 sources actives)
+## 🔗 Data Sources (15 sources actives)
 
-### Sources Actives (14 sources)
+### Sources Actives (15 sources)
 
 > **Note**: Les statistiques ci-dessous sont une **photo au 2025-12-20**. La collecte évolue quotidiennement pour les sources dynamiques. Les nombres d'articles augmentent à chaque exécution du pipeline.
 
@@ -149,8 +152,9 @@ python e1_export_correct.py
 | 10 | datagouv_datasets | Dataset | 50 | ✓ Dynamique |
 | 11 | ifop_barometers | Scraping | 18 | ✓ Dynamique |
 | 12 | insee_indicators | API | 5 | ✓ Dynamique |
-| 13 | GDELT_Last15_English | BigData | 2 | ✓ Dynamique |
-| 14 | GDELT_Master_List | BigData | 0 | ✓ Dynamique |
+| 13 | agora_consultations | API | n/a | ✓ Dynamique |
+| 14 | GDELT_Last15_English | BigData | 2 | ✓ Dynamique |
+| 15 | GDELT_Master_List | BigData | 0 | ✓ Dynamique |
 
 **Total articles en base** (au 20/12/2025): **43,022 articles**
 
@@ -171,7 +175,8 @@ python e1_export_correct.py
 | Kaggle_SentimentLexicons | Dataset | Inactif |
 | Kaggle_InsuranceReviews | Dataset | Inactif |
 | Kaggle_FrenchTweets | Dataset | Inactif |
-| zzdb_synthetic | SQLite | Inactif |
+| monavis_citoyen | Scraping | Inactif |
+| zzdb_synthetic | MongoDB | Inactif |
 
 ---
 

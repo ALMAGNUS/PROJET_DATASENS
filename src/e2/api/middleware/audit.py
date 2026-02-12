@@ -39,8 +39,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
         Returns:
             Response HTTP
         """
-        # Exclure certains endpoints (health, docs, etc.)
-        excluded_paths = ["/health", "/docs", "/redoc", "/openapi.json", "/api/v1/auth/login"]
+        # Exclure certains endpoints (health, docs) ; login est logue dans la route auth apres succes
+        excluded_paths = ["/health", "/docs", "/redoc", "/openapi.json", "/api/v1/auth/login", "/metrics"]
         if request.url.path in excluded_paths:
             return await call_next(request)
 
@@ -61,6 +61,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             if authorization and authorization.startswith("Bearer "):
                 token = authorization.split(" ")[1]
                 from src.e2.auth.security import get_security_service
+
                 security_service = get_security_service()
                 payload = security_service.decode_token(token)
                 if payload:
@@ -80,7 +81,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 resource_type=resource_type,
                 resource_id=resource_id,
                 ip_address=ip_address,
-                status_code=response.status_code
+                status_code=response.status_code,
             )
 
         return response
@@ -100,7 +101,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             "POST": "create",
             "PUT": "update",
             "PATCH": "update",
-            "DELETE": "delete"
+            "DELETE": "delete",
         }
         return mapping.get(method.upper())
 
@@ -154,7 +155,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         resource_type: str,
         resource_id: int | None = None,
         ip_address: str | None = None,
-        status_code: int | None = None
+        status_code: int | None = None,
     ) -> None:
         """
         Log une action dans user_action_log
@@ -172,7 +173,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
             cursor = conn.cursor()
 
             # Vérifier si la table existe
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_action_log'")
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='user_action_log'"
+            )
             if not cursor.fetchone():
                 # Table n'existe pas, on skip (sera créée par E1)
                 conn.close()
@@ -180,14 +183,47 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
             # Insérer le log
             details = f"HTTP {status_code}" if status_code else None
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO user_action_log
                 (profil_id, action_type, resource_type, resource_id, ip_address, details)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (profil_id, action_type, resource_type, resource_id, ip_address, details))
+            """,
+                (profil_id, action_type, resource_type, resource_id, ip_address, details),
+            )
 
             conn.commit()
             conn.close()
         except Exception as e:
             # Ne pas faire échouer la requête si le log échoue
             print(f"ATTENTION: Erreur audit trail: {e}")
+
+
+def log_login(profil_id: int, ip_address: str | None = None) -> None:
+    """
+    Enregistre une connexion reussie dans user_action_log (appelé depuis la route auth).
+    """
+    db_path = settings.db_path
+    if not db_path.startswith("/") and not db_path.startswith("C:"):
+        db_path = str(get_data_dir().parent / db_path)
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='user_action_log'"
+        )
+        if not cursor.fetchone():
+            conn.close()
+            return
+        cursor.execute(
+            """
+            INSERT INTO user_action_log
+            (profil_id, action_type, resource_type, resource_id, ip_address, details)
+            VALUES (?, 'login', 'auth', NULL, ?, 'login success')
+            """,
+            (profil_id, ip_address),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"ATTENTION: Erreur audit login: {e}")

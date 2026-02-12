@@ -9,8 +9,8 @@ import sqlite3
 import sys
 from pathlib import Path
 
-# Ajouter src au path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+# Racine projet pour import src
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.config import get_data_dir, get_settings
 
@@ -33,7 +33,9 @@ def verify_audit_trail():
 
     try:
         # Vérifier si la table existe
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_action_log'")
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='user_action_log'"
+        )
         if not cursor.fetchone():
             print("❌ Table 'user_action_log' does not exist")
             print("   This table should be created by E1 pipeline")
@@ -52,29 +54,34 @@ def verify_audit_trail():
             return True
 
         # Statistiques par action_type
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT action_type, COUNT(*) as count
             FROM user_action_log
             GROUP BY action_type
             ORDER BY count DESC
-        """)
+        """
+        )
         print("\n📊 Actions by type:")
         for row in cursor.fetchall():
             print(f"   {row[0]}: {row[1]}")
 
         # Statistiques par resource_type
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT resource_type, COUNT(*) as count
             FROM user_action_log
             GROUP BY resource_type
             ORDER BY count DESC
-        """)
+        """
+        )
         print("\n📊 Actions by resource:")
         for row in cursor.fetchall():
             print(f"   {row[0]}: {row[1]}")
 
         # Derniers logs (24h)
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT
                 action_date,
                 profil_id,
@@ -86,7 +93,8 @@ def verify_audit_trail():
             WHERE action_date >= datetime('now', '-1 day')
             ORDER BY action_date DESC
             LIMIT 10
-        """)
+        """
+        )
         recent_logs = cursor.fetchall()
 
         if recent_logs:

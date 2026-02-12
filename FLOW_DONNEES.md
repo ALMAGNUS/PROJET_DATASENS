@@ -17,7 +17,7 @@ Config    Articles  Valid   DB    Topics  Sentiment  DataFrame  CSV/Parquet
 - ✅ **API** : `openweather_api`, `insee_indicators`, `reddit_france`
 - ✅ **Scraping** : `trustpilot_reviews`, `ifop_barometers`
 - ✅ **ZZDB CSV** : `zzdb_csv` (actif) → Lit `zzdb/zzdb_dataset.csv` (1189 articles)
-- ❌ **ZZDB Synthetic** : `zzdb_synthetic` (désactivé) → Ne lit PAS `zzdb/synthetic_data.db`
+- ❌ **ZZDB Synthetic** : `zzdb_synthetic` (désactivé) → Source MongoDB (zzdb) non sollicitée
 
 ### **Processus**
 1. **Lecture config** : `main.py` → `load_sources()` → Parse `sources_config.json`

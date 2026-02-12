@@ -35,24 +35,25 @@ def get_spark_session() -> SparkSession:
         # Configuration pour mode local pur (PAS de connexion réseau)
         # Mode local = tout s'exécute dans le même processus JVM
         # Aucune connexion réseau nécessaire, aucun serveur distant
-        _spark_session = SparkSession.builder \
-            .appName(_settings.spark_app_name) \
-            .master("local[*]") \
-            .config("spark.driver.memory", _settings.spark_driver_memory) \
-            .config("spark.executor.memory", _settings.spark_executor_memory) \
-            .config("spark.sql.parquet.enableVectorizedReader", "true") \
-            .config("spark.sql.parquet.mergeSchema", "false") \
-            .config("spark.sql.adaptive.enabled", "true") \
-            .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
-            .config("spark.sql.execution.arrow.pyspark.enabled", "false") \
-            .config("spark.ui.enabled", "false") \
-            .config("spark.driver.bindAddress", "127.0.0.1") \
-            .config("spark.driver.host", "localhost") \
-            .config("spark.executor.allowSparkContext", "true") \
-            .config("spark.local.dir", "./spark-temp") \
-            .config("spark.network.timeout", "600s") \
-            .config("spark.executor.heartbeatInterval", "60s") \
+        _spark_session = (
+            SparkSession.builder.appName(_settings.spark_app_name)
+            .master("local[*]")
+            .config("spark.driver.memory", _settings.spark_driver_memory)
+            .config("spark.executor.memory", _settings.spark_executor_memory)
+            .config("spark.sql.parquet.enableVectorizedReader", "true")
+            .config("spark.sql.parquet.mergeSchema", "false")
+            .config("spark.sql.adaptive.enabled", "true")
+            .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
+            .config("spark.sql.execution.arrow.pyspark.enabled", "false")
+            .config("spark.ui.enabled", "false")
+            .config("spark.driver.bindAddress", "127.0.0.1")
+            .config("spark.driver.host", "localhost")
+            .config("spark.executor.allowSparkContext", "true")
+            .config("spark.local.dir", "./spark-temp")
+            .config("spark.network.timeout", "600s")
+            .config("spark.executor.heartbeatInterval", "60s")
             .getOrCreate()
+        )
 
     return _spark_session
 

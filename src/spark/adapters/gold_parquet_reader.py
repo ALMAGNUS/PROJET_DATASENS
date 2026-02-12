@@ -7,6 +7,7 @@ Lecteur Parquet GOLD depuis E1 (isolation E1)
 from datetime import date as date_type
 from pathlib import Path
 
+from loguru import logger
 from pyspark.sql import DataFrame
 
 # Gérer imports dans différents contextes (test vs normal)
@@ -103,9 +104,7 @@ class GoldParquetReader(DataReader):
             partitions = list(self.base_path.glob("date=*/articles.parquet"))
 
             if not partitions:
-                raise FileNotFoundError(
-                    f"No Parquet GOLD partitions found in {self.base_path}"
-                )
+                raise FileNotFoundError(f"No Parquet GOLD partitions found in {self.base_path}")
 
             # Lire toutes les partitions et les unionner explicitement
             # (évite les problèmes de connexion avec wildcard sur Windows)
@@ -121,11 +120,11 @@ class GoldParquetReader(DataReader):
                     dfs.append(df)
                 except (ConnectionRefusedError, OSError) as e:
                     # Erreur de connexion réseau - skip cette partition
-                    print(f"Warning: Connection error reading partition {partition}: {e}")
+                    logger.warning("Connection error reading partition {}: {}", partition, e)
                     continue
                 except Exception as e:
                     # Autres erreurs - skip cette partition
-                    print(f"Warning: Failed to read partition {partition}: {e}")
+                    logger.warning("Failed to read partition {}: {}", partition, e)
                     continue
 
             if not dfs:
@@ -148,16 +147,14 @@ class GoldParquetReader(DataReader):
                         result = result.unionByName(df, allowMissingColumns=True)
                     except Exception as union_error:
                         # Si même unionByName échoue, on skip cette partition
-                        print(f"Warning: Cannot union partition (schema/connection issue): {union_error}")
+                        logger.warning(
+                            "Cannot union partition (schema/connection issue): {}", union_error
+                        )
                         continue
 
             return result
 
-    def read_gold_date_range(
-        self,
-        start_date: date_type,
-        end_date: date_type
-    ) -> DataFrame:
+    def read_gold_date_range(self, start_date: date_type, end_date: date_type) -> DataFrame:
         """
         Lit Parquet GOLD pour une plage de dates
 
@@ -210,7 +207,7 @@ class GoldParquetReader(DataReader):
                     result = result.unionByName(df, allowMissingColumns=True)
                 except Exception as e:
                     # Si même unionByName échoue, on skip cette partition
-                    print(f"Warning: Cannot union partition (schema mismatch): {e}")
+                    logger.warning("Cannot union partition (schema mismatch): {}", e)
                     continue
 
         return result

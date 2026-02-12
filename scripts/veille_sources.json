@@ -1,0 +1,35 @@
+{
+  "theme": "veille_ia_datasens",
+  "sources": [
+    {
+      "name": "OpenAI Blog",
+      "url": "https://openai.com/blog/rss.xml",
+      "category": "ia",
+      "reliability": "high"
+    },
+    {
+      "name": "Mistral AI Blog",
+      "url": "https://mistral.ai/news/rss.xml",
+      "category": "ia",
+      "reliability": "high"
+    },
+    {
+      "name": "Hugging Face Blog",
+      "url": "https://huggingface.co/blog/rss.xml",
+      "category": "ia",
+      "reliability": "high"
+    },
+    {
+      "name": "ANSSI",
+      "url": "https://www.ssi.gouv.fr/feed/",
+      "category": "reglementaire",
+      "reliability": "high"
+    },
+    {
+      "name": "CNIL",
+      "url": "https://www.cnil.fr/fr/rss.xml",
+      "category": "reglementaire",
+      "reliability": "high"
+    }
+  ]
+}

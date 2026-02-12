@@ -33,17 +33,17 @@ class DataService:
             base_path = get_data_dir()
             # Utiliser le même chemin que E1 (home/datasens_project/datasens.db)
             import os
-            db_path_str = os.getenv('DB_PATH', str(Path.home() / 'datasens_project' / 'datasens.db'))
+
+            db_path_str = os.getenv(
+                "DB_PATH", str(Path.home() / "datasens_project" / "datasens.db")
+            )
             db_path = Path(db_path_str)
             self.data_reader = E1DataReaderImpl(base_path, db_path)
         else:
             self.data_reader = data_reader
 
     def get_raw_articles(
-        self,
-        date: str | None = None,
-        limit: int | None = None,
-        offset: int = 0
+        self, date: str | None = None, limit: int | None = None, offset: int = 0
     ) -> list[ArticleResponse]:
         """
         Récupère les articles RAW
@@ -59,7 +59,7 @@ class DataService:
         df = self.data_reader.read_raw_data(date)
 
         # Pagination
-        df = df.iloc[offset:offset + limit] if limit else df.iloc[offset:]
+        df = df.iloc[offset : offset + limit] if limit else df.iloc[offset:]
 
         # Convertir en ArticleResponse
         articles = []
@@ -87,27 +87,32 @@ class DataService:
                 elif isinstance(collected_at_val, datetime | date_type):
                     collected_at = collected_at_val
 
-            articles.append(ArticleResponse(
-                raw_data_id=int(row.get("raw_data_id", 0)) if pd.notna(row.get("raw_data_id")) else 0,
-                source_id=int(row.get("source_id", 0)) if pd.notna(row.get("source_id")) else 0,
-                source_name=row.get("source_name") if pd.notna(row.get("source_name")) else None,
-                title=str(row.get("title", "")) if pd.notna(row.get("title")) else "",
-                content=str(row.get("content", "")) if pd.notna(row.get("content")) else "",
-                url=row.get("url") if pd.notna(row.get("url")) else None,
-                published_at=published_at,
-                collected_at=collected_at,
-                quality_score=float(row.get("quality_score")) if pd.notna(row.get("quality_score")) else None,
-                sentiment=None,  # RAW n'a pas de sentiment
-                topics=None  # RAW n'a pas de topics
-            ))
+            articles.append(
+                ArticleResponse(
+                    raw_data_id=int(row.get("raw_data_id", 0))
+                    if pd.notna(row.get("raw_data_id"))
+                    else 0,
+                    source_id=int(row.get("source_id", 0)) if pd.notna(row.get("source_id")) else 0,
+                    source_name=row.get("source_name")
+                    if pd.notna(row.get("source_name"))
+                    else None,
+                    title=str(row.get("title", "")) if pd.notna(row.get("title")) else "",
+                    content=str(row.get("content", "")) if pd.notna(row.get("content")) else "",
+                    url=row.get("url") if pd.notna(row.get("url")) else None,
+                    published_at=published_at,
+                    collected_at=collected_at,
+                    quality_score=float(row.get("quality_score"))
+                    if pd.notna(row.get("quality_score"))
+                    else None,
+                    sentiment=None,  # RAW n'a pas de sentiment
+                    topics=None,  # RAW n'a pas de topics
+                )
+            )
 
         return articles
 
     def get_silver_articles(
-        self,
-        date: str | None = None,
-        limit: int | None = None,
-        offset: int = 0
+        self, date: str | None = None, limit: int | None = None, offset: int = 0
     ) -> list[ArticleResponse]:
         """
         Récupère les articles SILVER
@@ -123,7 +128,7 @@ class DataService:
         df = self.data_reader.read_silver_data(date)
 
         # Pagination
-        df = df.iloc[offset:offset + limit] if limit else df.iloc[offset:]
+        df = df.iloc[offset : offset + limit] if limit else df.iloc[offset:]
 
         # Convertir en ArticleResponse
         articles = []
@@ -147,27 +152,30 @@ class DataService:
             elif pd.isna(collected_at):
                 collected_at = None
 
-            articles.append(ArticleResponse(
-                raw_data_id=int(row.get("raw_data_id", 0)) if pd.notna(row.get("raw_data_id")) else 0,
-                source_id=int(row.get("source_id", 0)) if pd.notna(row.get("source_id")) else 0,
-                source_name=row.get("source_name"),
-                title=str(row.get("title", "")) if pd.notna(row.get("title")) else "",
-                content=str(row.get("content", "")) if pd.notna(row.get("content")) else "",
-                url=row.get("url") if pd.notna(row.get("url")) else None,
-                published_at=published_at,
-                collected_at=collected_at,
-                quality_score=float(row.get("quality_score")) if pd.notna(row.get("quality_score")) else None,
-                sentiment=None,  # SILVER peut avoir sentiment mais pas garanti
-                topics=None  # SILVER peut avoir topics mais pas garanti
-            ))
+            articles.append(
+                ArticleResponse(
+                    raw_data_id=int(row.get("raw_data_id", 0))
+                    if pd.notna(row.get("raw_data_id"))
+                    else 0,
+                    source_id=int(row.get("source_id", 0)) if pd.notna(row.get("source_id")) else 0,
+                    source_name=row.get("source_name"),
+                    title=str(row.get("title", "")) if pd.notna(row.get("title")) else "",
+                    content=str(row.get("content", "")) if pd.notna(row.get("content")) else "",
+                    url=row.get("url") if pd.notna(row.get("url")) else None,
+                    published_at=published_at,
+                    collected_at=collected_at,
+                    quality_score=float(row.get("quality_score"))
+                    if pd.notna(row.get("quality_score"))
+                    else None,
+                    sentiment=None,  # SILVER peut avoir sentiment mais pas garanti
+                    topics=None,  # SILVER peut avoir topics mais pas garanti
+                )
+            )
 
         return articles
 
     def get_gold_articles(
-        self,
-        date: str | None = None,
-        limit: int | None = None,
-        offset: int = 0
+        self, date: str | None = None, limit: int | None = None, offset: int = 0
     ) -> list[ArticleResponse]:
         """
         Récupère les articles GOLD (enrichis)
@@ -183,7 +191,7 @@ class DataService:
         df = self.data_reader.read_gold_data(date)
 
         # Pagination
-        df = df.iloc[offset:offset + limit] if limit else df.iloc[offset:]
+        df = df.iloc[offset : offset + limit] if limit else df.iloc[offset:]
 
         # Convertir en ArticleResponse
         articles = []
@@ -223,19 +231,27 @@ class DataService:
             else:
                 topics = None
 
-            articles.append(ArticleResponse(
-                raw_data_id=int(row.get("raw_data_id", 0)) if pd.notna(row.get("raw_data_id")) else 0,
-                source_id=int(row.get("source_id", 0)) if pd.notna(row.get("source_id")) else 0,
-                source_name=row.get("source_name") if pd.notna(row.get("source_name")) else None,
-                title=str(row.get("title", "")) if pd.notna(row.get("title")) else "",
-                content=str(row.get("content", "")) if pd.notna(row.get("content")) else "",
-                url=row.get("url") if pd.notna(row.get("url")) else None,
-                published_at=published_at,
-                collected_at=collected_at,
-                quality_score=float(row.get("quality_score")) if pd.notna(row.get("quality_score")) else None,
-                sentiment=row.get("sentiment") if pd.notna(row.get("sentiment")) else None,
-                topics=topics
-            ))
+            articles.append(
+                ArticleResponse(
+                    raw_data_id=int(row.get("raw_data_id", 0))
+                    if pd.notna(row.get("raw_data_id"))
+                    else 0,
+                    source_id=int(row.get("source_id", 0)) if pd.notna(row.get("source_id")) else 0,
+                    source_name=row.get("source_name")
+                    if pd.notna(row.get("source_name"))
+                    else None,
+                    title=str(row.get("title", "")) if pd.notna(row.get("title")) else "",
+                    content=str(row.get("content", "")) if pd.notna(row.get("content")) else "",
+                    url=row.get("url") if pd.notna(row.get("url")) else None,
+                    published_at=published_at,
+                    collected_at=collected_at,
+                    quality_score=float(row.get("quality_score"))
+                    if pd.notna(row.get("quality_score"))
+                    else None,
+                    sentiment=row.get("sentiment") if pd.notna(row.get("sentiment")) else None,
+                    topics=topics,
+                )
+            )
 
         return articles
 

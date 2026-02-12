@@ -11,7 +11,14 @@ from fastapi.responses import Response
 from src.config import get_settings
 from src.e2.api.middleware.audit import AuditMiddleware
 from src.e2.api.middleware.prometheus import PrometheusMiddleware, get_metrics
-from src.e2.api.routes import ai_router, auth_router, gold_router, raw_router, silver_router
+from src.e2.api.routes import (
+    ai_router,
+    auth_router,
+    gold_router,
+    raw_router,
+    silver_router,
+    sources_router,
+)
 from src.e2.api.routes.analytics import router as analytics_router
 
 settings = get_settings()
@@ -30,7 +37,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
         docs_url="/docs",
         redoc_url="/redoc",
-        openapi_url="/openapi.json"
+        openapi_url="/openapi.json",
     )
 
     # Prometheus metrics middleware (première position pour capturer toutes les requêtes)
@@ -53,6 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(raw_router, prefix=settings.api_v1_prefix)
     app.include_router(silver_router, prefix=settings.api_v1_prefix)
     app.include_router(gold_router, prefix=settings.api_v1_prefix)
+    app.include_router(sources_router, prefix=settings.api_v1_prefix)
     app.include_router(analytics_router, prefix=settings.api_v1_prefix)
     app.include_router(ai_router, prefix=settings.api_v1_prefix)
 
