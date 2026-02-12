@@ -2,6 +2,10 @@
 # Usage: prometheus --config.file=prometheus.local.yml
 # Depuis la racine du projet: prometheus --config.file=monitoring/prometheus.local.yml
 
+# Règles d'alertes (E1 pipeline - requiert serveur métriques E1 sur :8000)
+rule_files:
+  - 'prometheus_rules.yml'
+
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
