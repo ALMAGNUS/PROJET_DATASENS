@@ -3,6 +3,7 @@ import csv
 import hashlib
 import re
 import sqlite3
+import unicodedata
 import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -540,6 +541,28 @@ def create_extractor(source: Source) -> BaseExtractor:
     elif acq_type == "scraping": return ScrapingExtractor(source.source_name, source.url)
     return RSSExtractor(source.source_name, source.url)
 
+
+def sanitize_text(text: str | None) -> str:
+    """Remove null bytes, control chars, BOM, and problematic special chars.
+    Normalizes Unicode (NFC) to avoid duplicate char representations."""
+    if text is None or not isinstance(text, str):
+        return ''
+    text = str(text)
+    text = text.replace('\ufeff', '')  # BOM
+    text = text.replace('\x00', '')  # null bytes
+    text = ''.join(c for c in text if ord(c) >= 32 or c in ' \t\n\r')  # control chars
+    text = text.replace('\ufffd', '')  # Unicode replacement
+    text = unicodedata.normalize('NFC', text)
+    return text.strip()
+
+
+def sanitize_url(url: str | None) -> str:
+    """Sanitize URL for safe storage/export (same rules as text)."""
+    if not url:
+        return ''
+    return sanitize_text(str(url))
+
+
 class ContentTransformer:
     @staticmethod
     def clean_html(text: str) -> str:
@@ -553,8 +576,12 @@ class ContentTransformer:
         return text.strip()
     @staticmethod
     def transform(article: Article) -> Article:
+        article.title = sanitize_text(article.title)
+        article.content = sanitize_text(article.content)
         article.content = ContentTransformer.clean_html(article.content)
         article.content = ContentTransformer.normalize(article.content)
+        if article.url:
+            article.url = sanitize_url(article.url)
         return article
 
 class DatabaseLoader:

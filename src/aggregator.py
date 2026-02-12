@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from e1.core import sanitize_text, sanitize_url
+
 
 class DataAggregator:
     def __init__(self, db_path: str):
@@ -21,15 +23,16 @@ class DataAggregator:
                 if not gdelt_dir.is_dir(): continue
                 for json_file in gdelt_dir.rglob('*.json'):
                     try:
-                        with open(json_file, encoding='utf-8') as f:
+                        with open(json_file, encoding='utf-8', errors='replace') as f:
                             raw = json.load(f)
                             items = raw if isinstance(raw, list) else (raw.get('items', []) if isinstance(raw, dict) else [])
                             for item in items:
                                 if isinstance(item, dict):
-                                    title = item.get('title') or item.get('headline') or ''
-                                    content = item.get('content') or item.get('text') or item.get('description') or ''
+                                    title = sanitize_text(item.get('title') or item.get('headline') or '')
+                                    content = sanitize_text(item.get('content') or item.get('text') or item.get('description') or '')
                                     if len(title) > 3:
-                                        data.append({'source': gdelt_dir.name, 'title': title[:500], 'content': content[:2000] if content else title[:2000], 'url': item.get('url', ''), 'collected_at': ''})
+                                        url = sanitize_url(item.get('url', ''))
+                                        data.append({'source': gdelt_dir.name, 'title': title[:500], 'content': (content[:2000] if content else title[:2000]), 'url': url, 'collected_at': ''})
                     except: pass
         return pd.DataFrame(data) if data else pd.DataFrame(columns=['source', 'title', 'content', 'url', 'collected_at'])
 
