@@ -316,6 +316,8 @@ python scripts/enrich_all_articles.py
 - AGILE_ROADMAP.md (43 user stories)
 - SCHEMA_DESIGN.md (database design)
 - CHANGELOG.md (version history)
+- **Conformité** : Audits E1–E5, RGPD, OWASP, monitoring, incidents
+- **docs/** : 60+ documents (architecture, flux, audits, procédures)
 
 ✅ **Dependencies**
 - All listed in requirements.txt
@@ -417,6 +419,37 @@ PROJET_DATASENS/
 - ✅ Aucune modification `src/e1/` depuis E2/E3
 
 **Voir** : `docs/E1_ISOLATION_COMPLETE.md` pour détails complets
+
+---
+
+## 📋 Documentation & Conformité
+
+### Audits compétences (E1 → E5)
+
+| Épreuve | Document | Statut |
+|---------|----------|--------|
+| E1 | `docs/AUDIT_E1_COMPETENCES.md` | ✅ 100 % |
+| E2 | `docs/AUDIT_E2_COMPETENCES.md` | ✅ 100 % |
+| E3 | `docs/AUDIT_E3_COMPETENCES.md` | ✅ 100 % |
+| E4 | `docs/AUDIT_E4_ECART.md` | Plan d'action |
+| E5 | `docs/AUDIT_E5_COMPETENCES.md` | ✅ 100 % |
+
+### RGPD & Sécurité
+
+- `docs/REGISTRE_TRAITEMENTS_RGPD.md` — Registre des traitements
+- `docs/PROCEDURE_TRI_DONNEES_PERSONNELLES.md` — Procédure tri/suppression données
+- `docs/README_E2_API.md` — Section OWASP Top 10
+
+### Monitoring & Incidents
+
+- `docs/METRIQUES_SEUILS_ALERTES.md` — Métriques, seuils, alertes
+- `docs/PROCEDURE_INCIDENTS.md` — Résolution incidents techniques
+- `docs/MONITORING_E2_API.md` — Prometheus, Grafana, choix techniques
+- `docs/ACCESSIBILITE_DOCUMENTATION.md` — Accessibilité (AVH, Microsoft)
+
+### Index documentation
+
+Voir `docs/README.md` pour l'index complet des 60+ documents.
 
 ---
 
@@ -537,9 +570,11 @@ bash scripts/manage_parquet.sh
 
 ---
 
-**Last Updated:** December 20, 2025  
+**Last Updated:** February 12, 2026  
+**Version:** 1.5.0  
 **Status:** ✅ Production Ready  
 **E1 Complete:** ✅ All components delivered  
 **E2 Complete:** ✅ FastAPI + RBAC (100%)  
 **E3 Complete:** ✅ PySpark Integration (100%)  
-**GoldAI:** ✅ Fusion incrémentale Parquet GOLD → GoldAI (100%)
+**GoldAI:** ✅ Fusion incrémentale Parquet GOLD → GoldAI (100%)  
+**Documentation E1–E5:** ✅ Audits, RGPD, monitoring, accessibilité (100%)

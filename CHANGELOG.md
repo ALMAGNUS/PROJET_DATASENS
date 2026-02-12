@@ -7,6 +7,43 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ---
 
+## [1.5.0] — 2026-02-12
+
+### 📚 Documentation complète E1 → E5
+
+#### E1 — Conformité RGPD
+- ✅ **REGISTRE_TRAITEMENTS_RGPD.md** : Registre des traitements (Art. 30 RGPD) — T1 profils, T2 audit, T3 contenu
+- ✅ **PROCEDURE_TRI_DONNEES_PERSONNELLES.md** : Procédure détection, suppression, anonymisation des données personnelles
+- ✅ **README_E2_API.md** : Section Sécurisation OWASP Top 10 API
+- ✅ **AUDIT_E1_COMPETENCES.md** : Grille compétences E1 (100 % conforme)
+
+#### E2 — Veille & Services IA
+- ✅ **VEILLE_PLANIFICATION.md** : Planification temps dédiés (fréquence, durée, activités)
+- ✅ **docs/e2/AI_BENCHMARK.md** : Benchmark CamemBERT/FlauBERT vs API Cloud
+- ✅ **docs/e2/AI_REQUIREMENTS.md** : Exigences et contraintes IA
+- ✅ **.env.example** : MISTRAL_API_KEY documentée
+- ✅ **AUDIT_E2_COMPETENCES.md** : Grille compétences E2 (100 %)
+
+#### E3 — Cockpit
+- ✅ **AUDIT_E3_COMPETENCES.md** : Grille compétences E3 (100 %, réutilisation E2)
+
+#### E4 — Conception (anticipation)
+- ✅ **AUDIT_E4_ECART.md** : Écarts et plan d'action E4
+
+#### E5 — Maintien opérationnel
+- ✅ **METRIQUES_SEUILS_ALERTES.md** : Tableau métriques E1/E2, seuils, alertes, actions
+- ✅ **PROCEDURE_INCIDENTS.md** : Modèle gestion incidents + exemple 1.4.1
+- ✅ **MONITORING_E2_API.md** : Section "Choix techniques" (Prometheus, Grafana)
+- ✅ **ACCESSIBILITE_DOCUMENTATION.md** : Références AVH/Microsoft, structure, export
+- ✅ **prometheus.local.yml** : `rule_files` activés pour alertes en local
+- ✅ **AUDIT_E5_COMPETENCES.md** : Grille compétences E5 (100 %)
+
+#### CI/CD
+- ✅ Ruff retiré du workflow CI
+- ✅ PYTHONPATH ajouté pour tests E1
+
+---
+
 ## [1.4.2] — 2025-02-10
 
 ### ✨ ML Inference sur GoldAI (pas Silver)
