@@ -20,5 +20,4 @@ __all__ = [
     "raw_router",
     "silver_router",
     "sources_router",
-    "ai_router",
 ]

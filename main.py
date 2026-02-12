@@ -19,9 +19,10 @@ if sys.platform == "win32":
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 # Import E1 isolé depuis package e1
+from loguru import logger
+
 from e1.pipeline import E1Pipeline
 from logging_config import setup_logging
-from loguru import logger
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="DataSens E1 pipeline")

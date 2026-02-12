@@ -20,6 +20,7 @@ sys.path.insert(0, str(project_root / "src"))
 try:
     from pyspark.sql import DataFrame
     from pyspark.sql.functions import col, lit, when
+
     from spark.adapters import GoldParquetReader
     from spark.processors import GoldDataProcessor
     from spark.session import close_spark_session, get_spark_session

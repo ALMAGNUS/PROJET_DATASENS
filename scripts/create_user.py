@@ -33,6 +33,7 @@ def main() -> None:
     parser.add_argument("email", nargs="?", help="Email de l'utilisateur")
     parser.add_argument("password", nargs="?", help="Mot de passe (eviter de le mettre en clair en prod)")
     parser.add_argument("--role", default="admin", choices=["reader", "writer", "deleter", "admin"])
+    parser.add_argument("--username", default=None, help="Username unique (defaut: derive de l'email)")
     parser.add_argument("--firstname", default="", help="Prenom")
     parser.add_argument("--lastname", default="", help="Nom")
     args = parser.parse_args()
@@ -57,7 +58,11 @@ def main() -> None:
             sys.exit(1)
 
         password_hash = security.hash_password(password)
-        username = email.split("@")[0] if email else "user"
+        username = args.username or (email.split("@")[0] if email else "user")
+        if not args.username and email:
+            cursor.execute("SELECT profil_id FROM profils WHERE username = ?", (username,))
+            if cursor.fetchone():
+                username = email.replace("@", "_").replace(".", "_")[:30]
         firstname = args.firstname or "User"
         lastname = args.lastname or "DataSens"
 

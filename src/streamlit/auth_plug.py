@@ -12,8 +12,8 @@ import os
 from typing import Any
 
 import requests
-import streamlit as st
 
+import streamlit as st
 from src.config import get_settings
 
 
@@ -67,12 +67,12 @@ def login(email: str, password: str) -> tuple[bool, str]:
     En cas de succes, stocke token et user dans session_state.
     """
     init_session_auth()
-    url = f"{_api_base()}{_auth_prefix()}auth/login"
+    url = f"{_api_base()}{_auth_prefix().rstrip('/')}/auth/login"
     try:
         r = requests.post(
             url,
             json={"email": email, "password": password},
-            timeout=10,
+            timeout=30,
             headers={"Content-Type": "application/json"},
         )
     except requests.exceptions.RequestException as e:

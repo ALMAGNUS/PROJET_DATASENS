@@ -116,8 +116,36 @@ class Repository(DatabaseLoader):
             # Migration : Ajouter table PROFILS si elle n'existe pas (compatible avec schéma existant)
             self._ensure_profils_table()
 
+            # Migration MODEL_OUTPUT : colonnes IA (label_3c, confidence, p_pos/neu/neg, sentiment_score, inference_ms)
+            self._migrate_model_output_ml()
+
         except Exception as e:
             logger.error("Schema initialization error: {}", str(e)[:60])
+
+    def _migrate_model_output_ml(self):
+        """Ajoute colonnes E1+IA : label_3c, confidence, p_pos/neu/neg, sentiment_score, inference_ms."""
+        try:
+            self.cursor.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='model_output'")
+            if not self.cursor.fetchone():
+                return
+            self.cursor.execute("PRAGMA table_info(model_output)")
+            cols = {row[1] for row in self.cursor.fetchall()}
+            migrations = [
+                ("model_id", "VARCHAR(200)"),
+                ("label_3c", "VARCHAR(20)"),
+                ("confidence", "FLOAT"),
+                ("p_pos", "FLOAT"),
+                ("p_neu", "FLOAT"),
+                ("p_neg", "FLOAT"),
+                ("sentiment_score", "FLOAT"),
+                ("inference_ms", "INTEGER"),
+            ]
+            for name, typ in migrations:
+                if name not in cols:
+                    self.cursor.execute(f"ALTER TABLE model_output ADD COLUMN {name} {typ}")
+                    self.conn.commit()
+        except Exception as e:
+            logger.warning("model_output migration: {}", str(e)[:80])
 
     def _ensure_sources(self):
         """Load sources from sources_config.json - Add missing sources even if some exist"""

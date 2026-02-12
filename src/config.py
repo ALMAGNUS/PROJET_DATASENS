@@ -5,6 +5,12 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+# BASE_DIR: Windows natif = projet, Docker = /data (override via env)
+def _base_dir() -> Path:
+    p = Path(__file__).resolve().parent.parent
+    return p
+
+
 class Settings(BaseSettings):
     """Configuration centralisée pour E1, E2, E3"""
 
@@ -17,8 +23,12 @@ class Settings(BaseSettings):
     )
 
     # ============================================================
-    # E1: Database Configuration
+    # E1: Database & Paths (Windows + Docker)
     # ============================================================
+    base_dir: str | None = Field(
+        default=None,
+        description="Base path (Windows: projet, Docker: /data). Path() partout dans le code.",
+    )
     db_path: str = Field(default="datasens.db", description="SQLite database path")
 
     # ============================================================
@@ -85,11 +95,25 @@ class Settings(BaseSettings):
         default=".cache/transformers", description="Transformers cache"
     )
     model_device: str = Field(default="cpu", description="Model device (cpu/cuda)")
+    torch_num_threads: int = Field(
+        default=4, description="PyTorch CPU threads (évite saturation RAM, ex: 4 ou 6)"
+    )
+    inference_batch_size: int = Field(
+        default=8, description="Taille micro-batch inférence CPU (8-16 recommandé)"
+    )
+    inference_max_length: int = Field(
+        default=256, description="Max tokens par texte (256/384 = perf, 512 = contexte)"
+    )
     flaubert_model_path: str = Field(
         default="models/flaubert-base-uncased", description="FlauBERT model path"
     )
     camembert_model_path: str = Field(
-        default="models/camembert-base", description="CamemBERT model path"
+        default="cmarkea/distilcamembert-base-sentiment",
+        description="CamemBERT sentiment pré-entraîné FR (recommandé CPU)",
+    )
+    sentiment_finetuned_model_path: str | None = Field(
+        default=None,
+        description="Modèle sentiment fine-tuné (prioritaire sur flaubert/camembert pour /predict)",
     )
 
     # ============================================================
@@ -99,6 +123,14 @@ class Settings(BaseSettings):
     log_file: str = Field(default="logs/datasens.log", description="Log file path")
     prometheus_port: int = Field(default=9090, description="Prometheus port")
     grafana_port: int = Field(default=3000, description="Grafana port")
+
+    # ============================================================
+    # E3: MongoDB (Optional - backup Parquet)
+    # ============================================================
+    mongo_uri: str = Field(default="mongodb://localhost:27017", description="MongoDB URI")
+    mongo_db: str = Field(default="datasens", description="MongoDB database name")
+    mongo_gridfs_bucket: str = Field(default="parquet_fs", description="GridFS bucket for Parquet")
+    mongo_store_parquet: bool = Field(default=False, description="Enable Parquet backup to MongoDB")
 
     # ============================================================
     # E3: Redis (Optional)
@@ -138,10 +170,38 @@ def get_settings() -> Settings:
     return _settings
 
 
-# Path helpers
+# Path helpers (Windows natif + Docker)
+def get_base_dir() -> Path:
+    """Base du projet. Windows: projet | Docker: BASE_DIR env (ex: /data)."""
+    try:
+        s = get_settings()
+        if s.base_dir:
+            return Path(s.base_dir)
+    except Exception:
+        pass
+    return _base_dir()
+
+
 def get_data_dir() -> Path:
     """Get data directory path"""
-    return Path("data")
+    return get_base_dir() / "data"
+
+
+def get_project_root() -> Path:
+    """Racine du projet (sans BASE_DIR override)."""
+    return _base_dir()
+
+
+def get_db_path() -> Path:
+    """Chemin DB. Si base_dir défini, résolu depuis base_dir."""
+    try:
+        s = get_settings()
+        p = Path(s.db_path)
+        if s.base_dir and not p.is_absolute():
+            return Path(s.base_dir) / p
+        return p
+    except Exception:
+        return Path("datasens.db")
 
 
 def get_raw_dir() -> Path:

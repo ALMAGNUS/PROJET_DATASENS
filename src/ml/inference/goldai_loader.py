@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.config import get_settings, get_goldai_dir
+from src.config import get_goldai_dir, get_settings
 
 _settings = get_settings()
 
