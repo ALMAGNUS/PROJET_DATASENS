@@ -2,6 +2,12 @@
 set "ROOT=%~dp0"
 cd /d "%ROOT%"
 
+REM Liberer ports 8001 et 8501 avant demarrage
+echo Liberation des ports 8001 et 8501...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8001" 2^>nul') do taskkill /PID %%a /F 2>nul
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8501" 2^>nul') do taskkill /PID %%a /F 2>nul
+ping -n 2 127.0.0.1 >nul
+
 echo ============================================================
 echo   DataSens - Lancement de tout dans l'ordre
 echo ============================================================
@@ -41,7 +47,7 @@ echo.
 
 REM ----- 4. Attendre puis Cockpit (terminal 2) -----
 echo [4/4] Attente 5 s puis demarrage Cockpit (port 8501)...
-timeout /t 5 /nobreak >nul
+ping -n 6 127.0.0.1 >nul
 start "DataSens - Cockpit" cmd /k "cd /d "%ROOT%" && call .venv\Scripts\activate.bat && echo Cockpit - http://localhost:8501 && streamlit run src\streamlit\app.py"
 echo       OK - ne pas fermer ce terminal.
 echo.

@@ -1,4 +1,4 @@
-"""Display database tables for jury presentation."""
+"""Display database tables."""
 import sqlite3
 from pathlib import Path
 

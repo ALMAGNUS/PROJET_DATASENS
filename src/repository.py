@@ -4,8 +4,9 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-from core import Article, DatabaseLoader, Source
 from loguru import logger
+
+from core import Article, DatabaseLoader, Source
 
 
 class Repository(DatabaseLoader):
@@ -115,8 +116,35 @@ class Repository(DatabaseLoader):
             # Migration : Ajouter table PROFILS si elle n'existe pas (compatible avec schéma existant)
             self._ensure_profils_table()
 
+            # Migration MODEL_OUTPUT : colonnes IA
+            self._migrate_model_output_ml()
+
         except Exception as e:
             logger.error("Schema initialization error: {}", str(e)[:60])
+
+    def _migrate_model_output_ml(self):
+        """Ajoute colonnes E1+IA : label_3c, confidence, p_pos/neu/neg, sentiment_score, inference_ms."""
+        try:
+            self.cursor.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='model_output'")
+            if not self.cursor.fetchone():
+                return
+            self.cursor.execute("PRAGMA table_info(model_output)")
+            cols = {row[1] for row in self.cursor.fetchall()}
+            for name, typ in [
+                ("model_id", "VARCHAR(200)"),
+                ("label_3c", "VARCHAR(20)"),
+                ("confidence", "FLOAT"),
+                ("p_pos", "FLOAT"),
+                ("p_neu", "FLOAT"),
+                ("p_neg", "FLOAT"),
+                ("sentiment_score", "FLOAT"),
+                ("inference_ms", "INTEGER"),
+            ]:
+                if name not in cols:
+                    self.cursor.execute(f"ALTER TABLE model_output ADD COLUMN {name} {typ}")
+                    self.conn.commit()
+        except Exception:
+            pass
 
     def _ensure_sources(self):
         """Load sources from sources_config.json - Add missing sources even if some exist"""

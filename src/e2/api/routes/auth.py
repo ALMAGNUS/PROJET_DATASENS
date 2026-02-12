@@ -6,7 +6,7 @@ Endpoints pour authentification (login)
 
 from datetime import timedelta
 
-from fastapi import APIRouter, Request, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 
 from src.config import get_settings
 from src.e2.api.middleware.audit import log_login

@@ -35,6 +35,8 @@ ignore = [
     "SIM102", # Use single if (acceptable for nested conditions)
     "SIM105", # Use contextlib.suppress (acceptable for try-except-pass)
     "B904",   # Raise from err (acceptable for FastAPI error handling)
+    "RUF001", # Typographic quotes in French UI strings (l'API, d'un, etc.)
+    "RUF003", # Typographic quotes in comments
 ]
 
 [tool.ruff.lint.per-file-ignores]

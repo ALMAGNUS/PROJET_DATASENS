@@ -8,11 +8,11 @@ import os
 import re
 import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 import requests
+
 import streamlit as st
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -35,6 +35,26 @@ def _fmt_size(num: int) -> str:
             return f"{num:.1f} {unit}"
         num /= 1024
     return f"{num:.1f} PB"
+
+
+def _inject_css() -> None:
+    st.markdown(
+        """
+    <style>
+    .ds-hero { background: linear-gradient(135deg, #1a237e 0%, #283593 100%); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; }
+    .ds-hero h3 { color: #e8eaf6; margin: 0 0 0.5rem 0; font-size: 1.1rem; }
+    .ds-hero p { color: #c5cae9; margin: 0; font-size: 0.9rem; }
+    .ds-flow { display: flex; align-items: center; flex-wrap: wrap; gap: 0.3rem; margin: 1rem 0; font-size: 0.85rem; }
+    .ds-flow span { color: #90caf9; }
+    .ds-flow .arrow { color: #64b5f6; }
+    .ds-card { background: #1e1e2e; border: 1px solid #333; border-radius: 10px; padding: 1rem; margin-bottom: 0.8rem; }
+    .ds-card-title { color: #81d4fa; font-weight: 600; font-size: 0.95rem; margin-bottom: 0.3rem; }
+    .ds-card-value { color: #fff; font-size: 1.1rem; }
+    .ds-card-empty { color: #78909c; }
+    </style>
+    """,
+        unsafe_allow_html=True,
+    )
 
 
 def _scan_stage(path: Path, patterns: list[str]) -> dict:
@@ -196,7 +216,7 @@ def main() -> None:
         st.stop()
 
     st.title("DataSens Cockpit")
-    st.caption("Vue complète + pilotage + modifications contrôlées")
+    _inject_css()
 
     raw_dir = PROJECT_ROOT / "data" / "raw"
     silver_dir = PROJECT_ROOT / "data" / "silver"
@@ -211,7 +231,7 @@ def main() -> None:
             "RAW (sources brutes)",
             raw_dir,
             ["*.json", "*.csv"],
-            "Toutes les sources (RSS, ZZDB, etc.) ingérées ici. ZZDB = source comme les autres, pas du parquet.",
+            "Articles bruts extraits des sources RSS, agrégateurs et jeux de données.",
         ),
         (
             "SILVER (nettoyage, fusion)",
@@ -239,29 +259,42 @@ def main() -> None:
         ),
     ]
 
-    tab_overview, tab_pilotage, tab_datasets, tab_monitoring, tab_chrono, tab_ia = st.tabs(
-        ["Cockpit", "Pilotage", "Datasets", "Metriques avancees", "Chronologie", "Assistant IA"]
+    tab_overview, tab_pipeline, tab_pilotage, tab_ia, tab_monitoring = st.tabs(
+        ["Vue d'ensemble", "Pipeline & Fusion", "Pilotage", "IA", "Monitoring"]
     )
 
     with tab_overview:
+        st.markdown(
+            """
+        <div class="ds-hero">
+        <h3>Objectif</h3>
+        <p>Interface d'évaluation des sentiments croisant différentes sources de données.</p>
+        <div class="ds-flow">
+        <span>Sources</span><span class="arrow">→</span><span>RAW</span><span class="arrow">→</span><span>SILVER</span><span>(+ topics)</span><span class="arrow">→</span><span>GOLD</span><span>(+ sentiment)</span><span class="arrow">→</span><span>GoldAI</span><span class="arrow">→</span><span>Copie IA</span>
+        </div>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
+
         col1, col2, col3 = st.columns(3)
         for idx, (name, path, patterns, _desc) in enumerate(stages):
             target = col1 if idx % 3 == 0 else col2 if idx % 3 == 1 else col3
             with target:
                 data = _scan_stage(path, patterns)
-                st.subheader(name)
-                if not data["exists"]:
-                    st.error("Dossier absent")
-                    continue
-                st.metric("Fichiers", data["count"])
-                st.metric("Taille totale", _fmt_size(data["size"]))
-                if data["latest"]:
-                    latest = data["latest"]
-                    st.caption(f"Dernier fichier: {latest.name}")
-                    st.caption(f"Modifié: {datetime.fromtimestamp(latest.stat().st_mtime)}")
-
+                if data["exists"]:
+                    f = "fichier" if data["count"] == 1 else "fichiers"
+                    val = f"{data['count']} {f} · {_fmt_size(data['size'])}"
+                    cls = ""
+                else:
+                    val = "—"
+                    cls = " ds-card-empty"
+                st.markdown(
+                    f'<div class="ds-card"><div class="ds-card-title">{name}</div><div class="ds-card-value{cls}">{val}</div></div>',
+                    unsafe_allow_html=True,
+                )
         st.divider()
-        st.header("API & Monitoring")
+        st.caption("API & Dependencies")
         api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
         api_v1 = f"{api_base}{settings.api_v1_prefix}"
 
@@ -313,309 +346,575 @@ def main() -> None:
                 except Exception as exc:
                     st.error(str(exc)[:200])
 
-    with tab_pilotage:
-        st.header("Pilotage complet")
-        st.caption("Tout lancer manuellement avec des boutons.")
+    with tab_pipeline:
+        gold_dir = PROJECT_ROOT / "data" / "gold"
+        goldai_dir = PROJECT_ROOT / "data" / "goldai"
+        merged_path = goldai_dir / "merged_all_dates.parquet"
+        meta_path = goldai_dir / "metadata.json"
 
-        with st.expander("Paramètres exécution (pipeline)", expanded=True):
+        fusion_err = st.session_state.pop("fusion_error", None)
+        if fusion_err:
+            st.error(f"Erreur fusion : {fusion_err}")
+        fusion = st.session_state.get("fusion_success")
+        if fusion:
+            st.balloons()
+            st.success(
+                f"**Fusion réalisée.** GOLD ({fusion['date']}) → GoldAI. "
+                f"Avant : **{fusion['avant']:,}** · Maintenant : **{fusion['apres']:,}** (+{fusion['ajoutes']:,})"
+            )
+            st.session_state.pop("fusion_success", None)
+
+        st.markdown("### Fusion Parquet : GOLD quotidien + GoldAI")
+        dates_in_goldai = []
+        if meta_path.exists():
+            import json
+
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            dates_in_goldai = meta.get("dates_included", [])
+        if dates_in_goldai:
+            st.caption(f"Dates dans GoldAI : {', '.join(sorted(dates_in_goldai))}")
+
+        gold_dates = (
+            sorted(
+                [
+                    d.name.replace("date=", "")
+                    for d in gold_dir.iterdir()
+                    if d.is_dir() and d.name.startswith("date=")
+                ],
+                reverse=True,
+            )
+            if gold_dir.exists()
+            else []
+        )
+        selected_date = st.selectbox("Date GOLD", gold_dates or ["—"], index=0)
+
+        df_gold = df_goldai = None
+        gold_file = (
+            gold_dir / f"date={selected_date}" / "articles.parquet"
+            if selected_date != "—"
+            else None
+        )
+        if gold_file and gold_file.exists():
+            df_gold = pd.read_parquet(gold_file)
+        if merged_path.exists():
+            df_goldai = pd.read_parquet(merged_path)
+        n_gold = len(df_gold) if df_gold is not None else 0
+        n_goldai = len(df_goldai) if df_goldai is not None else 0
+
+        if st.button("Fusionner GoldAI", type="primary", use_container_width=True):
+            with st.spinner("Fusion en cours…"):
+                proc = subprocess.run(
+                    [sys.executable, "scripts/merge_parquet_goldai.py"],
+                    cwd=str(PROJECT_ROOT),
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+                    timeout=600,
+                )
+            if proc.returncode == 0 and meta_path.exists():
+                import json
+
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                apres = meta.get("total_rows", n_goldai + n_gold)
+                st.session_state["fusion_success"] = {
+                    "avant": n_goldai,
+                    "apres": apres,
+                    "ajoutes": apres - n_goldai,
+                    "date": selected_date or "—",
+                }
+            elif proc.returncode != 0:
+                st.session_state["fusion_error"] = (proc.stderr or proc.stdout or "")[-500:]
+            st.rerun()
+
+        w1, w2, w3, w4 = st.columns(4)
+        with w1:
+            st.markdown("#### 1. GOLD quotidien")
+            if df_gold is not None:
+                st.metric("Lignes", f"{n_gold:,}")
+                st.dataframe(df_gold.head(80), use_container_width=True, height=260)
+            else:
+                st.info("—")
+        with w2:
+            st.markdown("#### 2. GoldAI")
+            if df_goldai is not None:
+                st.metric("Lignes", f"{n_goldai:,}")
+                st.dataframe(df_goldai.head(80), use_container_width=True, height=260)
+            else:
+                st.info("—")
+        with w3:
+            st.markdown("#### 3. Lignes ajoutées")
+            n_new, df_new = 0, None
+            if (
+                df_gold is not None
+                and df_goldai is not None
+                and "id" in df_gold.columns
+                and "id" in df_goldai.columns
+            ):
+                ids = set(df_goldai["id"])
+                df_new = df_gold[~df_gold["id"].isin(ids)]
+                n_new = len(df_new)
+            st.metric("+ lignes", f"{n_new:,}")
+            if n_new == 0 and df_gold is not None and df_goldai is not None:
+                st.caption("Date déjà fusionnée")
+            if df_new is not None or df_gold is not None:
+                st.dataframe(
+                    (df_new if df_new is not None else df_gold).head(80),
+                    use_container_width=True,
+                    height=260,
+                )
+            else:
+                st.info("—")
+        with w4:
+            st.markdown("#### 4. Résultat")
+            if df_gold is not None and df_goldai is not None:
+                merged = pd.concat([df_goldai, df_gold], ignore_index=True)
+                n_concat = len(merged)
+                if "id" in merged.columns:
+                    merged = merged.drop_duplicates(subset=["id"], keep="last")
+                n_res = len(merged)
+                n_dedup = n_concat - n_res
+                st.caption(f"Concat : {n_goldai:,}+{n_gold:,}={n_concat:,}")
+                st.markdown(f"→ **{n_res:,}** ({n_dedup:,} doublons)")
+                st.dataframe(merged.tail(80), use_container_width=True, height=260)
+            elif df_goldai is not None:
+                st.metric("Lignes", f"{n_goldai:,}")
+                st.dataframe(df_goldai.head(80), use_container_width=True, height=260)
+            else:
+                st.info("—")
+
+        st.divider()
+        st.markdown("### Datasets par étape")
+        st.caption("RAW → SILVER → GOLD → GoldAI → Copie IA")
+
+        def _load_df_sample(path: Path, max_rows: int = 100) -> pd.DataFrame | None:
+            """Charge un DataFrame à partir d'un CSV ou Parquet, limité à max_rows."""
+            if not path.exists():
+                return None
+            try:
+                if path.suffix.lower() == ".parquet":
+                    return pd.read_parquet(path).head(max_rows)
+                if path.suffix.lower() == ".csv":
+                    return pd.read_csv(path, nrows=max_rows, encoding="utf-8", on_bad_lines="skip")
+                return None
+            except Exception:
+                return None
+
+        def _load_df_full(path: Path) -> pd.DataFrame | None:
+            """Charge un DataFrame complet (pour count uniquement)."""
+            if not path.exists():
+                return None
+            try:
+                if path.suffix.lower() == ".parquet":
+                    return pd.read_parquet(path)
+                if path.suffix.lower() == ".csv":
+                    return pd.read_csv(path, encoding="utf-8", on_bad_lines="skip")
+                return None
+            except Exception:
+                return None
+
+        def _render_stage_block(
+            title: str,
+            desc: str,
+            paths: list[Path],
+            primary_idx: int = 0,
+            exclude_zzdb: bool = False,
+        ) -> None:
+            """Affiche un bloc pour une étape."""
+            primary = (
+                paths[primary_idx] if primary_idx < len(paths) else (paths[0] if paths else None)
+            )
+            if not primary or not primary.exists():
+                with st.expander(f"**{title}** – données absentes", expanded=True):
+                    st.caption(desc)
+                    st.info("Aucun fichier trouvé.")
+                    return
+            df_full = _load_df_full(primary)
+            if df_full is None:
+                with st.expander(f"**{title}** – erreur lecture", expanded=True):
+                    st.caption(desc)
+                    st.error(f"Impossible de lire {primary.name}")
+                    return
+            if exclude_zzdb and "source" in df_full.columns:
+                mask = ~df_full["source"].astype(str).str.lower().str.contains("zzdb", na=False)
+                df_full = df_full[mask]
+            n_rows = len(df_full)
+            cols = list(df_full.columns)
+            if n_rows == 0 and exclude_zzdb:
+                with st.expander(f"**{title}**", expanded=True):
+                    st.caption(desc)
+                    st.info("Aucune donnée hors sources synthétiques dans les exports.")
+                return
+            df_preview = df_full.head(50)
+            with st.expander(f"**{title}** · {n_rows:,} lignes · {len(cols)} col.", expanded=True):
+                st.caption(desc)
+                st.caption(f"`{primary.relative_to(PROJECT_ROOT)}`")
+                st.dataframe(df_preview, use_container_width=True, height=320)
+
+        exports_dir = PROJECT_ROOT / "exports"
+        raw_dir = PROJECT_ROOT / "data" / "raw"
+        silver_dir = PROJECT_ROOT / "data" / "silver"
+        gold_dir = PROJECT_ROOT / "data" / "gold"
+        goldai_dir = PROJECT_ROOT / "data" / "goldai"
+        ia_dir = goldai_dir / "ia"
+
+        # Déterminer les fichiers sources par étape
+        raw_paths = []
+        if (exports_dir / "raw.csv").exists():
+            raw_paths.append(exports_dir / "raw.csv")
+        for d in sorted(raw_dir.iterdir(), reverse=True):
+            if d.is_dir() and "sources" in d.name:
+                for f in [d / "raw_articles.csv", d / "raw_articles.json"]:
+                    if f.exists() and f.suffix == ".csv":
+                        raw_paths.append(f)
+                        break
+                if raw_paths:
+                    break
+
+        silver_paths = []
+        if (exports_dir / "silver.csv").exists():
+            silver_paths.append(exports_dir / "silver.csv")
+        for d in sorted(silver_dir.iterdir(), reverse=True):
+            if d.is_dir():
+                for f in d.rglob("*.parquet"):
+                    silver_paths.append(f)
+                    break
+            if silver_paths:
+                break
+
+        gold_paths = []
+        if (exports_dir / "gold.parquet").exists():
+            gold_paths.append(exports_dir / "gold.parquet")
+        if (exports_dir / "gold.csv").exists():
+            gold_paths.append(exports_dir / "gold.csv")
+        for d in sorted(gold_dir.iterdir(), reverse=True):
+            if d.is_dir() and d.name.startswith("date="):
+                p = d / "articles.parquet"
+                if p.exists():
+                    gold_paths.append(p)
+                    break
+
+        _render_stage_block(
+            "1. RAW",
+            "Sources brutes (RSS, agrégateurs).",
+            raw_paths or [exports_dir / "raw.csv"],
+            exclude_zzdb=True,
+        )
+        _render_stage_block(
+            "2. SILVER",
+            "Nettoyage, fusion, topics.",
+            silver_paths or [exports_dir / "silver.csv"],
+            exclude_zzdb=True,
+        )
+        _render_stage_block(
+            "3. GOLD",
+            "Parquet quotidien, sentiment IA.",
+            gold_paths or [goldai_dir / "merged_all_dates.parquet"],
+        )
+        _render_stage_block(
+            "4. GoldAI",
+            "Fusion long terme des GOLD.",
+            [goldai_dir / "merged_all_dates.parquet"],
+        )
+        # Copie IA : merged_all_dates_annotated ou train comme fallback
+        ia_paths = [
+            ia_dir / "merged_all_dates_annotated.parquet",
+            ia_dir / "train.parquet",
+            ia_dir / "val.parquet",
+            ia_dir / "test.parquet",
+        ]
+        ia_existing = [p for p in ia_paths if p.exists()]
+        ia_primary = (
+            ia_existing[0] if ia_existing else ia_dir / "merged_all_dates_annotated.parquet"
+        )
+        if not ia_primary.exists():
+            with st.expander("**5. Copie IA** – données absentes", expanded=True):
+                st.caption("Split train/val/test pour l'entraînement.")
+                st.info("Pilotage → bouton « Créer copie IA (split) »")
+        else:
+            _render_stage_block(
+                "5. Copie IA",
+                "Split train/val/test.",
+                ia_existing,
+            )
+
+        for name, path in [
+            ("train", ia_dir / "train.parquet"),
+            ("val", ia_dir / "val.parquet"),
+            ("test", ia_dir / "test.parquet"),
+        ]:
+            if path.exists():
+                with st.expander(f"5b. {name}", expanded=False):
+                    df = _load_df_full(path)
+                    if df is not None:
+                        st.dataframe(df.head(30), use_container_width=True, height=280)
+
+    with tab_pilotage:
+
+        def _resolve_db_path() -> str:
+            db = os.getenv("DB_PATH")
+            if db and Path(db).exists():
+                return db
+            default = str(Path.home() / "datasens_project" / "datasens.db")
+            if Path(default).exists():
+                return default
+            return (
+                str(PROJECT_ROOT / "datasens.db")
+                if (PROJECT_ROOT / "datasens.db").exists()
+                else default
+            )
+
+        db_path = _resolve_db_path()
+        n_raw, n_silver, n_gold = 0, 0, 0
+        if Path(db_path).exists():
+            try:
+                import sqlite3
+
+                conn = sqlite3.connect(db_path)
+                cur = conn.cursor()
+                has_raw = cur.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='raw_data'"
+                ).fetchone()
+                conn.close()
+                if has_raw:
+                    from src.aggregator import DataAggregator
+
+                    agg = DataAggregator(db_path)
+                    n_raw = len(agg.aggregate_raw())
+                    n_silver = len(agg.aggregate_silver())
+                    n_gold = len(agg.aggregate())
+                    agg.close()
+            except Exception:
+                pass
+
+        m1, m2, m3 = st.columns(3)
+        m1.metric("RAW", f"{n_raw:,}")
+        m2.metric("SILVER", f"{n_silver:,}")
+        m3.metric("GOLD", f"{n_gold:,}")
+
+        st.divider()
+        b1, b2, b3 = st.columns(3)
+        with b1:
+            if st.button("Pipeline E1", type="primary", use_container_width=True):
+                env = {
+                    "ZZDB_MAX_ARTICLES": "50",
+                    "ZZDB_CSV_MAX_ARTICLES": "1000",
+                    "FORCE_ZZDB_REIMPORT": "false",
+                }
+                _run_command("pipeline", [sys.executable, "main.py"], extra_env=env)
+        with b2:
+            if st.button("Fusion GoldAI", type="primary", use_container_width=True):
+                _run_command("goldai", [sys.executable, "scripts/merge_parquet_goldai.py"])
+        with b3:
+            if st.button("Copie IA", type="primary", use_container_width=True):
+                _run_command("copie IA", [sys.executable, "scripts/create_ia_copy.py"])
+
+        b4, b5, _ = st.columns(3)
+        with b4:
+            if st.button("Lancer API E2", use_container_width=True):
+                _run_command("api", [sys.executable, "run_e2_api.py"])
+        with b5:
+            if st.button("Backup MongoDB", use_container_width=True):
+                _run_command(
+                    "backup",
+                    [sys.executable, "scripts/backup_parquet_to_mongo.py"],
+                    extra_env={"MONGO_STORE_PARQUET": "true"},
+                )
+
+        st.caption("Fine-tuning : améliore le modèle IA avec les données GoldAI")
+        b6, b7, _ = st.columns(3)
+        with b6:
+            if st.button(
+                "Fine-tuner sentiment",
+                use_container_width=True,
+                help="Entraîne CamemBERT sur train.parquet (Copie IA). Peut prendre 10-30 min.",
+            ):
+                _run_command(
+                    "finetune",
+                    [
+                        sys.executable,
+                        "scripts/finetune_sentiment.py",
+                        "--model",
+                        "camembert",
+                        "--epochs",
+                        "3",
+                    ],
+                )
+        with b7:
+            if st.button(
+                "Évaluer modèle",
+                use_container_width=True,
+                help="Calcule accuracy/F1 sur val.parquet (modèle fine-tuné)",
+            ):
+                _run_command(
+                    "eval", [sys.executable, "scripts/finetune_sentiment.py", "--eval-only"]
+                )
+        finetuned_path = getattr(settings, "sentiment_finetuned_model_path", None)
+        if finetuned_path:
+            st.caption(f"Modèle fine-tuné : {finetuned_path}")
+
+        with st.expander("Paramètres & détails", expanded=False):
             zzdb_max = st.number_input("ZZDB_MAX_ARTICLES", min_value=0, value=50, step=10)
             zzdb_csv_max = st.number_input(
                 "ZZDB_CSV_MAX_ARTICLES", min_value=0, value=1000, step=100
             )
             force_reimport = st.checkbox("FORCE_ZZDB_REIMPORT", value=False)
-
-        env = {
-            "ZZDB_MAX_ARTICLES": int(zzdb_max),
-            "ZZDB_CSV_MAX_ARTICLES": int(zzdb_csv_max),
-            "FORCE_ZZDB_REIMPORT": "true" if force_reimport else "false",
-        }
-
-        col_run1, col_run2, col_run3 = st.columns(3)
-        with col_run1:
-            st.caption(
-                "Collecte E1 (sources, ZZDB), enrichissement topics/sentiment, rapport et dashboard. Peut prendre plusieurs minutes."
-            )
-            if st.button("Lancer pipeline (main.py)"):
+            env = {
+                "ZZDB_MAX_ARTICLES": str(zzdb_max),
+                "ZZDB_CSV_MAX_ARTICLES": str(zzdb_csv_max),
+                "FORCE_ZZDB_REIMPORT": "true" if force_reimport else "false",
+            }
+            if st.button("Pipeline E1 (avec params)"):
                 _run_command("pipeline", [sys.executable, "main.py"], extra_env=env)
-        with col_run2:
-            st.caption(
-                "Fusionne les Parquet GOLD par date en un seul fichier (goldai). Prerequis pour le dataset IA."
-            )
-            if st.button("Fusion GoldAI"):
-                _run_command("goldai merge", [sys.executable, "scripts/merge_parquet_goldai.py"])
-        with col_run3:
-            st.caption(
-                "Genere un digest de veille (RSS, benchmarks, resume). Utile pour suivre l'actualite tech et donnees."
-            )
+            st.caption(f"Base : {db_path}")
+            if Path(db_path).exists():
+                try:
+                    import sqlite3
+
+                    conn = sqlite3.connect(db_path)
+                    cur = conn.cursor()
+                    cur.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+                    tables = []
+                    for r in cur.fetchall():
+                        if r[0] != "sqlite_sequence":
+                            try:
+                                cur.execute(f"SELECT COUNT(*) FROM [{r[0]}]")
+                                tables.append((r[0], cur.fetchone()[0]))
+                            except Exception:
+                                pass
+                    conn.close()
+                    st.caption("Tables : " + ", ".join(f"{t}={c}" for t, c in tables[:8]))
+                except Exception:
+                    pass
             if st.button("Veille IA"):
                 _run_command("veille", [sys.executable, "scripts/veille_digest.py"])
-
-        col_run4, col_run5, col_run6 = st.columns(3)
-        with col_run4:
-            st.caption(
-                "Compare les modèles IA (sentiment, topics) sur un échantillon. Affiche précision et temps."
-            )
             if st.button("Benchmark IA"):
                 _run_command("benchmark", [sys.executable, "scripts/ai_benchmark.py"])
-        with col_run5:
-            st.caption(
-                "Liste les Parquet stockés dans MongoDB GridFS (backups long terme). Pas de téléchargement."
-            )
             if st.button("Lister Parquet MongoDB"):
-                _run_command(
-                    "mongo list", [sys.executable, "scripts/mongo_parquet_restore.py", "--list"]
-                )
-        with col_run6:
-            st.caption(
-                "Démarre l'API FastAPI (E2) dans ce terminal. Gardez la page ouverte ; pour usage permanent, lancez run_e2_api.py à part."
+                _run_command("mongo", [sys.executable, "scripts/list_mongo_parquet.py"])
+            st.divider()
+            st.caption("Après fine-tuning : ajoutez dans .env :")
+            st.code("SENTIMENT_FINETUNED_MODEL_PATH=models/camembert-sentiment-finetuned")
+
+    with tab_ia:
+        api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
+        api_v1 = f"{api_base}{settings.api_v1_prefix}"
+
+        st.markdown("### IA – Modèles & Assistant")
+        try:
+            api_ok = requests.get(f"{api_base}/health", timeout=2).ok
+        except Exception:
+            api_ok = False
+        if not api_ok:
+            st.warning(
+                "L’API n’est pas démarrée. Allez dans **Pilotage** → *Lancer API E2* avant d’utiliser la prédiction ou l’assistant."
             )
-            if st.button("Lancer API E2"):
-                _run_command("api", [sys.executable, "run_e2_api.py"])
+        with st.expander("Comment utiliser cet onglet ?", expanded=True):
+            st.markdown("""
+            **1. Prédiction** : Testez l’analyse de sentiment sur un texte (ex. « Le marché affiche une hausse »).  
+            → Saisissez un texte, choisissez un modèle, cliquez sur *Prédire*. Si un modèle fine-tuné est configuré (SENTIMENT_FINETUNED_MODEL_PATH), il est utilisé automatiquement.
+
+            **2. Assistant** : Posez des questions par domaine (Politique, Financier, Utilisateurs).  
+            → Sélectionnez un thème, tapez votre question dans le champ en bas. L’assistant répond en fonction des données du projet.
+            """)
+
+        st.subheader("1. Prédiction de sentiment")
+        st.caption(
+            "Analysez le sentiment (positif / négatif / neutre) d’un texte avec FlauBERT ou CamemBERT."
+        )
+        pred_text = st.text_area(
+            "Texte à analyser",
+            "Le marché affiche une hausse.",
+            height=70,
+            help="Ex. une phrase ou un paragraphe",
+        )
+        pred_model = st.selectbox(
+            "Modèle", ["flaubert", "camembert"], key="pred_model", help="FlauBERT ou CamemBERT"
+        )
+        if st.button("Prédire le sentiment"):
+            token = get_token()
+            headers = {"Content-Type": "application/json"}
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+            try:
+                r = requests.post(
+                    f"{api_v1}/ai/predict",
+                    json={"text": pred_text, "model": pred_model, "task": "sentiment-analysis"},
+                    headers=headers,
+                    timeout=30,
+                )
+                if r.ok:
+                    data = r.json()
+                    st.json(data.get("result", data))
+                else:
+                    st.error(f"Erreur {r.status_code}")
+            except requests.exceptions.ConnectionError:
+                st.warning("API non démarrée (Pilotage → Lancer API E2)")
+            except Exception as e:
+                st.error(str(e)[:150])
 
         st.divider()
-        st.subheader("Sauvegarde long terme")
+        st.subheader("2. Assistant – Questions par domaine")
         st.caption(
-            "Envoie les Parquet GOLD/GoldAI vers MongoDB GridFS pour archivage long terme. Nécessite MongoDB démarré."
+            "Posez des questions sur les données : tendances politiques, financières ou comportement utilisateurs."
         )
-        if st.button("Backup MongoDB (Parquet → GridFS)"):
-            _run_command(
-                "backup MongoDB",
-                [sys.executable, "scripts/backup_parquet_to_mongo.py"],
-                extra_env={"MONGO_STORE_PARQUET": "true"},
+        if "ia_chat_messages" not in st.session_state:
+            st.session_state.ia_chat_messages = []
+        theme_options = {
+            "Politique": "politique",
+            "Financier": "financier",
+            "Utilisateurs": "utilisateurs",
+        }
+        theme = theme_options[
+            st.selectbox(
+                "Thème de la question",
+                list(theme_options.keys()),
+                key="ia_theme",
+                help="Politique : veille, tendances | Financier : marché, indicateurs | Utilisateurs : comportement, satisfaction",
             )
-
-    with tab_datasets:
-        st.header("Datasets – visualisation et copies modifiées")
-        st.markdown(
-            "**Flux :** Sources (dont ZZDB) → **RAW** → **SILVER** (+ topics) → **GOLD** (+ sentiment IA : positif/négatif/neutre) "
-            "→ MongoDB → **GoldAI** + **copie IA** (split train/val/test). "
-            "La source de vérité (GOLD) contient déjà sentiment et topics ; la copie IA est la même base, dédiée à l'entraînement."
-        )
+        ]
         st.caption(
-            "La source de vérité (GOLD) reste intacte. Les modifications créent une copie dans data/edits/."
+            "Exemples : « Quelles tendances sur l'inflation ? » (Financier) · « Résume les sujets politiques récents » (Politique)"
         )
-
-        stage_names = [s[0] for s in stages]
-        stage_descriptions = {s[0]: s[3] for s in stages}
-        selected_stage = st.selectbox("Étape", stage_names, index=0)
-        stage_map = {name: (path, patterns) for name, path, patterns, _ in stages}
-        base_path, patterns = stage_map[selected_stage]
-        if selected_stage in stage_descriptions:
-            st.caption(stage_descriptions[selected_stage])
-
-        files = []
-        if base_path.exists():
-            for pattern in patterns:
-                files.extend(base_path.rglob(pattern))
-        files = [p for p in files if p.is_file()]
-        files_sorted = sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)
-
-        if not files_sorted:
-            st.warning("Aucun fichier trouvé")
-            return
-
-        selected_file = st.selectbox(
-            "Fichier",
-            [str(p.relative_to(PROJECT_ROOT)) for p in files_sorted],
-        )
-        file_path = PROJECT_ROOT / selected_file
-
-        row_limit = st.number_input(
-            "Prévisualisation (lignes)", min_value=10, max_value=5000, value=200, step=50
-        )
-        try:
-            if file_path.suffix == ".parquet":
-                df = pd.read_parquet(file_path)
-            elif file_path.suffix == ".csv":
-                df = pd.read_csv(file_path)
-            elif file_path.suffix == ".json":
-                df = pd.read_json(file_path)
-            else:
-                st.error("Format non supporté")
-                return
-            st.dataframe(df.head(int(row_limit)))
-        except Exception as exc:
-            st.error(f"Erreur lecture: {exc}")
-            return
-
-        st.subheader("Copie modifiée (safe)")
-        col_left, col_right = st.columns(2)
-        with col_left:
-            drop_cols = st.multiselect("Supprimer colonnes", list(df.columns))
-            keyword = st.text_input("Filtrer (mot-clé dans title/content)")
-        with col_right:
-            sentiment_filter = st.selectbox(
-                "Filtrer sentiment",
-                ["(aucun)", "positif", "negatif", "négatif", "neutre"],
-                index=0,
-            )
-            max_rows = st.number_input("Limiter lignes", min_value=0, value=0, step=100)
-
-        df_mod = df.copy()
-        if drop_cols:
-            df_mod = df_mod.drop(columns=drop_cols, errors="ignore")
-        if keyword:
-            cols = [c for c in ["title", "content"] if c in df_mod.columns]
-            if cols:
-                mask = False
-                for c in cols:
-                    mask = mask | df_mod[c].astype(str).str.contains(keyword, case=False, na=False)
-                df_mod = df_mod[mask]
-        if sentiment_filter != "(aucun)" and "sentiment" in df_mod.columns:
-            df_mod = df_mod[df_mod["sentiment"] == sentiment_filter]
-        if max_rows and max_rows > 0:
-            df_mod = df_mod.head(int(max_rows))
-
-        st.caption(f"Lignes après modifications: {len(df_mod)}")
-        st.dataframe(df_mod.head(200))
-
-        output_dir = PROJECT_ROOT / "data" / "edits" / selected_stage.lower().split()[0]
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_name = st.text_input("Nom du fichier de sortie", f"{file_path.stem}_edited.parquet")
-        st.caption(
-            "Sauvegarde la version modifiée (filtres, colonnes supprimées) dans data/edits/. La source reste intacte."
-        )
-        if st.button("Enregistrer la copie"):
-            out_path = output_dir / output_name
-            try:
-                if out_path.suffix == ".csv":
-                    df_mod.to_csv(out_path, index=False)
-                else:
-                    df_mod.to_parquet(out_path, index=False)
-                st.success(f"OK: {out_path}")
-            except Exception as exc:
-                st.error(f"Erreur écriture: {exc}")
+        if st.button("Effacer la conversation", key="ia_clear"):
+            st.session_state.ia_chat_messages = []
+            st.rerun()
+        for msg in st.session_state.ia_chat_messages:
+            with st.chat_message(msg["role"]):
+                st.write(msg["content"])
+        prompt = st.chat_input("Votre question (insights)...")
+        if prompt:
+            st.session_state.ia_chat_messages.append({"role": "user", "content": prompt})
+            with st.chat_message("assistant"), st.spinner("Réponse..."):
+                token = get_token()
+                headers = {"Content-Type": "application/json"}
+                if token:
+                    headers["Authorization"] = f"Bearer {token}"
+                try:
+                    r = requests.post(
+                        f"{api_v1}/ai/insight",
+                        json={"theme": theme, "message": prompt},
+                        headers=headers,
+                        timeout=30,
+                    )
+                    reply = r.json().get("reply", "—") if r.ok else f"Erreur {r.status_code}"
+                except requests.exceptions.ConnectionError:
+                    reply = "API non disponible"
+                except Exception as e:
+                    reply = str(e)[:150]
+                st.write(reply)
+            st.session_state.ia_chat_messages.append({"role": "assistant", "content": reply})
+            st.rerun()
 
     with tab_monitoring:
-        st.header("Métriques avancées")
-        st.caption("Prometheus, Grafana et métriques IA pour piloter et améliorer le modèle.")
+        st.markdown("### Pilotage du modèle & insights")
         api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
         api_v1 = f"{api_base}{settings.api_v1_prefix}"
         prometheus_url = f"http://localhost:{settings.prometheus_port}"
         grafana_url = f"http://localhost:{settings.grafana_port}"
 
-        try:
-            r = requests.get(f"{api_base}/health", timeout=2)
-            api_ok = r.ok
-        except Exception:
-            api_ok = False
-        if not api_ok:
-            st.info("**API non démarrée.** Onglet Pilotage → **Lancer API E2**, puis rafraîchir.")
-
-        # ---- Ligne statut rapide ----
-        m1, m2, m3, m4 = st.columns(4)
-        with m1:
-            st.subheader("API (E2)")
-            try:
-                r = requests.get(f"{api_base}/health", timeout=3)
-                st.success("OK" if r.ok else f"Status {r.status_code}")
-            except requests.exceptions.ConnectionError:
-                st.warning("Arrêtée")
-            except Exception as e:
-                st.error(str(e)[:80])
-        with m2:
-            st.subheader("Prometheus")
-            try:
-                r = requests.get(f"{prometheus_url}/api/v1/status/config", timeout=2)
-                st.success("OK" if r.ok else "—")
-            except Exception:
-                st.caption("Non démarré")
-                st.caption(f"Port {settings.prometheus_port}")
-        with m3:
-            st.subheader("Grafana")
-            try:
-                r = requests.get(grafana_url, timeout=2)
-                st.success("OK" if r.status_code in (200, 302, 401) else "-")
-            except Exception:
-                st.caption("Non démarré")
-                st.caption(f"Port {settings.grafana_port}")
-        with m4:
-            st.subheader("MongoDB")
-            try:
-                from pymongo import MongoClient
-
-                client = MongoClient(settings.mongo_uri, serverSelectionTimeoutMS=2000)
-                client.admin.command("ping")
-                client.close()
-                st.success("OK")
-            except Exception:
-                st.warning("Hors ligne")
-
-        st.divider()
-
-        # ---- Prometheus ----
-        st.subheader("Prometheus")
-        st.caption(
-            "Metriques exposees par l'API E2 (format Prometheus). Scrapez cette URL dans Prometheus pour Grafana."
-        )
-        p1, p2 = st.columns([1, 1])
-        with p1:
-            st.markdown(f"**Endpoint API :** `{api_base}/metrics`")
-            st.link_button(
-                "Ouvrir /metrics dans le navigateur", f"{api_base}/metrics", type="secondary"
-            )
-        with p2:
-            st.markdown(f"**UI Prometheus :** `{prometheus_url}`")
-            st.link_button("Ouvrir Prometheus", prometheus_url, type="secondary")
-        try:
-            r = requests.get(f"{api_base}/metrics", timeout=5)
-            if r.ok:
-                lines = [ln for ln in r.text.splitlines() if ln and not ln.startswith("#")][:80]
-                with st.expander("Métriques brutes Prometheus (extrait)", expanded=False):
-                    st.code("\n".join(lines), language="text")
-            else:
-                st.caption("Métriques indisponibles (API arrêtée ou erreur).")
-        except Exception:
-            st.caption("Métriques indisponibles (API arrêtée).")
-
-        st.divider()
-
-        # ---- Grafana ----
-        st.subheader("Grafana")
-        st.caption(
-            "Tableaux de bord : configurez une source de données Prometheus pointant vers l'API ou le serveur Prometheus."
-        )
-        st.markdown(f"**URL :** {grafana_url}")
-        st.link_button("Ouvrir Grafana", grafana_url, type="secondary")
-        st.info(
-            "**Si « Ce site est inaccessible » / ERR_CONNECTION_REFUSED :** Grafana n'est pas démarré. À la racine du projet, lancez **start_grafana.bat** (Docker requis), attendez 10 s, puis réessayez. Voir monitoring/README_GRAFANA.md."
-        )
-        st.caption(
-            "Dans Grafana : Configuration → Data sources → Add Prometheus → URL = "
-            + f"`http://localhost:{settings.prometheus_port}` ou `{api_base}` selon votre setup."
-        )
-        with st.expander("Comment connecter Grafana et voir les courbes de drift"):
-            st.markdown("Voir **monitoring/README_GRAFANA.md** pour le guide pas à pas.")
-            st.caption(
-                "1) Démarrer Prometheus avec monitoring/prometheus.local.yml. 2) Démarrer Grafana, ajouter la source Prometheus (localhost:9090). 3) Importer le dashboard monitoring/grafana/dashboards/datasens-full.json. 4) Cliquer ci‑dessous pour mettre à jour les métriques de drift, puis regarder les courbes dans Grafana."
-            )
-
-        # Bouton pour mettre à jour les gauges de drift (Prometheus les scrape, Grafana affiche les courbes)
-        drift_url = f"{api_v1}/analytics/drift-metrics"
-        if st.button("Rafraîchir les métriques de drift (pour Grafana)"):
-            try:
-                r = requests.get(drift_url, timeout=30)
-                if r.ok:
-                    d = r.json()
-                    st.success(
-                        f"Drift mis à jour : {d.get('articles_total', 0)} articles, score={d.get('drift_score', 0):.3f}. Prometheus va scraper ces valeurs ; rafraîchissez le dashboard Grafana."
-                    )
-                else:
-                    st.warning(
-                        f"API a répondu {r.status_code}. Si 401 : authentification requise (token)."
-                    )
-            except requests.exceptions.ConnectionError:
-                st.warning("API non démarrée.")
-            except Exception as e:
-                st.error(str(e)[:200])
-
-        st.divider()
-
-        # ---- Métriques IA (pilotage modèle) ----
-        st.subheader("Métriques IA – pilotage du modèle")
-        st.caption(
-            "Indicateurs calculés depuis les données GOLD/GoldAI pour améliorer le modèle (déséquilibres, confiance, volume)."
-        )
+        st.subheader("Métriques IA")
+        st.caption("Déséquilibres, confiance, volume – pour piloter le modèle.")
         ia = _ia_metrics_from_parquet(PROJECT_ROOT)
         if ia is None:
             st.warning(
@@ -653,97 +952,25 @@ def main() -> None:
                 else:
                     st.caption("Colonne source absente.")
 
-            st.info(
-                "**Pour améliorer le modèle :** surveillez le déséquilibre sentiment/topics et le volume par source. "
-                "Le sentiment actuel (pipeline) est basé sur des **mots-clés** ; pour de meilleures perfs, fine-tunez "
-                "**CamemBERT/FlauBERT** sur la copie IA (dataset amélioré = équilibre, nettoyage, split train/val/test). "
-                "Voir **docs/SENTIMENT_ET_FINETUNING.md**."
+            st.caption(
+                "Surveiller déséquilibres et confiance ; fine-tuner CamemBERT/FlauBERT sur la copie IA."
             )
 
         st.divider()
-        st.subheader("Endpoints API")
-        st.code(
-            f"{api_base}/health\n{api_base}/metrics\n{api_v1}/ai/predict\n{api_v1}/analytics/statistics",
-            language="text",
-        )
-
-    with tab_chrono:
-        st.header("Vue chronologique")
+        st.subheader("Chronologie")
         df_chrono = _chrono_data(PROJECT_ROOT)
-        if df_chrono.empty:
-            st.info("Aucune donnée par date (gold/silver/goldai avec partitions date=).")
-        else:
+        if not df_chrono.empty:
             df_chrono = df_chrono.sort_values("date")
-            st.caption("Fichiers et taille par date et par étape")
-            col_c, col_s = st.columns(2)
-            with col_c:
-                pivot_c = df_chrono.pivot(index="date", columns="stage", values="count").fillna(0)
-                if not pivot_c.empty:
-                    st.line_chart(pivot_c)
-            with col_s:
-                pivot_s = df_chrono.pivot(index="date", columns="stage", values="size").fillna(0)
-                if not pivot_s.empty:
-                    st.line_chart(pivot_s)
-            with st.expander("Donnees brutes"):
-                st.dataframe(df_chrono)
+            pivot_c = df_chrono.pivot(index="date", columns="stage", values="count").fillna(0)
+            if not pivot_c.empty:
+                st.line_chart(pivot_c)
+        else:
+            st.caption("Aucune donnée par date")
 
-    with tab_ia:
-        st.header("Assistant IA – Insights")
-        st.caption(
-            "Posez des questions par theme : utilisateurs, financier ou politique. "
-            "Style fenetre chat."
-        )
-        api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
-        api_v1 = f"{api_base}{settings.api_v1_prefix}"
-        if "ia_chat_messages" not in st.session_state:
-            st.session_state.ia_chat_messages = []
-        theme_options = {
-            "Utilisateurs": "utilisateurs",
-            "Financier": "financier",
-            "Politique": "politique",
-        }
-        selected_label = st.selectbox(
-            "Type d'insight",
-            list(theme_options.keys()),
-            key="ia_theme_select",
-        )
-        theme = theme_options[selected_label]
-        if st.button("Effacer l'historique", key="ia_clear_chat"):
-            st.session_state.ia_chat_messages = []
-            st.rerun()
-        for msg in st.session_state.ia_chat_messages:
-            with st.chat_message(msg["role"]):
-                st.write(msg["content"])
-        prompt = st.chat_input("Votre question (insights)...")
-        if prompt:
-            st.session_state.ia_chat_messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.write(prompt)
-            with st.chat_message("assistant"):
-                with st.spinner("Reponse..."):
-                    token = get_token()
-                    headers = {"Content-Type": "application/json"}
-                    if token:
-                        headers["Authorization"] = f"Bearer {token}"
-                    try:
-                        r = requests.post(
-                            f"{api_v1}/ai/insight",
-                            json={"theme": theme, "message": prompt},
-                            headers=headers,
-                            timeout=30,
-                        )
-                        if r.status_code == 200:
-                            data = r.json()
-                            reply = data.get("reply", "Pas de reponse.")
-                        else:
-                            reply = f"Erreur API {r.status_code}: {(r.text or '')[:300]}"
-                    except requests.exceptions.ConnectionError:
-                        reply = "API non disponible. Demarrez l'API E2 (onglet Pilotage)."
-                    except Exception as e:
-                        reply = f"Erreur: {str(e)[:200]}"
-                    st.write(reply)
-            st.session_state.ia_chat_messages.append({"role": "assistant", "content": reply})
-            st.rerun()
+        with st.expander("Prometheus & Grafana"):
+            st.caption(
+                f"API metrics : {api_base}/metrics · Prometheus : {prometheus_url} · Grafana : {grafana_url}"
+            )
 
 
 if __name__ == "__main__":

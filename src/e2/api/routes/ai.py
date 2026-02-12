@@ -152,18 +152,23 @@ async def analyze_sentiment(
 @router.get("/ml/sentiment-goldai")
 async def ml_sentiment_goldai(
     limit: int = Query(50, ge=1, le=500, description="Nombre d'articles GoldAI"),
+    persist: bool = Query(False, description="Écrire dans MODEL_OUTPUT (label, score)"),
     current_user=Depends(require_reader)
 ):
     """
-    Inférence sentiment ML sur GoldAI (FlauBERT/CamemBERT).
-
-    Charge merged_all_dates.parquet depuis data/goldai/.
-    Nécessite: python scripts/merge_parquet_goldai.py
+    Inférence sentiment ML sur GoldAI. Optimisé CPU (batch=8, max_length=256).
+    Si persist=true: écrit dans model_output (model_name=sentiment_ml_distilcamembert).
     """
     try:
-        from src.ml.inference.sentiment import run_sentiment_inference
+        from src.ml.inference.sentiment import (
+            run_sentiment_inference,
+            write_inference_to_model_output,
+        )
         results = run_sentiment_inference(limit=limit, use_merged=True)
-        return {"count": len(results), "results": results}
+        persisted = 0
+        if persist and results:
+            persisted = write_inference_to_model_output(results)
+        return {"count": len(results), "persisted": persisted, "results": results}
     except FileNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -209,19 +214,50 @@ def _insight_reply(theme: str, message: str) -> str:
     )
 
 
-@router.post("/predict", response_model=AIPredictResponse)
-def predict(payload: AIPredictRequest, _user=Depends(require_reader)):
-    """Inference locale HF (CamemBERT/FlauBERT)."""
-    from src.ml.inference.local_hf_service import LocalHFService
+def _resolve_sentiment_model(choice: str) -> str:
+    """
+    Résout le modèle pour prédiction sentiment.
+    Priorité: SENTIMENT_FINETUNED > camembert (FR sentiment) > flaubert.
+    CamemBERT par défaut = distilcamembert-base-sentiment (pré-entraîné, CPU-friendly).
+    """
+    from pathlib import Path
 
     settings = get_settings()
-    if payload.model == "camembert":
-        model_path = settings.camembert_model_path
-    else:
-        model_path = settings.flaubert_model_path
+    finetuned = getattr(settings, "sentiment_finetuned_model_path", None)
+    if finetuned and finetuned.strip():
+        p = Path(finetuned.strip())
+        if not p.is_absolute():
+            p = Path.cwd() / p
+        if (p / "config.json").exists():
+            return str(p.resolve())
+        return finetuned.strip()
 
+    # CamemBERT = modèle sentiment FR par défaut
+    if choice == "camembert":
+        return settings.camembert_model_path
+    # FlauBERT base n'a pas de head sentiment → fallback camembert si flaubert = path local
+    return settings.flaubert_model_path
+
+
+@router.post("/predict", response_model=AIPredictResponse)
+def predict(payload: AIPredictRequest, _user=Depends(require_reader)):
+    """Inference locale HF (CamemBERT/FlauBERT). Utilise le modèle fine-tuné si configuré."""
+    from src.ml.inference.local_hf_service import LocalHFService
+
+    model_path = _resolve_sentiment_model(payload.model)
     service = LocalHFService(model_name=model_path, task=payload.task)
     result = service.predict(payload.text)
+    # Normaliser sortie pour sentiment: label positif/négatif/neutre
+    if payload.task == "sentiment-analysis" and result:
+        for r in result:
+            if "label" in r:
+                lbl = r["label"].lower()
+                if "positive" in lbl or "pos" in lbl:
+                    r["label"] = "positif"
+                elif "negative" in lbl or "neg" in lbl:
+                    r["label"] = "négatif"
+                else:
+                    r["label"] = "neutre"
     return AIPredictResponse(model=payload.model, task=payload.task, result=result)
 
 

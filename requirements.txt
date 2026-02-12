@@ -64,7 +64,7 @@ mistralai==1.0.0  # Mistral API client
 openai==1.54.0  # Alternative/compatible API client
 
 # ============================================================
-# E3: ML & NLP (FlauBERT, CamemBERT)
+# E3: ML & NLP (FlauBERT, CamemBERT, Fine-tuning)
 # ============================================================
 scikit-learn>=1.7,<1.8
 transformers>=4.46.0

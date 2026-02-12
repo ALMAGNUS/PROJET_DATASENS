@@ -1,0 +1,18 @@
+# DataSens — Docker CPU (préparation migration)
+# Base: python:3.11-slim (évite 3.12 pour zéro friction HF)
+# Usage: docker build -f Dockerfile.windows -t datasens .
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Requirements conservateurs (Windows-compatible)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -U pip && pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+# Volume montage: -v D:/Data:/data (ou /data en prod)
+ENV BASE_DIR=/data
+ENV PYTHONPATH=/app
+
+EXPOSE 8001 8501
+# CMD ["uvicorn", "src.e2.api.main:app", "--host", "0.0.0.0", "--port", "8001"]
