@@ -15,29 +15,29 @@ python main.py
 
 ### Fichiers fonctionnels purs :
 
-1. **`src/core.py`**
+1. **`src/e1/core.py`**
    - Classes : `Article`, `Source`, `BaseExtractor`
    - Extractors : `RSSExtractor`, `APIExtractor`, `ScrapingExtractor`, `GDELTFileExtractor`, `KaggleExtractor`, `SQLiteExtractor`, `CSVExtractor`
    - Factory : `create_extractor()`
    - Transformer : `ContentTransformer`
 
-2. **`src/repository.py`**
+2. **`src/e1/repository.py`**
    - Classe : `Repository` (CRUD complet)
    - Méthodes : `load_article_with_id()`, `log_sync()`, `log_foundation_integration()`, `is_foundation_integrated()`
 
-3. **`src/analyzer.py`**
+3. **`src/e1/analyzer.py`**
    - Classe : `SentimentAnalyzer`
    - Analyse sentiment : positif, négatif, neutre (100+ mots-clés)
 
-4. **`src/tagger.py`**
+4. **`src/e1/tagger.py`**
    - Classe : `TopicTagger`
    - 18 topics : finance, entreprise, politique, technologie, santé, société, environnement, sport, média, culture, transport, logement, sécurité, éducation, travail, retraite, jeunesse, international
 
-5. **`src/aggregator.py`**
+5. **`src/e1/aggregator.py`**
    - Classe : `DataAggregator`
    - Agrégation : RAW, SILVER, GOLD
 
-6. **`src/exporter.py`**
+6. **`src/e1/exporter.py`**
    - Classe : `GoldExporter`
    - Exports : CSV, Parquet (partitionné par date/source)
 
@@ -223,12 +223,12 @@ cat exports/gold.csv
 Pour faire fonctionner le projet, seuls ces fichiers sont nécessaires :
 
 1. `main.py` - Point d'entrée
-2. `src/core.py` - Extractors
-3. `src/repository.py` - Base de données
-4. `src/analyzer.py` - Sentiment
-5. `src/tagger.py` - Topics
-6. `src/aggregator.py` - Agrégation
-7. `src/exporter.py` - Exports
+2. `src/e1/core.py` - Extractors
+3. `src/e1/repository.py` - Base de données
+4. `src/e1/analyzer.py` - Sentiment
+5. `src/e1/tagger.py` - Topics
+6. `src/e1/aggregator.py` - Agrégation
+7. `src/e1/exporter.py` - Exports
 8. `sources_config.json` - Configuration
 9. `requirements.txt` - Dépendances
 

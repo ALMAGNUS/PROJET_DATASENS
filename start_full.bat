@@ -21,11 +21,11 @@ echo.
 echo Terminal 1 = Backend  (port 8001) - ne pas fermer
 echo Terminal 2 = Frontend (port 8501) - ne pas fermer
 echo.
-echo Ports: API 8001 | Cockpit 8501 | Prometheus 9090 | Grafana 3000
+echo Ports: API 8001, Cockpit 8501
 echo.
-start "DataSens Backend" cmd /k "cd /d ""%ROOT:~0,-1%"" && call .venv\Scripts\activate.bat && echo Backend API - port 8001 && python run_e2_api.py"
+start "DataSensBackend" cmd /k call "%ROOT%_launch_api.bat"
 ping -n 4 127.0.0.1 >nul
-start "DataSens Frontend" cmd /k "cd /d ""%ROOT:~0,-1%"" && call .venv\Scripts\activate.bat && echo Cockpit Streamlit - port 8501 && streamlit run src\streamlit\app.py --server.port 8501"
+start "DataSensFrontend" cmd /k call "%ROOT%_launch_cockpit.bat"
 echo.
 echo Deux fenetres ouvertes. Pour arreter : fermer les 2 terminaux Backend et Frontend.
 pause

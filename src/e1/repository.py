@@ -198,6 +198,27 @@ class Repository(DatabaseLoader):
         except Exception as e:
             logger.error("Sources initialization error: {}", str(e)[:60])
 
+    def ensure_source(self, name: str, acquisition_type: str = "csv", url: str = "") -> int | None:
+        """Crée la source si elle n'existe pas (pour injection à la demande). Retourne source_id."""
+        sid = self.get_source_id(name)
+        if sid is not None:
+            return sid
+        try:
+            self.cursor.execute(
+                """
+                INSERT INTO source (name, source_type, url, sync_frequency, active, is_synthetic, created_at)
+                VALUES (?, ?, ?, ?, 1, 1, datetime('now'))
+                """,
+                (name, acquisition_type, url, "DAILY"),
+            )
+            self.conn.commit()
+            return self.get_source_id(name)
+        except sqlite3.IntegrityError:
+            return self.get_source_id(name)
+        except Exception as e:
+            logger.error("ensure_source error: {}", str(e)[:60])
+            return None
+
     def load_article_with_id(self, article: Article, source_id: int) -> int | None:
         """Load article and return raw_data_id (or None if duplicate)"""
         try:
@@ -207,7 +228,7 @@ class Repository(DatabaseLoader):
             if existing:
                 return None  # Duplicate (déduplication normale)
 
-            # GARDE-FOU ZZDB: Qualité réduite pour données synthétiques (0.3 au lieu de 0.5)
+            # GARDE-FOU: Qualité réduite pour données synthétiques ZZDB (0.3)
             quality_score = (
                 0.3 if article.source_name and "zzdb" in article.source_name.lower() else 0.5
             )

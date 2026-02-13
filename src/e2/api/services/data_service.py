@@ -57,14 +57,23 @@ class DataService:
             Liste d'ArticleResponse
         """
         df = self.data_reader.read_raw_data(date)
-
-        # Pagination
         df = df.iloc[offset : offset + limit] if limit else df.iloc[offset:]
+        return self._raw_rows_to_articles(df)
 
-        # Convertir en ArticleResponse
+    def get_raw_articles_paginated(
+        self, date: str | None = None, limit: int = 50, offset: int = 0
+    ) -> tuple[list[ArticleResponse], int]:
+        """Récupère les articles RAW paginés avec le total. Une seule lecture."""
+        df = self.data_reader.read_raw_data(date)
+        total = len(df)
+        df_page = df.iloc[offset : offset + limit] if limit else df.iloc[offset:]
+        articles = self._raw_rows_to_articles(df_page)
+        return articles, total
+
+    def _raw_rows_to_articles(self, df: pd.DataFrame) -> list[ArticleResponse]:
+        """Convertit les lignes RAW en ArticleResponse."""
         articles = []
         for _, row in df.iterrows():
-            # Parser les dates si elles sont en string (gérer NaN)
             published_at_val = row.get("published_at")
             published_at = None
             if pd.notna(published_at_val):
@@ -104,11 +113,10 @@ class DataService:
                     quality_score=float(row.get("quality_score"))
                     if pd.notna(row.get("quality_score"))
                     else None,
-                    sentiment=None,  # RAW n'a pas de sentiment
-                    topics=None,  # RAW n'a pas de topics
+                    sentiment=None,
+                    topics=None,
                 )
             )
-
         return articles
 
     def get_silver_articles(
@@ -126,14 +134,23 @@ class DataService:
             Liste d'ArticleResponse
         """
         df = self.data_reader.read_silver_data(date)
-
-        # Pagination
         df = df.iloc[offset : offset + limit] if limit else df.iloc[offset:]
+        return self._silver_rows_to_articles(df)
 
-        # Convertir en ArticleResponse
+    def get_silver_articles_paginated(
+        self, date: str | None = None, limit: int = 50, offset: int = 0
+    ) -> tuple[list[ArticleResponse], int]:
+        """Récupère les articles SILVER paginés avec le total. Une seule lecture."""
+        df = self.data_reader.read_silver_data(date)
+        total = len(df)
+        df_page = df.iloc[offset : offset + limit] if limit else df.iloc[offset:]
+        articles = self._silver_rows_to_articles(df_page)
+        return articles, total
+
+    def _silver_rows_to_articles(self, df: pd.DataFrame) -> list[ArticleResponse]:
+        """Convertit les lignes SILVER en ArticleResponse."""
         articles = []
         for _, row in df.iterrows():
-            # Parser les dates si elles sont en string (gérer NaN)
             published_at = row.get("published_at")
             if pd.notna(published_at) and isinstance(published_at, str):
                 try:
@@ -167,11 +184,10 @@ class DataService:
                     quality_score=float(row.get("quality_score"))
                     if pd.notna(row.get("quality_score"))
                     else None,
-                    sentiment=None,  # SILVER peut avoir sentiment mais pas garanti
-                    topics=None,  # SILVER peut avoir topics mais pas garanti
+                    sentiment=None,
+                    topics=None,
                 )
             )
-
         return articles
 
     def get_gold_articles(
@@ -189,14 +205,23 @@ class DataService:
             Liste d'ArticleResponse avec sentiment et topics
         """
         df = self.data_reader.read_gold_data(date)
-
-        # Pagination
         df = df.iloc[offset : offset + limit] if limit else df.iloc[offset:]
+        return self._gold_rows_to_articles(df)
 
-        # Convertir en ArticleResponse
+    def get_gold_articles_paginated(
+        self, date: str | None = None, limit: int = 50, offset: int = 0
+    ) -> tuple[list[ArticleResponse], int]:
+        """Récupère les articles GOLD paginés avec le total. Une seule lecture."""
+        df = self.data_reader.read_gold_data(date)
+        total = len(df)
+        df_page = df.iloc[offset : offset + limit] if limit else df.iloc[offset:]
+        articles = self._gold_rows_to_articles(df_page)
+        return articles, total
+
+    def _gold_rows_to_articles(self, df: pd.DataFrame) -> list[ArticleResponse]:
+        """Convertit les lignes GOLD en ArticleResponse."""
         articles = []
         for _, row in df.iterrows():
-            # Parser les dates si elles sont en string (gérer NaN)
             published_at_val = row.get("published_at")
             published_at = None
             if pd.notna(published_at_val):
@@ -219,13 +244,12 @@ class DataService:
                 elif isinstance(collected_at_val, datetime | date_type):
                     collected_at = collected_at_val
 
-            # Extraire topics (peut être une liste ou string)
             topics = row.get("topics")
             if pd.notna(topics):
                 if isinstance(topics, str):
                     topics = [t.strip() for t in topics.split(",") if t.strip()]
                 elif isinstance(topics, list):
-                    topics = topics
+                    pass
                 else:
                     topics = None
             else:
@@ -252,7 +276,6 @@ class DataService:
                     topics=topics,
                 )
             )
-
         return articles
 
     def get_database_stats(self) -> dict:

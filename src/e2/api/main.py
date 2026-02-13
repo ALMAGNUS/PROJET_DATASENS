@@ -46,10 +46,12 @@ def create_app() -> FastAPI:
     # Audit trail middleware (avant CORS pour capturer toutes les requêtes)
     app.add_middleware(AuditMiddleware)
 
-    # CORS middleware
+    # CORS middleware (CORS_ORIGINS: '*' en dev, liste d'origines en prod)
+    origins_str = settings.cors_origins.strip()
+    cors_origins_list = [o.strip() for o in origins_str.split(",") if o.strip()] if origins_str != "*" else ["*"]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # TODO: Restreindre en production
+        allow_origins=cors_origins_list,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

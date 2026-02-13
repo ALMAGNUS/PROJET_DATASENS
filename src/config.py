@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     fastapi_port: int = Field(default=8001, description="FastAPI port")
     fastapi_reload: bool = Field(default=True, description="FastAPI auto-reload")
     api_v1_prefix: str = Field(default="/api/v1", description="API v1 prefix")
+    cors_origins: str = Field(
+        default="*",
+        description="CORS allow_origins: '*' (dev) ou liste séparée par virgules (ex: http://localhost:8501,https://app.example.com)",
+    )
 
     # ============================================================
     # E3: Security & Authentication (RBAC)
@@ -99,17 +103,22 @@ class Settings(BaseSettings):
         default=4, description="PyTorch CPU threads (évite saturation RAM, ex: 4 ou 6)"
     )
     inference_batch_size: int = Field(
-        default=8, description="Taille micro-batch inférence CPU (8-16 recommandé)"
+        default=8, description="Taille micro-batch CPU (8 pour i7, 4-6 pour i5)"
     )
     inference_max_length: int = Field(
-        default=256, description="Max tokens par texte (256/384 = perf, 512 = contexte)"
+        default=256, description="Max tokens par texte (256 = rapide, conforme spec)"
     )
     flaubert_model_path: str = Field(
-        default="models/flaubert-base-uncased", description="FlauBERT model path"
+        default="cardiffnlp/twitter-xlm-roberta-base-sentiment-multilingual",
+        description="Multilingue XLM-RoBERTa (pos/neg/neu)",
     )
     camembert_model_path: str = Field(
         default="cmarkea/distilcamembert-base-sentiment",
         description="CamemBERT sentiment pré-entraîné FR (recommandé CPU)",
+    )
+    sentiment_fr_model_path: str = Field(
+        default="ac0hik/Sentiment_Analysis_French",
+        description="CamemBERT fine-tuné FR (76.54% accuracy pos/nég/neutre)",
     )
     sentiment_finetuned_model_path: str | None = Field(
         default=None,

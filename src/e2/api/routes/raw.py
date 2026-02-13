@@ -40,10 +40,9 @@ async def list_raw_articles(
     data_service = get_data_service()
     offset = (page - 1) * page_size
 
-    articles = data_service.get_raw_articles(date=date, limit=page_size, offset=offset)
-
-    # TODO: Calculer total depuis DB (pour l'instant on retourne juste la page)
-    total = len(articles)  # Approximation
+    articles, total = data_service.get_raw_articles_paginated(
+        date=date, limit=page_size, offset=offset
+    )
     total_pages = (total + page_size - 1) // page_size if total > 0 else 1
 
     return ArticleListResponse(

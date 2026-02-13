@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import json
 
-from src.core import Source, create_extractor
+from src.e1.core import Source, create_extractor
 
 
 def test_kaggle_extraction():

@@ -43,7 +43,7 @@ try:
     for source in active_sources:
         print(f"\n   Extraction {source.source_name}...", end=" ")
         try:
-            from src.core import create_extractor
+            from src.e1.core import create_extractor
 
             extractor = create_extractor(source)
             extracted = extractor.extract()

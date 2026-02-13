@@ -4,10 +4,10 @@ REM Ouvrir ensuite : http://localhost:9090
 
 cd /d "%~dp0"
 
-where prometheus 2>nul || (
-    echo Prometheus n'est pas dans le PATH.
-    echo Telechargez-le : https://prometheus.io/download/
-    echo Ou avec Docker : docker run -d -p 9090:9090 -v "%cd%\monitoring\prometheus.local.yml:/etc/prometheus/prometheus.yml" prom/prometheus
+where prometheus >nul 2>&1
+if errorlevel 1 (
+    echo Prometheus absent du PATH.
+    echo Telechargez : https://prometheus.io/download/
     pause
     exit /b 1
 )

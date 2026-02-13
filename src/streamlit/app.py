@@ -152,8 +152,28 @@ def _ia_metrics_from_parquet(root: Path) -> dict | None:
     return out
 
 
+def _launch_api_in_new_window() -> None:
+    """Lance l'API E2 dans une nouvelle fenêtre (ne bloque pas le Cockpit)."""
+    bat = PROJECT_ROOT / "_launch_api.bat"
+    if bat.exists():
+        subprocess.Popen(
+            ["cmd", "/c", "start", "API E2", str(bat)],
+            cwd=str(PROJECT_ROOT),
+        )
+        st.success("API E2 lancée dans une nouvelle fenêtre.")
+    else:
+        cmd = [sys.executable, "run_e2_api.py"]
+        subprocess.Popen(
+            cmd,
+            cwd=str(PROJECT_ROOT),
+            creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0,
+        )
+        st.success("API E2 lancée dans une nouvelle fenêtre.")
+
+
 def _run_command(label: str, command: list[str], extra_env: dict | None = None) -> None:
     st.write(f"Commande: `{' '.join(command)}`")
+    out, err = "", None
     with st.spinner(f"Exécution: {label}"):
         try:
             env = os.environ.copy()
@@ -173,14 +193,41 @@ def _run_command(label: str, command: list[str], extra_env: dict | None = None) 
             out = (proc.stdout or "").strip()
             if len(out) > 15000:
                 out = "... (début tronqué)\n\n" + out[-15000:]
-            st.code(out or "OK", language="text")
-            if proc.returncode != 0:
-                err = (proc.stderr or "").strip()
-                if len(err) > 3000:
-                    err = err[-3000:]
-                st.error(err or "Erreur inconnue")
+            err = (proc.stderr or "").strip() if proc.returncode != 0 else None
+            if err and len(err) > 3000:
+                err = err[-3000:]
         except subprocess.TimeoutExpired:
+            out = ""
+            err = None
             st.warning("Timeout: commande trop longue")
+
+        # Persister le rapport pour qu'il reste après rechargement Streamlit
+        if "last_command_report" not in st.session_state:
+            st.session_state.last_command_report = {}
+        st.session_state.last_command_report = {
+            "label": label,
+            "out": out or "OK",
+            "err": err,
+            "command": " ".join(command),
+        }
+
+
+def _render_last_report() -> None:
+    """Affiche le dernier rapport d'exécution (persiste après rerun)."""
+    report = st.session_state.get("last_command_report")
+    if not report:
+        return
+    with st.expander("📋 Rapport d'exécution (cliquez pour afficher)", expanded=True):
+        st.text_area(
+            "Sortie",
+            value=report.get("out", "OK"),
+            height=350,
+            disabled=True,
+            label_visibility="collapsed",
+            key="last_command_report_output",
+        )
+        if report.get("err"):
+            st.error(report.get("err", "Erreur inconnue"))
 
 
 def main() -> None:
@@ -677,7 +724,7 @@ def main() -> None:
                 ).fetchone()
                 conn.close()
                 if has_raw:
-                    from src.aggregator import DataAggregator
+                    from src.e1.aggregator import DataAggregator
 
                     agg = DataAggregator(db_path)
                     n_raw = len(agg.aggregate_raw())
@@ -696,11 +743,7 @@ def main() -> None:
         b1, b2, b3 = st.columns(3)
         with b1:
             if st.button("Pipeline E1", type="primary", use_container_width=True):
-                env = {
-                    "ZZDB_MAX_ARTICLES": "50",
-                    "ZZDB_CSV_MAX_ARTICLES": "1000",
-                    "FORCE_ZZDB_REIMPORT": "false",
-                }
+                env = {"FORCE_ZZDB_REIMPORT": "false"}
                 _run_command("pipeline", [sys.executable, "main.py"], extra_env=env)
         with b2:
             if st.button("Fusion GoldAI", type="primary", use_container_width=True):
@@ -709,17 +752,59 @@ def main() -> None:
             if st.button("Copie IA", type="primary", use_container_width=True):
                 _run_command("copie IA", [sys.executable, "scripts/create_ia_copy.py"])
 
+        # Rapport d'exécution (affiché juste après les boutons principaux)
+        _render_last_report()
+
         b4, b5, _ = st.columns(3)
         with b4:
             if st.button("Lancer API E2", use_container_width=True):
-                _run_command("api", [sys.executable, "run_e2_api.py"])
+                _launch_api_in_new_window()
         with b5:
-            if st.button("Backup MongoDB", use_container_width=True):
+            if st.button(
+                "Backup MongoDB",
+                use_container_width=True,
+                help="Parquet vers MongoDB GridFS. Lancer start_mongo.bat avant (Docker).",
+            ):
                 _run_command(
                     "backup",
                     [sys.executable, "scripts/backup_parquet_to_mongo.py"],
                     extra_env={"MONGO_STORE_PARQUET": "true"},
                 )
+
+        with st.expander("Injecter un CSV (à la demande)", expanded=False):
+            st.caption(
+                "Le CSV parcourt le pipeline E1 complet (RAW → SILVER → GOLD). "
+                "Colonnes: title, content (obligatoires), url, published_at (optionnels)"
+            )
+            csv_file = st.file_uploader("Fichier CSV", type=["csv"], key="inject_csv")
+            source_name = st.text_input("Nom de la source", value="csv_inject", key="inject_source")
+            if st.button("Injecter dans le pipeline E1"):
+                if csv_file:
+                    import tempfile
+                    with tempfile.NamedTemporaryFile(
+                        suffix=".csv", delete=False, mode="wb"
+                    ) as tmp:
+                        tmp.write(csv_file.getvalue())
+                        tmp_path = tmp.name
+                    try:
+                        _run_command(
+                            "inject CSV (pipeline complet)",
+                            [
+                                sys.executable,
+                                "main.py",
+                                "--inject-csv",
+                                tmp_path,
+                                "--source-name",
+                                source_name or "csv_inject",
+                            ],
+                        )
+                    finally:
+                        try:
+                            os.unlink(tmp_path)
+                        except Exception:
+                            pass
+                else:
+                    st.warning("Déposez un fichier CSV.")
 
         st.caption("Fine-tuning : améliore le modèle IA avec les données GoldAI")
         b6, b7, _ = st.columns(3)
@@ -754,16 +839,8 @@ def main() -> None:
             st.caption(f"Modèle fine-tuné : {finetuned_path}")
 
         with st.expander("Paramètres & détails", expanded=False):
-            zzdb_max = st.number_input("ZZDB_MAX_ARTICLES", min_value=0, value=50, step=10)
-            zzdb_csv_max = st.number_input(
-                "ZZDB_CSV_MAX_ARTICLES", min_value=0, value=1000, step=100
-            )
-            force_reimport = st.checkbox("FORCE_ZZDB_REIMPORT", value=False)
-            env = {
-                "ZZDB_MAX_ARTICLES": str(zzdb_max),
-                "ZZDB_CSV_MAX_ARTICLES": str(zzdb_csv_max),
-                "FORCE_ZZDB_REIMPORT": "true" if force_reimport else "false",
-            }
+            force_reimport = st.checkbox("FORCE_ZZDB_REIMPORT (zzdb_csv)", value=False)
+            env = {"FORCE_ZZDB_REIMPORT": "true" if force_reimport else "false"}
             if st.button("Pipeline E1 (avec params)"):
                 _run_command("pipeline", [sys.executable, "main.py"], extra_env=env)
             st.caption(f"Base : {db_path}")
@@ -829,7 +906,15 @@ def main() -> None:
             help="Ex. une phrase ou un paragraphe",
         )
         pred_model = st.selectbox(
-            "Modèle", ["flaubert", "camembert"], key="pred_model", help="FlauBERT ou CamemBERT"
+            "Modèle",
+            ["sentiment_fr", "camembert", "flaubert"],
+            format_func=lambda x: {
+                "sentiment_fr": "sentiment_fr (76% - recommandé)",
+                "camembert": "camembert (DistilCamemBERT)",
+                "flaubert": "flaubert (XLM-RoBERTa multilingue)",
+            }.get(x, x),
+            key="pred_model",
+            help="Benchmark : sentiment_fr = meilleur accuracy FR pos/nég/neutre",
         )
         if st.button("Prédire le sentiment"):
             token = get_token()
@@ -841,13 +926,23 @@ def main() -> None:
                     f"{api_v1}/ai/predict",
                     json={"text": pred_text, "model": pred_model, "task": "sentiment-analysis"},
                     headers=headers,
-                    timeout=30,
+                    timeout=120,
                 )
                 if r.ok:
                     data = r.json()
-                    st.json(data.get("result", data))
+                    res = data.get("result", data)
+                    if res and isinstance(res, list) and res[0].get("sentiment_score") is not None:
+                        r0 = res[0]
+                        c1, c2, c3 = st.columns(3)
+                        c1.metric("Label", r0.get("label", "-"))
+                        c2.metric("Confidence", f"{r0.get('confidence', 0):.1%}")
+                        c3.metric("Score [-1,+1]", r0.get("sentiment_score", 0))
+                        st.json(res)
+                    else:
+                        st.json(res)
                 else:
-                    st.error(f"Erreur {r.status_code}")
+                    err_detail = r.json().get("detail", r.text) if r.headers.get("content-type", "").startswith("application/json") else r.text
+                    st.error(f"Erreur {r.status_code}: {err_detail[:300]}")
             except requests.exceptions.ConnectionError:
                 st.warning("API non démarrée (Pilotage → Lancer API E2)")
             except Exception as e:
@@ -895,7 +990,7 @@ def main() -> None:
                         f"{api_v1}/ai/insight",
                         json={"theme": theme, "message": prompt},
                         headers=headers,
-                        timeout=30,
+                        timeout=120,
                     )
                     reply = r.json().get("reply", "—") if r.ok else f"Erreur {r.status_code}"
                 except requests.exceptions.ConnectionError:

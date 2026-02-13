@@ -591,46 +591,48 @@ class CSVExtractor(BaseExtractor):
             if os.getenv("DISABLE_ZZDB_CSV", "false").lower() == "true":
                 return articles
 
-            # CSV path - try multiple locations (comme Kaggle/GDELT dans data/raw/)
-            possible_paths = [
-                # Emplacement standard dans data/raw/ (comme Kaggle/GDELT)
-                Path(__file__).parent.parent.parent
-                / "data"
-                / "raw"
-                / "zzdb_csv"
-                / "zzdb_dataset.csv",
-                Path.cwd() / "data" / "raw" / "zzdb_csv" / "zzdb_dataset.csv",
-                Path.home() / "datasens_project" / "data" / "raw" / "zzdb_csv" / "zzdb_dataset.csv",
-                # Emplacements alternatifs (zzdb/export/)
-                Path(__file__).parent.parent.parent / "zzdb" / "export" / "zzdb_dataset.csv",
-                Path(__file__).parent.parent.parent / "zzdb" / "zzdb_dataset.csv",
-                Path.cwd() / "zzdb" / "export" / "zzdb_dataset.csv",
-                Path.cwd() / "zzdb" / "zzdb_dataset.csv",
-                # URL configurée
-                Path(self.url) if Path(self.url).is_absolute() else Path.cwd() / self.url,
-            ]
+            # Injection à la demande: si url est un chemin absolu existant, l'utiliser exclusivement
+            if self.url:
+                p_inject = Path(self.url)
+                if p_inject.is_absolute() and p_inject.exists():
+                    csv_path = p_inject
+                else:
+                    csv_path = None
+            else:
+                csv_path = None
 
-            csv_path = None
-            for p in possible_paths:
-                if p.exists():
-                    csv_path = p
-                    break
+            if csv_path is None:
+                # CSV path - emplacements standards (zzdb, data/raw/)
+                possible_paths = [
+                    Path(__file__).parent.parent.parent / "data" / "raw" / "zzdb_csv" / "zzdb_dataset.csv",
+                    Path.cwd() / "data" / "raw" / "zzdb_csv" / "zzdb_dataset.csv",
+                    Path.home() / "datasens_project" / "data" / "raw" / "zzdb_csv" / "zzdb_dataset.csv",
+                    Path(__file__).parent.parent.parent / "zzdb" / "export" / "zzdb_dataset.csv",
+                    Path(__file__).parent.parent.parent / "zzdb" / "zzdb_dataset.csv",
+                    Path.cwd() / "zzdb" / "export" / "zzdb_dataset.csv",
+                    Path.cwd() / "zzdb" / "zzdb_dataset.csv",
+                ]
+                if self.url:
+                    possible_paths.append(
+                        Path(self.url) if Path(self.url).is_absolute() else Path.cwd() / self.url
+                    )
+                for p in possible_paths:
+                    if p.exists():
+                        csv_path = p
+                        break
 
             if not csv_path or not csv_path.exists():
                 return articles
 
-            # GARDE-FOU 0: Vérifier si la source est déjà intégrée COMPLÈTEMENT (comme Kaggle/GDELT)
-            # Si le CSV a été intégré en totalité, on ne re-collecte plus (source statique)
-            # Sinon, on continue pour compléter l'import (déduplication automatique via fingerprint)
-            # IMPORTANT: La déduplication via fingerprint (SHA256(title|content)) empêche les doublons
-            # même si les articles existent déjà dans la DB (toutes sources confondues)
-            #
-            # OPTION: FORCE_ZZDB_REIMPORT=true permet de forcer la réimportation même si déjà intégré
-            # (utile pour améliorer le dataset et réinjecter les versions améliorées)
+            # GARDE-FOU 0: Source statique déjà intégrée (sauf injection à la demande)
+            # csv_inject = injection ponctuelle, on extrait toujours
+            is_inject = self.name == "csv_inject" or (
+                self.url and Path(self.url).is_absolute() and Path(self.url).exists()
+            )
             force_reimport = os.getenv("FORCE_ZZDB_REIMPORT", "false").lower() == "true"
-
             db_path = os.getenv("DB_PATH", str(Path.home() / "datasens_project" / "datasens.db"))
-            if Path(db_path).exists() and not force_reimport:
+
+            if not is_inject and Path(db_path).exists() and not force_reimport:
                 try:
                     # Compter les lignes valides dans le CSV
                     csv_valid_count = 0
@@ -890,9 +892,9 @@ def create_extractor(source: Source) -> BaseExtractor:
         return RSSExtractor(source.source_name, source.url)
     elif acq_type == "bigdata":
         return GDELTFileExtractor(source.source_name, source.url)
-    elif acq_type == "mongodb" or ("zzdb" in src_low and "csv" not in src_low):
+    elif acq_type == "mongodb":
         return MongoExtractor(source.source_name, source.url)
-    elif acq_type == "csv" or ("zzdb" in src_low and "csv" in src_low):
+    elif acq_type == "csv" or "zzdb" in src_low:
         return CSVExtractor(source.source_name, source.url)
     elif acq_type == "dataset":
         if "kaggle" in src_low:

@@ -217,8 +217,7 @@ def _insight_reply(theme: str, message: str) -> str:
 def _resolve_sentiment_model(choice: str) -> str:
     """
     Résout le modèle pour prédiction sentiment.
-    Priorité: SENTIMENT_FINETUNED > camembert (FR sentiment) > flaubert.
-    CamemBERT par défaut = distilcamembert-base-sentiment (pré-entraîné, CPU-friendly).
+    Priorité: SENTIMENT_FINETUNED > sentiment_fr (76%) > camembert > flaubert.
     """
     from pathlib import Path
 
@@ -232,33 +231,43 @@ def _resolve_sentiment_model(choice: str) -> str:
             return str(p.resolve())
         return finetuned.strip()
 
-    # CamemBERT = modèle sentiment FR par défaut
+    if choice == "sentiment_fr":
+        return getattr(settings, "sentiment_fr_model_path", "ac0hik/Sentiment_Analysis_French")
     if choice == "camembert":
         return settings.camembert_model_path
-    # FlauBERT base n'a pas de head sentiment → fallback camembert si flaubert = path local
+    # flaubert = XLM-RoBERTa multilingue (robuste)
     return settings.flaubert_model_path
 
 
 @router.post("/predict", response_model=AIPredictResponse)
 def predict(payload: AIPredictRequest, _user=Depends(require_reader)):
-    """Inference locale HF (CamemBERT/FlauBERT). Utilise le modèle fine-tuné si configuré."""
-    from src.ml.inference.local_hf_service import LocalHFService
+    """
+    Inférence locale HF (CamemBERT/sentiment_fr).
+    Sentiment: label 3 classes (POSITIVE/NEUTRAL/NEGATIVE) + confidence + sentiment_score ∈ [-1,+1].
+    """
+    from src.ml.inference.local_hf_service import (
+        LocalHFService,
+        compute_sentiment_output,
+    )
+    from loguru import logger
 
-    model_path = _resolve_sentiment_model(payload.model)
-    service = LocalHFService(model_name=model_path, task=payload.task)
-    result = service.predict(payload.text)
-    # Normaliser sortie pour sentiment: label positif/négatif/neutre
-    if payload.task == "sentiment-analysis" and result:
-        for r in result:
-            if "label" in r:
-                lbl = r["label"].lower()
-                if "positive" in lbl or "pos" in lbl:
-                    r["label"] = "positif"
-                elif "negative" in lbl or "neg" in lbl:
-                    r["label"] = "négatif"
-                else:
-                    r["label"] = "neutre"
-    return AIPredictResponse(model=payload.model, task=payload.task, result=result)
+    try:
+        model_path = _resolve_sentiment_model(payload.model)
+        task = "text-classification" if payload.task == "sentiment-analysis" else payload.task
+        service = LocalHFService(model_name=model_path, task=task)
+        raw = service.predict(payload.text, return_all_scores=True)
+        # raw = [[{label, score}, ...]] pour 1 texte
+        scores = raw[0] if raw and isinstance(raw[0], list) else raw
+        if not scores:
+            return AIPredictResponse(model=payload.model, task=payload.task, result=[])
+        if payload.task == "sentiment-analysis":
+            out = compute_sentiment_output(scores)
+            return AIPredictResponse(model=payload.model, task=payload.task, result=[out])
+        # Autre tâche: format brut
+        return AIPredictResponse(model=payload.model, task=payload.task, result=[scores[0]])
+    except Exception as e:
+        logger.exception("Predict error: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)[:200])
 
 
 @router.post("/insight", response_model=InsightResponse)
