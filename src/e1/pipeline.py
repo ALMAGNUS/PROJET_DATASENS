@@ -85,16 +85,21 @@ class E1Pipeline:
         except Exception as e:
             logger.warning("Metrics server failed: {}", e)
 
-    def load_sources(self) -> list:
-        """Load sources from JSON config"""
+    def load_sources(self, inject_csv_path: str | None = None, inject_source_name: str = "csv_inject") -> list:
+        """Load sources from JSON config + source CSV injectée si --inject-csv"""
         config_path = Path(__file__).parent.parent.parent / "sources_config.json"
+        sources = []
         if config_path.exists():
             with open(config_path) as f:
                 config = json.load(f)
-                return [Source(**s) for s in config["sources"]]
-        return []
+                sources = [Source(**s) for s in config["sources"]]
+        if inject_csv_path:
+            p = Path(inject_csv_path)
+            if p.exists():
+                sources.insert(0, Source(source_name=inject_source_name, acquisition_type="csv", url=str(p.resolve())))
+        return sources
 
-    def extract(self) -> list:
+    def extract(self, inject_csv_path: str | None = None, inject_source_name: str = "csv_inject") -> list:
         """Extract from all sources"""
         console_write = self.console.write
         console_write("\n" + UiMessages.extraction_title()[0])
@@ -102,7 +107,7 @@ class E1Pipeline:
         console_write(UiMessages.extraction_title()[2])
         logger.info("Extraction start: all sources")
 
-        sources = self.load_sources()
+        sources = self.load_sources(inject_csv_path=inject_csv_path, inject_source_name=inject_source_name)
         articles = []
 
         total_sources = sum(1 for s in sources if s.active)
@@ -119,15 +124,14 @@ class E1Pipeline:
                 flush=True,
             )
 
-            # Vérifier si source fondation déjà intégrée (à figer)
+            # Vérifier si source fondation déjà intégrée (à figer) - sauf injection à la demande
             is_foundation, _foundation_type, should_freeze = self._is_foundation_source(
                 source.source_name
             )
-            if is_foundation and should_freeze:
-                # Vérifier si déjà intégrée
+            if source.source_name != inject_source_name and is_foundation and should_freeze:
                 if self.db.is_foundation_integrated(source.source_name):
                     console_write("SKIP (fondation déjà intégrée)")
-                    continue  # Skip extraction pour sources fondation déjà intégrées
+                    continue
 
             start_time = time.time()
             try:
@@ -432,8 +436,12 @@ class E1Pipeline:
             console_write(f"      • {name}: {count:,}")
         console_write("=" * 70 + "\n")
 
-    def run(self):
-        """Run complete pipeline"""
+    def run(
+        self,
+        inject_csv_path: str | None = None,
+        inject_source_name: str = "csv_inject",
+    ):
+        """Run complete pipeline. inject_csv_path: CSV à injecter comme source (parcourt tout le pipeline)."""
         with MetricsCollector("full_pipeline"):
             pipeline_runs_total.inc()
             console_write = self.console.write
@@ -442,8 +450,14 @@ class E1Pipeline:
             console_write(UiMessages.pipeline_start_title()[2])
             logger.info("Pipeline run start")
 
-            # ETAPE 1: Extract + Clean + Load (Kaggle/GDELT déjà en local, fusionnés dans GOLD)
-            articles = self.extract()
+            if inject_csv_path:
+                self.db.ensure_source(inject_source_name, "csv", inject_csv_path)
+
+            # ETAPE 1: Extract + Clean + Load
+            articles = self.extract(
+                inject_csv_path=inject_csv_path,
+                inject_source_name=inject_source_name,
+            )
             articles = self.clean(articles)
             self.load(articles)
             self.show_stats()

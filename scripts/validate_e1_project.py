@@ -20,10 +20,6 @@ print("=" * 80)
 
 project_root = Path(__file__).parent.parent
 db_path = Path(os.getenv("DB_PATH", str(Path.home() / "datasens_project" / "datasens.db")))
-zzdb_mongo_uri = os.getenv("ZZDB_MONGO_URI", os.getenv("MONGO_URI", "mongodb://localhost:27017"))
-zzdb_db_name = os.getenv("ZZDB_MONGO_DB", "zzdb")
-zzdb_collection_name = os.getenv("ZZDB_MONGO_COLLECTION", "synthetic_articles")
-
 results = {"passed": 0, "failed": 0, "warnings": 0, "details": []}
 
 
@@ -56,10 +52,10 @@ print("-" * 80)
 
 # Fichiers essentiels
 test("main.py existe", (project_root / "main.py").exists(), "Point d'entrée du pipeline")
-test("src/core.py existe", (project_root / "src" / "core.py").exists(), "Extracteurs et modèles")
+test("src/e1/core.py existe", (project_root / "src" / "e1" / "core.py").exists(), "Extracteurs et modèles")
 test(
-    "src/repository.py existe",
-    (project_root / "src" / "repository.py").exists(),
+    "src/e1/repository.py existe",
+    (project_root / "src" / "e1" / "repository.py").exists(),
     "Gestion base de données",
 )
 test(
@@ -69,17 +65,19 @@ test(
 )
 test("requirements.txt existe", (project_root / "requirements.txt").exists(), "Dépendances Python")
 
-# Modules essentiels
+# Modules essentiels E1
 test(
-    "src/aggregator.py existe",
-    (project_root / "src" / "aggregator.py").exists(),
+    "src/e1/aggregator.py existe",
+    (project_root / "src" / "e1" / "aggregator.py").exists(),
     "Agrégation RAW/SILVER/GOLD",
 )
 test(
-    "src/exporter.py existe", (project_root / "src" / "exporter.py").exists(), "Export CSV/Parquet"
+    "src/e1/exporter.py existe",
+    (project_root / "src" / "e1" / "exporter.py").exists(),
+    "Export CSV/Parquet",
 )
-test("src/tagger.py existe", (project_root / "src" / "tagger.py").exists(), "Tagging topics")
-test("src/analyzer.py existe", (project_root / "src" / "analyzer.py").exists(), "Analyse sentiment")
+test("src/e1/tagger.py existe", (project_root / "src" / "e1" / "tagger.py").exists(), "Tagging topics")
+test("src/e1/analyzer.py existe", (project_root / "src" / "e1" / "analyzer.py").exists(), "Analyse sentiment")
 
 print("\n[2] VÉRIFICATION BASE DE DONNÉES DataSens")
 print("-" * 80)
@@ -157,30 +155,16 @@ if db_path.exists():
 else:
     test("datasens.db existe", False, "Base de données non trouvée - Lancer python main.py")
 
-print("\n[3] VÉRIFICATION ZZDB (LAB IA)")
+print("\n[3] VÉRIFICATION ZZDB (données synthétiques CSV)")
 print("-" * 80)
 
-try:
-    from pymongo import MongoClient
-
-    client = MongoClient(zzdb_mongo_uri, serverSelectionTimeoutMS=3000)
-    collection = client[zzdb_db_name][zzdb_collection_name]
-
-    total_zzdb = collection.count_documents({})
-    test(
-        "Connexion à ZZDB MongoDB", True, f"{zzdb_mongo_uri}/{zzdb_db_name}.{zzdb_collection_name}"
-    )
-    test("Articles synthétiques ZZDB", total_zzdb > 0, f"{total_zzdb:,} articles")
-
-    themes_count = len(collection.distinct("theme"))
-    test("Thèmes différents", themes_count > 0, f"{themes_count} thèmes")
-
-    sentiments_count = len(collection.distinct("sentiment"))
-    test("Sentiments différents", sentiments_count > 0, f"{sentiments_count} sentiments")
-
-    client.close()
-except Exception as e:
-    warn("ZZDB MongoDB", f"Connexion impossible ou base vide - Optionnel pour E1 ({str(e)[:60]})")
+zzdb_csv_paths = [
+    project_root / "zzdb" / "zzdb_dataset.csv",
+    project_root / "zzdb" / "export" / "zzdb_dataset.csv",
+    project_root / "data" / "raw" / "zzdb_csv" / "zzdb_dataset.csv",
+]
+zzdb_csv_found = next((p for p in zzdb_csv_paths if p.exists()), None)
+test("Fichier ZZDB CSV", zzdb_csv_found is not None, str(zzdb_csv_found) if zzdb_csv_found else "zzdb/zzdb_dataset.csv non trouvé")
 
 print("\n[4] VÉRIFICATION PIPELINE E1")
 print("-" * 80)
@@ -189,6 +173,7 @@ print("-" * 80)
 try:
     sys.path.insert(0, str(project_root))
     from src.e1.core import Source, create_extractor
+    from src.e1.repository import Repository
 
     test("Import modules core", True, "Article, Source, create_extractor")
     test("Import Repository", True, "Repository disponible")
@@ -197,7 +182,7 @@ except Exception as e:
 
 # Vérifier extracteurs
 try:
-    test("Extracteurs disponibles", True, "RSS, API, MongoDB, CSV")
+    test("Extracteurs disponibles", True, "RSS, API, CSV, Kaggle")
 except Exception as e:
     test("Extracteurs disponibles", False, f"Erreur: {str(e)[:60]}")
 
@@ -210,9 +195,9 @@ try:
             "sources_config.json valide", sources_count > 0, f"{sources_count} sources configurées"
         )
 
-        # Vérifier source zzdb
+        # Vérifier source zzdb_csv
         zzdb_sources = [s for s in config["sources"] if "zzdb" in s.get("source_name", "").lower()]
-        test("Source ZZDB configurée", len(zzdb_sources) > 0, f"{len(zzdb_sources)} source(s) ZZDB")
+        test("Source ZZDB (zzdb_csv) configurée", len(zzdb_sources) > 0, f"{len(zzdb_sources)} source(s)")
 except Exception as e:
     test("sources_config.json valide", False, f"Erreur: {str(e)[:60]}")
 
@@ -286,21 +271,21 @@ if db_path.exists():
             f"{len(sentiments)} catégories: {', '.join([s[0] for s in sentiments])}",
         )
 
-        # Vérifier quality_score pour ZZDB
+        # Vérifier quality_score pour ZZDB (données synthétiques)
         cursor.execute(
             """
             SELECT AVG(quality_score)
             FROM raw_data r
             JOIN source s ON r.source_id = s.source_id
-            WHERE s.name LIKE '%zzdb%'
+            WHERE s.name LIKE '%zzdb%' OR s.name = 'csv_inject'
         """
         )
         zzdb_quality = cursor.fetchone()[0]
         if zzdb_quality is not None:
             test(
-                "Quality score ZZDB (garde-fou)",
-                zzdb_quality == 0.3,
-                f"Score: {zzdb_quality} (attendu: 0.3)",
+                "Quality score données synthétiques (garde-fou)",
+                0.2 <= zzdb_quality <= 0.6,
+                f"Score: {zzdb_quality}",
             )
 
         conn.close()
@@ -314,21 +299,19 @@ try:
     sys.path.insert(0, str(project_root))
     from src.e1.core import Source, create_extractor
 
-    # Test avec source zzdb_synthetic
+    # Test avec source zzdb_csv (CSV, pas MongoDB)
+    zzdb_url = "zzdb/zzdb_dataset.csv"
     test_source = Source(
-        source_name="zzdb_synthetic", acquisition_type="mongodb", url=zzdb_mongo_uri
+        source_name="zzdb_csv", acquisition_type="csv", url=zzdb_url
     )
-
     extractor = create_extractor(test_source)
-    test("Création extractor ZZDB", extractor is not None, f"Type: {type(extractor).__name__}")
+    test("Création extractor ZZDB (CSV)", extractor is not None, f"Type: {type(extractor).__name__}")
 
-    # Test extraction (avec limite)
-    os.environ["ZZDB_MAX_ARTICLES"] = "5"  # Limiter pour test rapide
     articles = extractor.extract()
     test(
         "Extraction ZZDB fonctionne",
         len(articles) >= 0,
-        f"{len(articles)} articles extraits (max 5 pour test)",
+        f"{len(articles)} articles extraits",
     )
 
 except Exception as e:

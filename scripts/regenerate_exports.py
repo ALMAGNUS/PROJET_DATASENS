@@ -13,8 +13,8 @@ if sys.platform == "win32":
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-from aggregator import DataAggregator
-from exporter import GoldExporter
+from e1.aggregator import DataAggregator
+from e1.exporter import GoldExporter
 
 if __name__ == "__main__":
     db_path = os.getenv("DB_PATH", str(Path.home() / "datasens_project" / "datasens.db"))

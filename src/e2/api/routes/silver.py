@@ -1,11 +1,9 @@
 """
-SILVER Routes - Read/Write Endpoints
-=====================================
-Endpoints pour zone SILVER (lecture + écriture)
-Permissions:
-- GET: reader, writer, deleter, admin
-- POST/PUT: writer, admin
-- DELETE: deleter, admin
+SILVER Routes - Lecture seule (isolation E1)
+============================================
+- GET : actifs (reader, writer, deleter, admin)
+- POST/PUT/DELETE : exposés pour cohérence API → retournent 501 par conception.
+  E2 ne modifie jamais les données E1. Voir docs/README_E2_API.md.
 """
 
 
@@ -52,10 +50,9 @@ async def list_silver_articles(
     data_service = get_data_service()
     offset = (page - 1) * page_size
 
-    articles = data_service.get_silver_articles(date=date, limit=page_size, offset=offset)
-
-    # TODO: Calculer total depuis DB
-    total = len(articles)
+    articles, total = data_service.get_silver_articles_paginated(
+        date=date, limit=page_size, offset=offset
+    )
     total_pages = (total + page_size - 1) // page_size if total > 0 else 1
 
     return ArticleListResponse(
@@ -93,26 +90,24 @@ async def get_silver_article(article_id: int, current_user: UserInDB = Depends(r
     )
 
 
-@router.post("/articles", response_model=ArticleResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/articles",
+    response_model=ArticleResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        501: {
+            "description": "Par conception (isolation E1) : E2 ne modifie jamais les données. Réponse attendue.",
+        }
+    },
+)
 async def create_silver_article(
     article: ArticleCreate, current_user: UserInDB = Depends(require_writer)
 ):
     """
-    Crée un article dans la zone SILVER (écriture)
+    Crée un article dans la zone SILVER.
 
-    Permissions: writer, admin
-
-    Args:
-        article: Données de l'article à créer
-        current_user: Utilisateur authentifié (dépendance)
-
-    Returns:
-        ArticleResponse
-
-    Note:
-        Pour l'instant, cette fonction retourne une erreur car l'écriture
-        dans SILVER nécessite une modification de E1 (non autorisée).
-        Cette fonction sera implémentée dans une phase ultérieure si nécessaire.
+    **Retourne toujours 501** — par conception (isolation E1). E2 = reader uniquement.
+    Endpoint exposé pour cohérence API. Voir docs/README_E2_API.md.
     """
     # TODO: Implémenter création article SILVER
     # Pour l'instant, on respecte l'isolation E1 (pas d'écriture)
@@ -122,26 +117,22 @@ async def create_silver_article(
     )
 
 
-@router.put("/articles/{article_id}", response_model=ArticleResponse)
+@router.put(
+    "/articles/{article_id}",
+    response_model=ArticleResponse,
+    responses={
+        501: {
+            "description": "Par conception (isolation E1) : E2 ne modifie jamais les données. Réponse attendue.",
+        }
+    },
+)
 async def update_silver_article(
     article_id: int, article: ArticleUpdate, current_user: UserInDB = Depends(require_writer)
 ):
     """
-    Met à jour un article dans la zone SILVER (écriture)
+    Met à jour un article dans la zone SILVER.
 
-    Permissions: writer, admin
-
-    Args:
-        article_id: ID de l'article
-        article: Données à mettre à jour
-        current_user: Utilisateur authentifié (dépendance)
-
-    Returns:
-        ArticleResponse
-
-    Note:
-        Pour l'instant, cette fonction retourne une erreur car la modification
-        dans SILVER nécessite une modification de E1 (non autorisée).
+    **Retourne toujours 501** — par conception (isolation E1). Voir docs/README_E2_API.md.
     """
     # TODO: Implémenter mise à jour article SILVER
     raise HTTPException(
@@ -150,23 +141,20 @@ async def update_silver_article(
     )
 
 
-@router.delete("/articles/{article_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/articles/{article_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        501: {
+            "description": "Par conception (isolation E1) : E2 ne modifie jamais les données. Réponse attendue.",
+        }
+    },
+)
 async def delete_silver_article(article_id: int, current_user: UserInDB = Depends(require_deleter)):
     """
-    Supprime un article de la zone SILVER (suppression)
+    Supprime un article de la zone SILVER.
 
-    Permissions: deleter, admin
-
-    Args:
-        article_id: ID de l'article
-        current_user: Utilisateur authentifié (dépendance)
-
-    Returns:
-        204 No Content
-
-    Note:
-        Pour l'instant, cette fonction retourne une erreur car la suppression
-        dans SILVER nécessite une modification de E1 (non autorisée).
+    **Retourne toujours 501** — par conception (isolation E1). Voir docs/README_E2_API.md.
     """
     # TODO: Implémenter suppression article SILVER
     raise HTTPException(

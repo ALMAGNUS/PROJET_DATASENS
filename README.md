@@ -72,14 +72,16 @@ python main.py
 ```
 
 **Output:**
-- 216 articles extracted to database
+- Articles extracted to database
 - sync_log updated (10 sources logged)
-- Ready for export
+- **Export RAW/SILVER/GOLD inclus** dans le pipeline
 
-### 4. Export Data (RAW → SILVER → GOLD)
+### 4. Export ou régénération (optionnel)
+
+L'export est déjà effectué par `main.py`. Pour régénérer manuellement les exports :
 
 ```bash
-python e1_export_correct.py
+python scripts/regenerate_exports.py
 ```
 
 **Produces:**
@@ -120,10 +122,10 @@ python e1_export_correct.py
 
 | File | Purpose | Status |
 |------|---------|--------|
-| **main.py** | E1 pipeline orchestration | ✅ |
-| **setup_with_sql.py** | Database initialization | ✅ |
-| **e1_export_correct.py** | RAW → SILVER → GOLD | ✅ |
-| **src/core.py** | All extractors + transformers | ✅ |
+| **main.py** | E1 pipeline orchestration (inclut export RAW/SILVER/GOLD) | ✅ |
+| **scripts/setup_with_sql.py** | Database initialization | ✅ |
+| **scripts/regenerate_exports.py** | Régénération manuelle RAW → SILVER → GOLD | ✅ |
+| **src/e1/core.py** | Extracteurs et transformers E1 | ✅ |
 | **sources_config.json** | 10 sources configuration | ✅ |
 | **requirements.txt** | All dependencies | ✅ |
 
@@ -316,7 +318,7 @@ python scripts/enrich_all_articles.py
 - AGILE_ROADMAP.md (43 user stories)
 - SCHEMA_DESIGN.md (database design)
 - CHANGELOG.md (version history)
-- **Conformité** : Audits E1–E5, RGPD, OWASP, monitoring, incidents
+- **Conformité** : Audits E1–E5, RGPD, OWASP, monitoring, incidents (tout bâché)
 - **docs/** : 60+ documents (architecture, flux, audits, procédures)
 
 ✅ **Dependencies**
@@ -330,8 +332,8 @@ python scripts/enrich_all_articles.py
 
 ```
 PROJET_DATASENS/
-├── main.py                          # E1 orchestration (utilise E1 isolé)
-├── setup_with_sql.py                # Database setup
+├── main.py                          # E1 orchestration (inclut export RAW/SILVER/GOLD)
+├── scripts/setup_with_sql.py        # Database setup
 ├── requirements.txt                 # Dependencies
 ├── sources_config.json              # Sources config
 ├── README.md                        # This file
@@ -403,78 +405,33 @@ PROJET_DATASENS/
 
 ---
 
-## 🔒 E1 Isolation (Phase 0 - Complete)
+## 🔒 E1 Isolation (Phase 0)
 
-**E1 est maintenant isolé et protégé** pour la construction de E2/E3.
-
-### Structure Isolée
-- ✅ Package `src/e1/` : E1 complètement isolé
-- ✅ Interface `src/shared/interfaces.py` : E1DataReader (lecture seule)
-- ✅ Tests de non-régression : `tests/test_e1_isolation.py`
-- ✅ Documentation : `docs/E1_ISOLATION_STRATEGY.md`
-
-### Règles d'Isolation
-- ✅ E2/E3 utilisent UNIQUEMENT `E1DataReader` (pas de modification E1)
-- ✅ Tests E1 passent à 100% avant chaque merge E2/E3
-- ✅ Aucune modification `src/e1/` depuis E2/E3
-
-**Voir** : `docs/E1_ISOLATION_COMPLETE.md` pour détails complets
+Package `src/e1/` isolé. E2/E3 lisent via `E1DataReader` uniquement — pas de touche au code E1. Tests non-régression en place. Détails : `docs/E1_ISOLATION_COMPLETE.md`.
 
 ---
 
-## 📋 Documentation & Conformité
+## 📋 Doc & conformité
 
-### Audits compétences (E1 → E5)
+**Grilles E1–E5** : `AUDIT_E1_COMPETENCES.md` … `AUDIT_E5_COMPETENCES.md`, E4 = écarts + plan. E1/E2/E3/E5 validés.
 
-| Épreuve | Document | Statut |
-|---------|----------|--------|
-| E1 | `docs/AUDIT_E1_COMPETENCES.md` | ✅ 100 % |
-| E2 | `docs/AUDIT_E2_COMPETENCES.md` | ✅ 100 % |
-| E3 | `docs/AUDIT_E3_COMPETENCES.md` | ✅ 100 % |
-| E4 | `docs/AUDIT_E4_ECART.md` | Plan d'action |
-| E5 | `docs/AUDIT_E5_COMPETENCES.md` | ✅ 100 % |
+**RGPD / sécu** : Registre traitements, procédure tri DP, OWASP Top 10 (dans README_E2_API).
 
-### RGPD & Sécurité
+**Monitoring / incidents** : Métriques, seuils, alertes, Prometheus/Grafana, accessibilité. Procédure incidents prête.
 
-- `docs/REGISTRE_TRAITEMENTS_RGPD.md` — Registre des traitements
-- `docs/PROCEDURE_TRI_DONNEES_PERSONNELLES.md` — Procédure tri/suppression données
-- `docs/README_E2_API.md` — Section OWASP Top 10
-
-### Monitoring & Incidents
-
-- `docs/METRIQUES_SEUILS_ALERTES.md` — Métriques, seuils, alertes
-- `docs/PROCEDURE_INCIDENTS.md` — Résolution incidents techniques
-- `docs/MONITORING_E2_API.md` — Prometheus, Grafana, choix techniques
-- `docs/ACCESSIBILITE_DOCUMENTATION.md` — Accessibilité (AVH, Microsoft)
-
-### Index documentation
-
-Voir `docs/README.md` pour l'index complet des 60+ documents.
+Index complet : `docs/README.md`.
 
 ---
 
 ## 🚀 Phases du Projet
 
-### ✅ Phase 0 — Isolation E1 (TERMINÉE)
-- Package `src/e1/` isolé et protégé
-- Interface `E1DataReader` pour lecture seule
-- Tests de non-régression (11 tests)
+**Phase 0** : E1 isolé, `E1DataReader`, tests non-régression.
 
-### ✅ Phase 2 — FastAPI + RBAC (TERMINÉE)
-- API REST sécurisée avec JWT
-- Authentification et autorisation par rôles
-- Audit trail complet
-- 16 tests API (100% passing)
+**Phase 2** : FastAPI + RBAC, JWT, audit trail. Tests API OK.
 
-### ✅ Phase 3 — PySpark Integration (TERMINÉE)
-- **SparkSession** singleton (mode local)
-- **GoldParquetReader** : Lecture Parquet GOLD depuis E1
-- **GoldDataProcessor** : Agrégations et analyses Big Data
-- **4 endpoints analytics** intégrés dans E2 API
-- **13 tests PySpark** (100% passing)
-- **87,907 lignes** dans 4 fichiers Parquet GOLD
+**Phase 3** : PySpark (singleton local), GoldParquetReader, 4 endpoints analytics. ~88k lignes Parquet GOLD.
 
-**Outils PySpark disponibles** :
+**Outils PySpark** :
 ```bash
 # Shell interactif PySpark
 python scripts/pyspark_shell.py
@@ -486,28 +443,13 @@ python scripts/test_spark_simple.py
 pytest tests/test_spark_integration.py -v
 ```
 
-**Endpoints Analytics** :
-- `GET /api/v1/analytics/sentiment/distribution` : Distribution des sentiments
-- `GET /api/v1/analytics/source/aggregation` : Agrégation par source
-- `GET /api/v1/analytics/statistics` : Statistiques générales
-- `GET /api/v1/analytics/available-dates` : Dates disponibles
+Endpoints : `sentiment/distribution`, `source/aggregation`, `statistics`, `available-dates`.
 
-### 🔄 Phase 4 — ML Fine-tuning (À VENIR)
-- Fine-tuning FlauBERT (sentiment)
-- Fine-tuning CamemBERT (topics)
-- Model registry (MLflow)
+Phase 4 : FlauBERT/CamemBERT fine-tuning, MLflow.  
+Phase 5 : Dashboard Streamlit.  
+Phase 6 : Mistral insights.  
 
-### 🔄 Phase 5 — Streamlit Dashboard (À VENIR)
-- Visualisations interactives
-- Prédictions IA en temps réel
-- Dashboard analytics
-
-### 🔄 Phase 6 — Mistral IA (À VENIR)
-- Insights générés par IA
-- Climat social/financier
-- Analyse prédictive
-
-**Voir** : `docs/PLAN_ACTION_E1_E2_E3.md` pour plan détaillé
+Plan détaillé : `docs/PLAN_ACTION_E1_E2_E3.md`
 
 ---
 
@@ -572,9 +514,5 @@ bash scripts/manage_parquet.sh
 
 **Last Updated:** February 12, 2026  
 **Version:** 1.5.0  
-**Status:** ✅ Production Ready  
-**E1 Complete:** ✅ All components delivered  
-**E2 Complete:** ✅ FastAPI + RBAC (100%)  
-**E3 Complete:** ✅ PySpark Integration (100%)  
-**GoldAI:** ✅ Fusion incrémentale Parquet GOLD → GoldAI (100%)  
-**Documentation E1–E5:** ✅ Audits, RGPD, monitoring, accessibilité (100%)
+**Status:** Production Ready  
+E1/E2/E3 bouclés. GoldAI merge opérationnel. Doc audit E1–E5 couverte.

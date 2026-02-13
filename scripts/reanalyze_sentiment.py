@@ -15,7 +15,7 @@ if sys.platform == "win32":
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 import sqlite3
 
-from analyzer import SentimentAnalyzer
+from e1.analyzer import SentimentAnalyzer
 
 
 def reanalyze_all_sentiments():

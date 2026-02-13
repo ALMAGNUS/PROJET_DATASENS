@@ -36,7 +36,11 @@ docker run -d --name prometheus -p 9090:9090 \
 
 Prometheus va scrapper :
 - **localhost:8001** → API E2 (`/metrics`) : requêtes, latence, erreurs, auth, **drift**
-- **localhost:8000** → Pipeline E1 (si le serveur métriques est lancé)
+- **localhost:8000** → Métriques E1 (voir ci-dessous)
+
+**Métriques E1 (port 8000)** — deux options :
+1. **Standalone** (recommandé pour monitoring continu) : `python scripts/run_e1_metrics.py` — expose /metrics en continu, met à jour les gauges depuis la DB toutes les 30 s.
+2. **Après pipeline** : `python main.py --keep-metrics` — garde le processus vivant après une exécution (métriques à jour du dernier run).
 
 Vérifier : ouvrir http://localhost:9090 → Status → Targets. Les cibles `datasens-e2-api` doivent être "UP" si l’API tourne sur le port 8001.
 
@@ -63,7 +67,16 @@ Vérifier : ouvrir http://localhost:9090 → Status → Targets. Les cibles `dat
 
 ## 3. Source de données Prometheus dans Grafana
 
-- **Grafana sur la même machine que Prometheus** : URL = `http://localhost:9090`.
+Deux datasources sont provisionnées automatiquement :
+
+| Datasource | URL | Quand l'utiliser |
+|------------|-----|------------------|
+| **Prometheus (Docker)** | `http://prometheus:9090` | docker-compose up (tout dans Docker) |
+| **Prometheus (Local)** | `http://host.docker.internal:9090` | start_grafana.bat + Prometheus local |
+
+Si les dashboards sont vides : Configuration → Data sources → sélectionner **Prometheus (Local)** et cliquer Save & test.
+
+- **Grafana sur la même machine que Prometheus** (sans Docker) : URL = `http://localhost:9090`.
 - **Grafana dans Docker, Prometheus sur l’hôte** : URL = `http://host.docker.internal:9090` (Windows/Mac).
 
 Dans **Configuration** → **Data sources** → **Prometheus** : vérifier que l’URL est correcte et **Save & test**.

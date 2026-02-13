@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test complet de ZZDB - Base synthétique"""
+"""Test ZZDB - Données synthétiques (CSV, pas MongoDB)."""
 import os
 import sqlite3
 import sys
@@ -12,131 +12,104 @@ if sys.platform == "win32":
     except (AttributeError, OSError):
         pass
 
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
 print("\n" + "=" * 80)
-print("  TEST ZZDB - Base de Données Synthétiques")
+print("  TEST ZZDB - Données synthétiques (CSV)")
 print("=" * 80)
 
-zzdb_mongo_uri = os.getenv("ZZDB_MONGO_URI", os.getenv("MONGO_URI", "mongodb://localhost:27017"))
-zzdb_db_name = os.getenv("ZZDB_MONGO_DB", "zzdb")
-zzdb_collection_name = os.getenv("ZZDB_MONGO_COLLECTION", "synthetic_articles")
-
-# 1. Vérifier la base
-print("\n[1/6] Vérification de la base de données...")
-client = None
-try:
-    from pymongo import MongoClient
-
-    client = MongoClient(zzdb_mongo_uri, serverSelectionTimeoutMS=3000)
-    collection = client[zzdb_db_name][zzdb_collection_name]
-    count = collection.count_documents({})
-    print(f"   ✅ MongoDB OK: {zzdb_mongo_uri}/{zzdb_db_name}.{zzdb_collection_name}")
-    print(f"   📊 Documents: {count:,}")
-except Exception as e:
-    print(f"   ❌ MongoDB KO: {str(e)[:80]}")
+# 1. Vérifier fichier CSV ZZDB
+print("\n[1/6] Vérification fichier ZZDB CSV...")
+zzdb_paths = [
+    project_root / "zzdb" / "zzdb_dataset.csv",
+    project_root / "zzdb" / "export" / "zzdb_dataset.csv",
+    project_root / "data" / "raw" / "zzdb_csv" / "zzdb_dataset.csv",
+]
+zzdb_csv = next((p for p in zzdb_paths if p.exists()), None)
+if not zzdb_csv:
+    print("   ❌ zzdb_dataset.csv introuvable")
     sys.exit(1)
+print(f"   ✅ {zzdb_csv}")
 
-# 2. Statistiques de la base
-print("\n[2/6] Statistiques de la base...")
-total = collection.count_documents({})
-sentiments = {
-    k: collection.count_documents({"sentiment": k}) for k in collection.distinct("sentiment")
-}
-themes = {k: collection.count_documents({"theme": k}) for k in collection.distinct("theme")}
+# 2. Test extraction CSVExtractor
+print("\n[2/6] Test extraction CSVExtractor...")
+from src.e1.core import Source, create_extractor
 
-print(f"   Total articles: {total}")
-print(f"   Sentiments: {sentiments}")
-print(f"   Thèmes: {themes}")
-
-# 3. Test extraction
-print("\n[3/6] Test extraction MongoExtractor...")
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from src.core import Source, create_extractor
-
-s = Source(source_name="zzdb_synthetic", acquisition_type="mongodb", url=zzdb_mongo_uri)
+s = Source(source_name="zzdb_csv", acquisition_type="csv", url=str(zzdb_csv))
 e = create_extractor(s)
 articles = e.extract()
-
 print(f"   ✅ {len(articles)} articles extraits")
 if articles:
     print(f"   Exemple: {articles[0].title[:60]}...")
-    print(f"   Source: {articles[0].source_name}")
 
-# 4. Test intégration pipeline
-print("\n[4/6] Test intégration dans le pipeline...")
-os.environ["ZZDB_MAX_ARTICLES"] = "10"
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# 3. Test pipeline (zzdb_csv dans sources_config)
+print("\n[3/6] Test intégration pipeline...")
 try:
-    from main import E1Pipeline
-
-    p = E1Pipeline()
+    from src.e1.pipeline import E1Pipeline
+    p = E1Pipeline(quiet=True)
     pipeline_articles = p.extract()
-    zzdb_articles = [a for a, s in pipeline_articles if s == "zzdb_synthetic"]
-
+    zzdb_articles = [a for a, src in pipeline_articles if "zzdb" in src.lower()]
     print(f"   ✅ {len(zzdb_articles)} articles ZZDB dans le pipeline")
     print(f"   Total extraits: {len(pipeline_articles)} articles")
     p.db.conn.close()
-except Exception as e:
-    print(f"   ⚠️  Pipeline test: {str(e)[:60]}")
+except Exception as ex:
+    print(f"   ⚠️  Pipeline: {str(ex)[:60]}")
     zzdb_articles = []
 
-# 5. Vérifier dans la base principale
-print("\n[5/6] Vérification dans la base principale...")
+# 4. Vérifier base principale
+print("\n[4/6] Vérification base principale...")
 main_db = os.getenv("DB_PATH", str(Path.home() / "datasens_project" / "datasens.db"))
 if Path(main_db).exists():
-    main_conn = sqlite3.connect(main_db)
-    main_c = main_conn.cursor()
-    main_c.execute(
-        """
-        SELECT COUNT(*) FROM raw_data r
-        JOIN source s ON r.source_id = s.source_id
-        WHERE s.name = 'zzdb_synthetic'
-    """
+    conn = sqlite3.connect(main_db)
+    cur = conn.cursor()
+    cur.execute(
+        """SELECT COUNT(*) FROM raw_data r
+           JOIN source s ON r.source_id = s.source_id
+           WHERE s.name LIKE '%zzdb%'"""
     )
-    zzdb_in_main = main_c.fetchone()[0]
-    print(f"   ✅ {zzdb_in_main} articles ZZDB dans la base principale")
-    main_conn.close()
+    count = cur.fetchone()[0]
+    print(f"   ✅ {count} articles ZZDB dans la base principale")
+    conn.close()
 else:
-    print(f"   ⚠️  Base principale non trouvée: {main_db}")
+    print(f"   ⚠️  Base non trouvée: {main_db}")
 
-# 6. Test exports
-print("\n[6/6] Test exports (GOLD)...")
+# 5. Test catapulte
+print("\n[5/6] Test catapulte...")
 try:
-    from src.aggregator import DataAggregator
-
-    main_db_path = main_db if Path(main_db).exists() else None
-    if main_db_path:
-        agg = DataAggregator(main_db_path)
-        df = agg.aggregate()
-
-        zzdb_count = len(df[df["source"] == "zzdb_synthetic"]) if "source" in df.columns else 0
-        academic_count = (
-            len(df[df["source_type"] == "academic"]) if "source_type" in df.columns else 0
+    from zzdb.catapulte_to_pipeline import ZzdbCatapult, ZzdbFileScanner, SourceConfig
+    scanner = ZzdbFileScanner(Path(project_root / "zzdb"), {".csv", ".json"})
+    files = scanner.scan()
+    if files:
+        catapult = ZzdbCatapult(
+            db_path=Path(main_db),
+            source_config=SourceConfig(name="zzdb_csv"),
+            dry_run=True,
+            limit=5,
         )
-
-        print(f"   ✅ GOLD export - Articles ZZDB: {zzdb_count}")
-        print(f"   ✅ GOLD export - Articles académiques: {academic_count}")
-        print(f"   Total GOLD: {len(df)}")
-
-        if "source_type" in df.columns:
-            print("   Colonne source_type présente: ✅")
-        else:
-            print("   Colonne source_type manquante: ⚠️")
-
-        agg.close()
+        stats = catapult.import_files(files[:1])
+        print(f"   ✅ Catapulte (dry-run): {stats.parsed_rows} lignes parsées")
     else:
-        print("   ⚠️  Base principale non disponible pour test exports")
-except Exception as e:
-    print(f"   ⚠️  Erreur exports: {str(e)[:60]}")
+        print("   ⚠️  Aucun fichier à catapulter")
+except Exception as ex:
+    print(f"   ⚠️  Catapulte: {str(ex)[:60]}")
 
-if client is not None:
-    client.close()
+# 6. Test inject_csv
+print("\n[6/6] Test inject_csv script...")
+try:
+    import subprocess
+    r = subprocess.run(
+        [sys.executable, "scripts/inject_csv.py", str(zzdb_csv), "--source-name", "test_zzdb"],
+        cwd=str(project_root),
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    if r.returncode == 0:
+        print("   ✅ inject_csv.py OK")
+    else:
+        print(f"   ⚠️  {r.stderr[:80] if r.stderr else r.stdout[:80]}")
+except Exception as ex:
+    print(f"   ⚠️  inject_csv: {str(ex)[:60]}")
 
-print("\n" + "=" * 80)
-print("  RÉSUMÉ")
-print("=" * 80)
-print(f"  ✅ Base ZZDB: {total} articles")
-print(f"  ✅ Extraction: {len(articles)} articles")
-print(f"  ✅ Pipeline: {len(zzdb_articles)} articles")
-if Path(main_db).exists():
-    print(f"  ✅ Base principale: {zzdb_in_main} articles ZZDB")
-print("=" * 80 + "\n")
+print("\n" + "=" * 80 + "\n")

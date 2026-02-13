@@ -9,38 +9,19 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [1.5.0] — 2026-02-12
 
-### 📚 Documentation complète E1 → E5
+### Doc pour passer l'audit (E1→E5)
 
-#### E1 — Conformité RGPD
-- ✅ **REGISTRE_TRAITEMENTS_RGPD.md** : Registre des traitements (Art. 30 RGPD) — T1 profils, T2 audit, T3 contenu
-- ✅ **PROCEDURE_TRI_DONNEES_PERSONNELLES.md** : Procédure détection, suppression, anonymisation des données personnelles
-- ✅ **README_E2_API.md** : Section Sécurisation OWASP Top 10 API
-- ✅ **AUDIT_E1_COMPETENCES.md** : Grille compétences E1 (100 % conforme)
+**RGPD & API** : Registre Art. 30, procédure tri/suppression DP, OWASP Top 10 couvert. Grille E1 OK.
 
-#### E2 — Veille & Services IA
-- ✅ **VEILLE_PLANIFICATION.md** : Planification temps dédiés (fréquence, durée, activités)
-- ✅ **docs/e2/AI_BENCHMARK.md** : Benchmark CamemBERT/FlauBERT vs API Cloud
-- ✅ **docs/e2/AI_REQUIREMENTS.md** : Exigences et contraintes IA
-- ✅ **.env.example** : MISTRAL_API_KEY documentée
-- ✅ **AUDIT_E2_COMPETENCES.md** : Grille compétences E2 (100 %)
+**Veille & IA** : Planning temps dédiés, benchmark CamemBERT/FlauBERT vs cloud, specs IA. MISTRAL_API_KEY dans .env.example. Grille E2 OK.
 
-#### E3 — Cockpit
-- ✅ **AUDIT_E3_COMPETENCES.md** : Grille compétences E3 (100 %, réutilisation E2)
+**Cockpit** : E3 bouclé (réutilise E2).
 
-#### E4 — Conception (anticipation)
-- ✅ **AUDIT_E4_ECART.md** : Écarts et plan d'action E4
+**E4** : Écarts listés + plan d'action (à appliquer si besoin).
 
-#### E5 — Maintien opérationnel
-- ✅ **METRIQUES_SEUILS_ALERTES.md** : Tableau métriques E1/E2, seuils, alertes, actions
-- ✅ **PROCEDURE_INCIDENTS.md** : Modèle gestion incidents + exemple 1.4.1
-- ✅ **MONITORING_E2_API.md** : Section "Choix techniques" (Prometheus, Grafana)
-- ✅ **ACCESSIBILITE_DOCUMENTATION.md** : Références AVH/Microsoft, structure, export
-- ✅ **prometheus.local.yml** : `rule_files` activés pour alertes en local
-- ✅ **AUDIT_E5_COMPETENCES.md** : Grille compétences E5 (100 %)
+**Ops** : Métriques/seuils/alertes, procédure incidents, Prometheus/Grafana doc, accessibilité (AVH, MS). `rule_files` activés en local. Grille E5 OK.
 
-#### CI/CD
-- ✅ Ruff retiré du workflow CI
-- ✅ PYTHONPATH ajouté pour tests E1
+**CI** : Ruff dégagé, PYTHONPATH fix pour les tests.
 
 ---
 

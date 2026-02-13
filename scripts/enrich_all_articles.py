@@ -6,8 +6,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 import sqlite3
 
-from analyzer import SentimentAnalyzer
-from tagger import TopicTagger
+from e1.analyzer import SentimentAnalyzer
+from e1.tagger import TopicTagger
 
 db_path = str(Path.home() / "datasens_project" / "datasens.db")
 conn = sqlite3.connect(db_path)

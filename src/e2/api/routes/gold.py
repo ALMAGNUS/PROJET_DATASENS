@@ -40,10 +40,9 @@ async def list_gold_articles(
     data_service = get_data_service()
     offset = (page - 1) * page_size
 
-    articles = data_service.get_gold_articles(date=date, limit=page_size, offset=offset)
-
-    # TODO: Calculer total depuis DB
-    total = len(articles)
+    articles, total = data_service.get_gold_articles_paginated(
+        date=date, limit=page_size, offset=offset
+    )
     total_pages = (total + page_size - 1) // page_size if total > 0 else 1
 
     return ArticleListResponse(

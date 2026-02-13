@@ -38,7 +38,7 @@ try:
         sys.exit(1)
 
     # Créer utilisateur admin de test
-    email = "admin@datasens.test"
+    email = "admin@datasens.fr"
     password = "admin123"  # Mot de passe simple pour test
     password_hash = security_service.hash_password(password)
 

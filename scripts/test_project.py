@@ -48,9 +48,9 @@ for script in required_scripts:
 if not all_ok:
     sys.exit(1)
 
-# Test 4: Fichiers src/
-print("\n[TEST 4] Vérification fichiers src/")
-src_dir = Path("src")
+# Test 4: Fichiers src/e1/
+print("\n[TEST 4] Vérification fichiers src/e1/")
+e1_dir = Path("src/e1")
 required_modules = [
     "core.py",
     "repository.py",
@@ -58,15 +58,20 @@ required_modules = [
     "analyzer.py",
     "aggregator.py",
     "exporter.py",
-    "dashboard.py",
-    "collection_report.py",
 ]
 all_ok = True
 for module in required_modules:
-    if (src_dir / module).exists():
-        print(f"   [OK] {module}")
+    if (e1_dir / module).exists():
+        print(f"   [OK] e1/{module}")
     else:
-        print(f"   [ERROR] {module} manquant")
+        print(f"   [ERROR] e1/{module} manquant")
+        all_ok = False
+
+for m in ["dashboard.py", "collection_report.py"]:
+    if (Path("src") / m).exists():
+        print(f"   [OK] {m}")
+    else:
+        print(f"   [ERROR] {m} manquant")
         all_ok = False
 
 if not all_ok:

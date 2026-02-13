@@ -50,9 +50,9 @@ class ImportStats:
 
 @dataclass
 class SourceConfig:
-    name: str = "zzdb_synthetic"
-    acquisition_type: str = "mongodb"
-    url: str = "mongodb://localhost:27017/zzdb"
+    name: str = "zzdb_csv"
+    acquisition_type: str = "csv"
+    url: str = "zzdb/zzdb_dataset.csv"
     active: bool = True
     is_synthetic: int = 1
 
@@ -229,10 +229,12 @@ class ZzdbCatapult:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="ZZDB -> SQLite catapult (safe)")
+    parser = argparse.ArgumentParser(description="ZZDB/CSV -> SQLite catapult (safe)")
+    parser.add_argument("--file", type=str, default=None, help="Fichier CSV/JSON unique (injection à la demande)")
     parser.add_argument("--db-path", type=str, default=str(Path.home() / "datasens_project" / "datasens.db"))
     parser.add_argument("--zzdb-dir", type=str, default=str(Path(__file__).parent))
     parser.add_argument("--extensions", type=str, default=".csv,.json")
+    parser.add_argument("--source-name", type=str, default=None, help="Nom source (défaut: zzdb_csv ou csv_inject si --file)")
     parser.add_argument("--dry-run", action="store_true", help="Parse only, do not insert")
     parser.add_argument("--limit", type=int, default=None, help="Max rows to import")
     return parser
@@ -241,19 +243,31 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_parser().parse_args()
     db_path = Path(args.db_path)
-    zzdb_dir = Path(args.zzdb_dir)
-    extensions = {ext.strip() for ext in args.extensions.split(",") if ext.strip()}
 
-    scanner = ZzdbFileScanner(zzdb_dir, extensions)
-    files = scanner.scan()
+    if args.file:
+        files = [Path(args.file)]
+        if not files[0].exists():
+            print(f"[ZZDB] Fichier introuvable: {args.file}")
+            return
+        source_config = SourceConfig(
+            name=args.source_name or "csv_inject",
+            acquisition_type="csv",
+            url=str(files[0]),
+        )
+    else:
+        zzdb_dir = Path(args.zzdb_dir)
+        extensions = {ext.strip() for ext in args.extensions.split(",") if ext.strip()}
+        scanner = ZzdbFileScanner(zzdb_dir, extensions)
+        files = scanner.scan()
+        source_config = SourceConfig(name=args.source_name or "zzdb_csv")
 
     if not files:
-        print(f"[ZZDB] Aucun fichier trouvé dans: {zzdb_dir}")
+        print(f"[ZZDB] Aucun fichier trouvé dans: {args.zzdb_dir}")
         return
 
     catapult = ZzdbCatapult(
         db_path=db_path,
-        source_config=SourceConfig(),
+        source_config=source_config,
         dry_run=args.dry_run,
         limit=args.limit,
     )
