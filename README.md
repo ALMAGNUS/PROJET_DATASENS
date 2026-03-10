@@ -417,7 +417,7 @@ Package `src/e1/` isolé. E2/E3 lisent via `E1DataReader` uniquement — pas de 
 
 **RGPD / sécu** : Registre traitements, procédure tri DP, OWASP Top 10 (dans README_E2_API).
 
-**Monitoring / incidents** : Métriques, seuils, alertes, Prometheus/Grafana, accessibilité. Procédure incidents prête.
+**Monitoring / incidents** : Métriques, seuils, alertes, Prometheus/Grafana, Uptime Kuma, accessibilité. Procédure incidents prête. Guide captures (ReDoc, Prometheus, Grafana) : `docs/E1_CAPTURES_MONITORING.md`. Uptime Kuma est lancé via Docker (`docker-compose` / `start_uptime_kuma.bat`), pas via `pip`.
 
 Index complet : `docs/README.md`.
 
@@ -512,7 +512,40 @@ bash scripts/manage_parquet.sh
 
 ---
 
-**Last Updated:** February 12, 2026  
-**Version:** 1.5.0  
+## E2 Fine-tuning rapide (CPU ecole)
+
+Un mode d'execution court est disponible pour produire une preuve C7/C8 exploitable sur machine CPU limitee.
+
+### Boucle complete recommandee
+
+```bash
+scripts\run_training_loop_e2.bat
+```
+
+Ce mode quick (par defaut) execute:
+- regeneration des jeux `train/val/test` depuis GoldAI
+- normalisation des labels sentiment avant split
+- fine-tuning CamemBERT en volume borne
+- benchmark final multi-modeles avec rapport dans `docs/e2/`
+
+### Mode complet (plus long)
+
+```bash
+scripts\run_training_loop_e2.bat --full
+```
+
+Le mode `--full` enleve les bornes d'echantillonnage et relance un entrainement complet (duree significativement plus elevee en CPU).
+
+### Artefacts produits
+
+- `docs/e2/AI_BENCHMARK.md`
+- `docs/e2/AI_BENCHMARK_RESULTS.json`
+- `docs/e2/AI_REQUIREMENTS.md`
+- `models/camembert-sentiment-finetuned/`
+
+---
+
+**Last Updated:** March 9, 2026  
+**Version:** 1.5.1  
 **Status:** Production Ready  
 E1/E2/E3 bouclés. GoldAI merge opérationnel. Doc audit E1–E5 couverte.
