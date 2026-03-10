@@ -7,6 +7,21 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ---
 
+## [Unreleased]
+
+### E2 - fiabilisation training/benchmark (CPU-first)
+
+- Ajout d'une normalisation robuste des labels sentiment dans `scripts/create_ia_copy.py` avant generation des splits `train/val/test` (`négatif`, `neutre`, `positif`), y compris gestion des variantes d'encodage.
+- Renforcement de `scripts/finetune_sentiment.py` avec normalisation des labels a l'entree, options `--max-train-samples` et `--max-val-samples` pour execution rapide sur poste contraint, et configuration `dataloader_pin_memory` adaptee CPU.
+- Mise a jour de `scripts/run_training_loop_e2.bat` avec:
+  - installation explicite de `accelerate>=0.26.0` et `scikit-learn`,
+  - arret strict en cas d'erreur intermediaire,
+  - deux profils d'execution (`quick` par defaut, `--full` pour entrainement complet),
+  - passage automatique des parametres de fine-tuning et benchmark selon le profil.
+- Documentation ajoutee dans `README.md` pour l'execution E2 rapide et les artefacts de preuve generes dans `docs/e2/`.
+
+---
+
 ## [1.5.0] — 2026-02-12
 
 ### Doc pour passer l'audit (E1→E5)

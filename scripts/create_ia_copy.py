@@ -17,6 +17,23 @@ import pandas as pd
 from src.config import get_settings
 
 
+def normalize_sentiment_label(value: object) -> str:
+    """Normalise les variantes de label vers négatif/neutre/positif."""
+    s = str(value or "").strip().lower()
+
+    negative = {"negatif", "négatif", "negative", "n�gatif"}
+    positive = {"positif", "positive"}
+    neutral = {"neutre", "neutral"}
+
+    if s in negative:
+        return "négatif"
+    if s in positive:
+        return "positif"
+    if s in neutral:
+        return "neutre"
+    return "neutre"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Copie IA avec split train/val/test")
     parser.add_argument("--train", type=float, default=0.8, help="Fraction train (défaut 0.8)")
@@ -44,6 +61,15 @@ def main() -> int:
     df = pd.read_parquet(merged_path)
     n = len(df)
     print(f"  {n:,} lignes chargées")
+
+    if "sentiment" not in df.columns:
+        print(f"ERREUR: Colonne 'sentiment' absente dans {merged_path}")
+        return 1
+
+    # Normalisation des labels pour éviter les variantes d'encodage (ex: n�gatif).
+    df["sentiment"] = df["sentiment"].apply(normalize_sentiment_label)
+    dist = df["sentiment"].value_counts().to_dict()
+    print(f"  Distribution sentiment normalisée: {dist}")
 
     ia_dir.mkdir(parents=True, exist_ok=True)
 

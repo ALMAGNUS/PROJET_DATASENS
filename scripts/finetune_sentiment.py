@@ -28,6 +28,23 @@ LABEL2ID = {"négatif": 0, "neutre": 1, "positif": 2}
 ID2LABEL = {v: k for k, v in LABEL2ID.items()}
 
 
+def normalize_sentiment_label(value: object) -> str | None:
+    """Normalise les variantes de label vers négatif/neutre/positif."""
+    s = str(value or "").strip().lower()
+
+    negative = {"negatif", "négatif", "negative", "n�gatif"}
+    positive = {"positif", "positive"}
+    neutral = {"neutre", "neutral"}
+
+    if s in negative:
+        return "négatif"
+    if s in positive:
+        return "positif"
+    if s in neutral:
+        return "neutre"
+    return None
+
+
 def load_ia_dataset(ia_dir: Path, split: str) -> pd.DataFrame:
     """Charge train, val ou test depuis data/goldai/ia/."""
     path = ia_dir / f"{split}.parquet"
@@ -47,24 +64,22 @@ def prepare_text(df: pd.DataFrame) -> tuple[list[str], list[int]]:
 
     texts = []
     labels = []
+    skipped_unknown = 0
     for _, row in df.iterrows():
         title = str(row.get(title_col, "") or "")
         content = str(row.get(content_col, "") or "")
         text = f"{title} {content}".strip()[:512]
         if not text:
             continue
-        sent = str(row[sent_col]).strip().lower()
-        # Normaliser variations (negatif, négatif, etc.)
-        if sent in ("negatif", "négatif", "negative"):
-            sent = "négatif"
-        elif sent in ("positif", "positive"):
-            sent = "positif"
-        else:
-            sent = "neutre"
-        if sent not in LABEL2ID:
+        sent = normalize_sentiment_label(row[sent_col])
+        if sent is None:
+            skipped_unknown += 1
             continue
         texts.append(text)
         labels.append(LABEL2ID[sent])
+
+    if skipped_unknown:
+        print(f"ATTENTION: {skipped_unknown} lignes ignorées (label sentiment inconnu).")
 
     return texts, labels
 
@@ -99,6 +114,18 @@ def main() -> int:
         action="store_true",
         help="Évaluer uniquement un modèle existant (sans entraînement)",
     )
+    parser.add_argument(
+        "--max-train-samples",
+        type=int,
+        default=0,
+        help="Limiter le nombre d'exemples train (0 = tous).",
+    )
+    parser.add_argument(
+        "--max-val-samples",
+        type=int,
+        default=0,
+        help="Limiter le nombre d'exemples validation (0 = tous).",
+    )
     args = parser.parse_args()
 
     settings = get_settings()
@@ -120,6 +147,22 @@ def main() -> int:
     train_texts, train_labels = prepare_text(train_df)
     val_texts, val_labels = prepare_text(val_df)
 
+    if args.max_train_samples and args.max_train_samples > 0 and len(train_texts) > args.max_train_samples:
+        train_pairs = list(zip(train_texts, train_labels))
+        train_pairs = pd.DataFrame(train_pairs, columns=["text", "label"]).sample(
+            n=args.max_train_samples, random_state=42
+        )
+        train_texts = train_pairs["text"].tolist()
+        train_labels = train_pairs["label"].tolist()
+
+    if args.max_val_samples and args.max_val_samples > 0 and len(val_texts) > args.max_val_samples:
+        val_pairs = list(zip(val_texts, val_labels))
+        val_pairs = pd.DataFrame(val_pairs, columns=["text", "label"]).sample(
+            n=args.max_val_samples, random_state=42
+        )
+        val_texts = val_pairs["text"].tolist()
+        val_labels = val_pairs["label"].tolist()
+
     if len(train_texts) < 100:
         print(
             f"ATTENTION: Peu d'exemples ({len(train_texts)}). "
@@ -130,6 +173,7 @@ def main() -> int:
     print(f"  Val:   {len(val_texts):,} exemples")
 
     try:
+        import torch
         from datasets import Dataset
         from transformers import (
             AutoModelForSequenceClassification,
@@ -228,6 +272,7 @@ def main() -> int:
         metric_for_best_model="f1",
         greater_is_better=True,
         report_to="none",
+        dataloader_pin_memory=torch.cuda.is_available(),
     )
 
     def compute_metrics(eval_pred):

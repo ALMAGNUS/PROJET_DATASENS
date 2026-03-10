@@ -88,6 +88,18 @@ services:
       - datasens-network
     restart: unless-stopped
 
+  # Uptime Kuma - Monitoring de disponibilité (API, Prometheus, Grafana)
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: datasens-uptime-kuma
+    volumes:
+      - uptime-kuma-data:/app/data
+    ports:
+      - "3001:3001"
+    networks:
+      - datasens-network
+    restart: unless-stopped
+
   # Grafana - Visualization
   grafana:
     image: grafana/grafana:latest
@@ -114,6 +126,7 @@ volumes:
   prometheus-data:
   grafana-data:
   mongodb-data:
+  uptime-kuma-data:
 
 networks:
   datasens-network:
