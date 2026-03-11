@@ -4,7 +4,7 @@ Security Module - JWT & Password Hashing
 Service pour JWT tokens et hashage de mots de passe (SRP)
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import bcrypt
 from jose import JWTError, jwt
@@ -75,9 +75,9 @@ class SecurityService:
         """
         to_encode = data.copy()
         if expires_delta:
-            expire = datetime.now(UTC) + expires_delta
+            expire = datetime.now(timezone.utc) + expires_delta
         else:
-            expire = datetime.now(UTC) + timedelta(minutes=self.access_token_expire_minutes)
+            expire = datetime.now(timezone.utc) + timedelta(minutes=self.access_token_expire_minutes)
 
         to_encode.update({"exp": expire})
         encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)

@@ -169,8 +169,8 @@ def main() -> None:
     annex_catalog_json.write_text(config_json, encoding="utf-8")
     print(f"OK Veille générée (MD): {output_path_md}")
     print(f"OK Veille générée (JSON): {output_path_json}")
-    print(f"OK Copie annexe jury (MD): {annex_path_md}")
-    print(f"OK Copie annexe jury (JSON): {annex_path_json}")
+    print(f"OK Copie annexe dossier (MD): {annex_path_md}")
+    print(f"OK Copie annexe dossier (JSON): {annex_path_json}")
     print(f"OK Annexe sources+mots-clés (MD): {annex_catalog_md}")
     print(f"OK Annexe sources+mots-clés (JSON): {annex_catalog_json}")
 

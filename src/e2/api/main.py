@@ -5,6 +5,7 @@ Application FastAPI principale avec tous les routers
 """
 
 from fastapi import FastAPI
+from fastapi.openapi.docs import get_redoc_html
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
@@ -36,7 +37,7 @@ def create_app() -> FastAPI:
         description="API REST avec authentification et contrôle d'accès par zone (RAW/SILVER/GOLD)",
         version="0.1.0",
         docs_url="/docs",
-        redoc_url="/redoc",
+        redoc_url=None,
         openapi_url="/openapi.json",
     )
 
@@ -77,6 +78,15 @@ def create_app() -> FastAPI:
     async def metrics():
         """Prometheus metrics endpoint"""
         return Response(content=get_metrics(), media_type="text/plain")
+
+    @app.get("/redoc", include_in_schema=False)
+    async def redoc_html():
+        """ReDoc UI with stable JS bundle URL."""
+        return get_redoc_html(
+            openapi_url=app.openapi_url,
+            title=f"{app.title} - ReDoc",
+            redoc_js_url="https://unpkg.com/redoc@2.1.3/bundles/redoc.standalone.js",
+        )
 
     return app
 

@@ -7,6 +7,7 @@ Endpoints pour analyses Big Data avec PySpark
 import math
 from datetime import date
 
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
@@ -184,6 +185,80 @@ class DriftMetricsResponse(BaseModel):
     articles_total: int
 
 
+def _compute_drift_with_pandas(target_date: date | None = None) -> DriftMetricsResponse:
+    """
+    Fallback local sans Spark (utile si Java/Spark indisponible).
+    Lit les partitions GOLD Parquet avec pandas.
+    """
+    from pathlib import Path
+
+    from src.config import get_data_dir
+
+    base_path = Path(get_data_dir()) / "gold"
+    if target_date:
+        partition = base_path / f"date={target_date:%Y-%m-%d}" / "articles.parquet"
+        if not partition.exists():
+            raise FileNotFoundError(
+                f"Parquet GOLD not found for date {target_date:%Y-%m-%d} at {partition}"
+            )
+        partitions = [partition]
+    else:
+        partitions = list(base_path.glob("date=*/articles.parquet"))
+        if not partitions:
+            raise FileNotFoundError(f"No Parquet GOLD partitions found in {base_path}")
+
+    frames = [pd.read_parquet(path) for path in partitions]
+    pdf = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    total = len(pdf)
+    if total == 0:
+        return DriftMetricsResponse(
+            sentiment_entropy=0.0, topic_dominance=0.0, drift_score=0.0, articles_total=0
+        )
+
+    sentiment_col = "sentiment" if "sentiment" in pdf.columns else None
+    if sentiment_col:
+        sentiment_counts = (
+            pdf[sentiment_col].fillna("inconnu").astype(str).value_counts(dropna=False).to_dict()
+        )
+    else:
+        sentiment_counts = {}
+
+    probs = [count / total for count in sentiment_counts.values() if count > 0]
+    entropy = 0.0
+    if probs:
+        for p in probs:
+            entropy -= p * math.log2(p)
+        entropy_max = math.log2(max(len(probs), 1))
+        entropy_norm = entropy / entropy_max if entropy_max > 0 else 0.0
+    else:
+        entropy_norm = 0.0
+
+    topic_series = None
+    if "topic_1" in pdf.columns:
+        topic_series = pdf["topic_1"]
+    elif "topic" in pdf.columns:
+        topic_series = pdf["topic"]
+    elif "topics" in pdf.columns:
+        topics = pdf["topics"].dropna()
+        if not topics.empty:
+            topic_series = topics.astype(str).str.split(",").str[0].str.strip()
+
+    dominance = 0.0
+    if topic_series is not None:
+        value_counts = topic_series.dropna().astype(str).value_counts()
+        if not value_counts.empty:
+            dominance = float(value_counts.max() / total)
+
+    drift_val = (1 - entropy_norm) * 0.5 + dominance * 0.5
+
+    return DriftMetricsResponse(
+        sentiment_entropy=round(entropy, 4),
+        topic_dominance=round(dominance, 4),
+        drift_score=round(drift_val, 4),
+        articles_total=total,
+    )
+
+
 @router.get("/drift-metrics", response_model=DriftMetricsResponse)
 async def get_drift_metrics(
     target_date: date | None = Query(None, description="Date (optionnel)"),
@@ -252,7 +327,19 @@ async def get_drift_metrics(
             drift_score=round(drift_val, 4),
             articles_total=total,
         )
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=f"Parquet GOLD not found: {e!s}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error computing drift: {e!s}")
+    except Exception as spark_error:
+        # Fallback robuste pour environnements démo/école sans Java Spark
+        try:
+            fallback = _compute_drift_with_pandas(target_date=target_date)
+            drift_sentiment_entropy.set(fallback.sentiment_entropy)
+            drift_topic_dominance.set(fallback.topic_dominance)
+            drift_score.set(fallback.drift_score)
+            drift_articles_total.set(fallback.articles_total)
+            return fallback
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=404, detail=f"Parquet GOLD not found: {e!s}") from e
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error computing drift (Spark: {spark_error!s}; fallback: {e!s})",
+            ) from e

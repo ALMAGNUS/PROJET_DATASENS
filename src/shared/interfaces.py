@@ -13,6 +13,7 @@ from datetime import date as date_module
 from pathlib import Path
 
 import pandas as pd
+from pandas.errors import EmptyDataError
 
 
 class E1DataReader(ABC):
@@ -110,7 +111,23 @@ class E1DataReaderImpl(E1DataReader):
             if not csv_path.exists():
                 raise FileNotFoundError(f"RAW data not found for date {date_str}")
 
-        return pd.read_csv(csv_path)
+        try:
+            return pd.read_csv(csv_path)
+        except EmptyDataError:
+            # CSV présent mais vide: retourner un DataFrame vide compatible API
+            return pd.DataFrame(
+                columns=[
+                    "raw_data_id",
+                    "source_id",
+                    "source_name",
+                    "title",
+                    "content",
+                    "url",
+                    "published_at",
+                    "collected_at",
+                    "quality_score",
+                ]
+            )
 
     def read_silver_data(self, date: str | None = None) -> pd.DataFrame:
         """Lit SILVER depuis data/silver/v_YYYY-MM-DD/silver_articles.parquet"""
