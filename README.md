@@ -545,7 +545,36 @@ Le mode `--full` enleve les bornes d'echantillonnage et relance un entrainement 
 
 ---
 
+## Journal de session (2026-03-09)
+
+### Stabilisation technique E2
+
+- Endpoint drift rendu resilient: `GET /api/v1/analytics/drift-metrics` bascule automatiquement sur un calcul `pandas` si Spark/Java n'est pas disponible.
+- Lecture RAW durcie: un `raw_articles.csv` vide ne provoque plus de 500 (schema vide compatible API renvoye).
+- Documentation API maintenue accessible via:
+  - `http://localhost:8001/redoc`
+  - `http://localhost:8001/openapi.json`
+
+### Industrialisation E3
+
+- Quality gate E3 ajoute:
+  - `tests/test_e3_quality_gate.py`
+  - `scripts/run_e3_quality_gate.py`
+  - `.github/workflows/e3-quality-gate.yml`
+- Commande locale:
+
+```bash
+python scripts/run_e3_quality_gate.py
+```
+
+### Consolidation documentation de soutenance
+
+- E2 structure dans `docs/e2/` avec annexes de preuves/captures/demo.
+- E3 structure dans `docs/e3/` avec dossier principal et annexes prêtes soutenance.
+
+---
+
 **Last Updated:** March 9, 2026  
-**Version:** 1.5.1  
+**Version:** 1.5.2  
 **Status:** Production Ready  
-E1/E2/E3 bouclés. GoldAI merge opérationnel. Doc audit E1–E5 couverte.
+E1/E2/E3 boucles. GoldAI merge operationnel. Quality gates E2/E3 et docs de soutenance structures.

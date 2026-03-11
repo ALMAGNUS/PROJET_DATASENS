@@ -9,6 +9,23 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### E2/E3 - consolidation des preuves de soutenance (2026-03-09)
+
+- Fiabilisation API E2 pour la demo:
+  - gestion du cas `raw_articles.csv` vide dans `src/shared/interfaces.py` (retour DataFrame vide compatible, plus de 500),
+  - fallback `pandas` ajoute dans `src/e2/api/routes/analytics.py` pour `/api/v1/analytics/drift-metrics` quand Spark/Java est indisponible.
+- Mise en place d'un quality gate E3 executable localement et en CI:
+  - tests cibles `tests/test_e3_quality_gate.py` (RAW vide, fallback drift, contrat predict, exposition metrics),
+  - script `scripts/run_e3_quality_gate.py`,
+  - workflow `.github/workflows/e3-quality-gate.yml`.
+- Structuration documentaire E3 dans `docs/e3/`:
+  - dossier principal `DOSSIER_E3_A4_A5_C9_C10_C11_C12_C13.md`,
+  - annexes de preuves, captures et plan demo 15 min.
+- Consolidation documentaire E2 dans `docs/e2/`:
+  - ajout d'un index `README.md` orientant les pieces de soutenance vs supports techniques,
+  - creation des annexes `ANNEXE_6`, `ANNEXE_7`, `ANNEXE_10`, `ANNEXE_11`, `ANNEXE_12`,
+  - mise a jour du dossier principal E2 pour referencer les annexes 10 a 12.
+
 ### E2 - fiabilisation training/benchmark (CPU-first)
 
 - Ajout d'une normalisation robuste des labels sentiment dans `scripts/create_ia_copy.py` avant generation des splits `train/val/test` (`négatif`, `neutre`, `positif`), y compris gestion des variantes d'encodage.
