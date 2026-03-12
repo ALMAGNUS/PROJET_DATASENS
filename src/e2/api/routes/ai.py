@@ -187,31 +187,183 @@ async def ml_sentiment_goldai(
 
 
 # --- Local HF + Insights (Cockpit Streamlit) ---
+def _build_data_context(theme: str) -> str:
+    """
+    Construit un contexte de données réel depuis GoldAI pour alimenter le prompt Mistral.
+    Retourne un bloc texte résumant les données récentes selon le thème demandé.
+    """
+    import json
+    from pathlib import Path
+    import pandas as pd
+
+    context_lines: list[str] = []
+    try:
+        project_root = Path(__file__).resolve().parents[4]
+        goldai_path = project_root / "data" / "goldai" / "merged_all_dates.parquet"
+        if not goldai_path.exists():
+            # Fallback: dernier GOLD disponible
+            gold_dir = project_root / "data" / "gold"
+            if gold_dir.exists():
+                for d in sorted(gold_dir.iterdir(), reverse=True):
+                    if d.is_dir() and d.name.startswith("date="):
+                        p = d / "articles.parquet"
+                        if p.exists():
+                            goldai_path = p
+                            break
+
+        if not goldai_path.exists():
+            return "Aucune donnée disponible dans le dataset."
+
+        df = pd.read_parquet(goldai_path)
+
+        # Filtrer par thème si possible
+        THEME_KEYWORDS = {
+            "politique": ["politiqu", "gouvern", "election", "president", "parti", "senat", "assemblee", "ministre"],
+            "financier": ["financ", "economie", "econom", "bourse", "marche", "inflation", "bce", "fed", "taux", "banque"],
+            "utilisateurs": [],
+        }
+        kws = THEME_KEYWORDS.get(theme.lower(), [])
+        df_theme = df
+        if kws and "topic_1" in df.columns:
+            mask = df["topic_1"].astype(str).str.lower().str.contains("|".join(kws), na=False)
+            if "title" in df.columns:
+                mask |= df["title"].astype(str).str.lower().str.contains("|".join(kws), na=False)
+            if mask.sum() > 10:
+                df_theme = df[mask]
+
+        total = len(df_theme)
+        context_lines.append(f"Dataset analysé : {total:,} articles (thème : {theme})")
+
+        # Sentiment distribution
+        if "sentiment" in df_theme.columns:
+            sv = df_theme["sentiment"].value_counts()
+            sent_str = " | ".join(f"{k}: {v} ({v/total:.0%})" for k, v in sv.items())
+            context_lines.append(f"Répartition sentiment : {sent_str}")
+            if "sentiment_score" in df_theme.columns:
+                mean_score = df_theme["sentiment_score"].mean()
+                context_lines.append(f"Score sentiment moyen : {mean_score:+.3f} ({'positif' if mean_score > 0.05 else 'négatif' if mean_score < -0.05 else 'neutre'})")
+
+        # Top topics
+        if "topic_1" in df_theme.columns:
+            top_topics = df_theme["topic_1"].dropna().value_counts().head(8)
+            topics_str = " | ".join(f"{t}: {n}" for t, n in top_topics.items())
+            context_lines.append(f"Topics principaux : {topics_str}")
+
+        # Top sources
+        if "source" in df_theme.columns:
+            top_srcs = df_theme["source"].dropna().value_counts().head(5)
+            srcs_str = " | ".join(f"{s}: {n}" for s, n in top_srcs.items())
+            context_lines.append(f"Sources principales : {srcs_str}")
+
+        # Articles récents (titres)
+        recent_cols = [c for c in ["title", "published_at"] if c in df_theme.columns]
+        if recent_cols and "published_at" in df_theme.columns:
+            recent = df_theme.sort_values("published_at", ascending=False).head(5)
+            titles = [str(r.get("title", ""))[:120] for _, r in recent.iterrows() if str(r.get("title", "")).strip()]
+            if titles:
+                context_lines.append("Articles récents :")
+                for t in titles:
+                    sentiment_tag = ""
+                    if "sentiment" in df_theme.columns:
+                        row_sent = recent[recent.get("title", pd.Series()) == t]["sentiment"] if "title" in recent.columns else pd.Series()
+                    context_lines.append(f"  - {t}")
+
+        # Tendance récente vs ancienne (si dates disponibles)
+        if "published_at" in df_theme.columns and "sentiment_score" in df_theme.columns:
+            try:
+                df_theme = df_theme.copy()
+                df_theme["_d"] = pd.to_datetime(df_theme["published_at"], errors="coerce")
+                df_theme = df_theme.dropna(subset=["_d"])
+                median_date = df_theme["_d"].median()
+                score_recent = df_theme[df_theme["_d"] >= median_date]["sentiment_score"].mean()
+                score_old = df_theme[df_theme["_d"] < median_date]["sentiment_score"].mean()
+                trend = "en hausse" if score_recent > score_old + 0.05 else ("en baisse" if score_recent < score_old - 0.05 else "stable")
+                context_lines.append(f"Tendance sentiment : {trend} (récent={score_recent:+.3f} vs ancien={score_old:+.3f})")
+            except Exception:
+                pass
+
+    except Exception as exc:
+        context_lines.append(f"(Contexte données partiellement disponible : {exc!s})")
+
+    return "\n".join(context_lines)
+
+
+def _get_mistral_analysis_paragraphs(data_context: str, theme: str) -> str:
+    """
+    Demande à Mistral de produire un paragraphe d'analyse politique et un paragraphe
+    d'analyse financière du dataset. Enrichit le contexte pour des réponses plus pertinentes.
+    """
+    service = get_mistral_service()
+    if not service.is_available():
+        return ""
+
+    prompt_analysis = (
+        "À partir des données dataset ci-dessous, rédige deux courts paragraphes distincts :\n"
+        "1. **Analyse politique** : tendances, sujets dominants, sentiment sur le gouvernement/partis (max 80 mots)\n"
+        "2. **Analyse financière** : tendances économiques, marchés, indicateurs clés (max 80 mots)\n\n"
+        "Données :\n" + data_context[:4000]
+    )
+    try:
+        analysis = service.chat(
+            message=prompt_analysis,
+            system_prompt=(
+                "Tu es un analyste expert. Réponds uniquement en français. "
+                "Sois factuel, cite les chiffres du dataset. Pas d'introduction ni de conclusion."
+            ),
+        )
+        return f"\n\n--- Synthèse Mistral (analyse politique + financière) ---\n{analysis.strip()}\n"
+    except Exception:
+        return ""
+
+
 def _insight_reply(theme: str, message: str) -> str:
     """
-    Genere une reponse pour le chat insights.
-    Peut etre etendue avec Mistral/LLM (config.mistral_api_key).
+    Génère une réponse d'analyse client via Mistral, enrichie du contexte GoldAI.
     """
     theme_labels = {
-        "utilisateurs": "insights utilisateurs (comportement, satisfaction, personas)",
-        "financier": "insights financiers (marche, tendances, indicateurs)",
-        "politique": "insights politiques (veille, tendances, analyse)",
+        "utilisateurs": "analyse des comportements et satisfaction utilisateurs",
+        "financier": "analyse financière et économique (marchés, indicateurs, tendances)",
+        "politique": "veille politique et analyse des tendances politiques françaises",
     }
     label = theme_labels.get(theme.lower(), theme)
     settings = get_settings()
-    if settings.mistral_api_key:
-        # Placeholder: integration Mistral a implementer
+
+    if not settings.mistral_api_key:
         return (
-            f"[Theme: {label}]\n\n"
-            f"Votre question : « {message[:500]} »\n\n"
-            "Reponse synthetique (integration Mistral a brancher ici)."
+            f"**Assistant DataSens — {label}**\n\n"
+            f"Question : {message[:500]}\n\n"
+            "Configurez `MISTRAL_API_KEY` dans `.env` pour activer les réponses IA."
         )
-    return (
-        f"[Theme: {label}]\n\n"
-        f"Vous avez demande : « {message[:500]} »\n\n"
-        "Reponse synthetique basee sur les donnees DataSens. "
-        "Pour des reponses generees par IA, configurez MISTRAL_API_KEY et branchez le service Mistral."
-    )
+
+    try:
+        data_context = _build_data_context(theme)
+
+        # Enrichissement : paragraphe d'analyse politique et financière par Mistral
+        mistral_analysis = _get_mistral_analysis_paragraphs(data_context, theme)
+        full_context = data_context + (mistral_analysis if mistral_analysis else "")
+
+        system_prompt = (
+            f"Tu es un assistant expert en analyse de données pour DataSens, "
+            f"une plateforme d'analyse de sentiment et de veille pour des clients professionnels "
+            f"(journalistes, analystes politiques, équipes financières).\n\n"
+            f"Tu as accès aux données suivantes extraites du dataset GoldAI (articles enrichis) "
+            f"et à une synthèse d'analyse politique et financière :\n\n"
+            f"{full_context}\n\n"
+            f"Ton rôle : répondre à la question du client en t'appuyant sur ces données réelles "
+            f"et sur l'analyse politique/financière fournie. Sois précis, professionnel et actionnable. "
+            f"Réponds en français. Si les données ne permettent pas de répondre précisément, indique-le clairement. "
+            f"Cite les chiffres clés du dataset quand c'est pertinent. "
+            f"Limite ta réponse à 300 mots maximum."
+        )
+
+        service = get_mistral_service()
+        return service.chat(message=message, system_prompt=system_prompt)
+
+    except Exception as exc:
+        return (
+            f"**Erreur Mistral** : {exc!s}\n\n"
+            "Vérifiez que l'API Mistral est accessible et que la clé est valide."
+        )
 
 
 def _resolve_sentiment_model(choice: str) -> str:

@@ -68,6 +68,8 @@ openai==1.54.0  # Alternative/compatible API client
 # ============================================================
 scikit-learn>=1.7,<1.8
 transformers>=4.46.0
+accelerate>=0.26.0  # Requis par Trainer (fine-tuning)
+datasets>=4.0.0  # Hugging Face datasets (fine-tuning sentiment)
 torch>=2.6,<2.8
 sentencepiece>=0.2.1  # Tokenization for French models
 tokenizers>=0.20,<0.22

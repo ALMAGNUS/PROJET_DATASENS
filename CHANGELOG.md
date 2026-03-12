@@ -9,6 +9,16 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### E2 - Fine-tuning sentiment_fr, Mistral, filtres topics (2026-03-12)
+
+- **Fine-tuning** : Backbone recommandé `sentiment_fr` (ac0hik, CamemBERT sentiment FR) — meilleur benchmark 57–64 %. Détection automatique du modèle fine-tuné via `SENTIMENT_FINETUNED_MODEL_PATH` ou chemins `sentiment_fr-sentiment-finetuned` / `camembert-sentiment-finetuned`.
+- **Filtre topics** : Options `--topics finance,politique` dans `create_ia_copy.py` et `finetune_sentiment.py` pour entraîner sur articles ciblés (veille). Exposé dans Streamlit Pilotage (checkboxes).
+- **Mistral** : Enrichissement du prompt système avec paragraphe d'analyse politique et financière généré par Mistral à partir du dataset.
+- **Streamlit** : Correction bug exemples financiers (affichage correct selon thème sélectionné).
+- **Dépendances** : `datasets`, `accelerate>=0.26.0` ajoutés à `requirements.txt` pour le fine-tuning.
+- **Script** : `scripts/run_benchmark_et_plots.bat` — benchmark + plots en une commande.
+- **Figures** : Label "Fine-tuné local (projet)" générique dans `plot_e2_results.py`.
+
 ### E2/E3 - consolidation des preuves de soutenance (2026-03-09)
 
 - Fiabilisation API E2 pour la demo:

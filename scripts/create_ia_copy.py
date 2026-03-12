@@ -34,11 +34,30 @@ def normalize_sentiment_label(value: object) -> str:
     return "neutre"
 
 
+def _filter_by_topics(df: pd.DataFrame, topics: list[str]) -> pd.DataFrame:
+    """Filtre les lignes où topic_1 ou topic_2 est dans la liste des topics autorisés."""
+    if "topic_1" not in df.columns and "topic_2" not in df.columns:
+        return df
+    allowed = {t.strip().lower() for t in topics if t.strip()}
+    if not allowed:
+        return df
+    t1 = df.get("topic_1", pd.Series(dtype=object)).fillna("").astype(str).str.strip().str.lower()
+    t2 = df.get("topic_2", pd.Series(dtype=object)).fillna("").astype(str).str.strip().str.lower()
+    mask = t1.isin(allowed) | t2.isin(allowed)
+    return df[mask].reset_index(drop=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Copie IA avec split train/val/test")
     parser.add_argument("--train", type=float, default=0.8, help="Fraction train (défaut 0.8)")
     parser.add_argument("--val", type=float, default=0.1, help="Fraction validation (défaut 0.1)")
     parser.add_argument("--test", type=float, default=0.1, help="Fraction test (défaut 0.1)")
+    parser.add_argument(
+        "--topics",
+        type=str,
+        default="",
+        help="Filtrer par topics (ex: finance,politique). Vide = toutes les données. Améliore la restitution veille.",
+    )
     args = parser.parse_args()
 
     tot = args.train + args.val + args.test
@@ -70,6 +89,17 @@ def main() -> int:
     df["sentiment"] = df["sentiment"].apply(normalize_sentiment_label)
     dist = df["sentiment"].value_counts().to_dict()
     print(f"  Distribution sentiment normalisée: {dist}")
+
+    # Filtre par topics (finance, politique) pour veille ciblée
+    if args.topics:
+        topics_list = [t.strip() for t in args.topics.split(",") if t.strip()]
+        if topics_list:
+            n_before = len(df)
+            df = _filter_by_topics(df, topics_list)
+            n_after = len(df)
+            print(f"  Filtre topics [{', '.join(topics_list)}]: {n_before:,} → {n_after:,} lignes")
+            if n_after < 100:
+                print(f"  ATTENTION: Peu d'exemples ({n_after}). Vérifiez que topic_1/topic_2 existent dans merged_all_dates.parquet.")
 
     ia_dir.mkdir(parents=True, exist_ok=True)
 

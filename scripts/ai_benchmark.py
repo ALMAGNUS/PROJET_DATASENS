@@ -14,8 +14,11 @@ from pathlib import Path
 
 
 BASE_MODELS = {
-    "camembert_distil": "cmarkea/distilcamembert-base-sentiment",
+    # BERT multilingue 5★ (1-2→neg, 3→neu, 4-5→pos) — PyTorch, pas CamemBERT
+    "bert_multilingual": "nlptown/bert-base-multilingual-uncased-sentiment",
+    # XLM-RoBERTa Twitter multilingue
     "flaubert_multilingual": "cardiffnlp/twitter-xlm-roberta-base-sentiment-multilingual",
+    # Modèle FR dédié presse/opinion (ac0hik)
     "sentiment_fr": "ac0hik/Sentiment_Analysis_French",
 }
 
@@ -287,9 +290,24 @@ def parse_args() -> argparse.Namespace:
 
 def get_available_models(project_root: Path) -> dict[str, str]:
     models = dict(BASE_MODELS)
-    local_ft = project_root / "models" / "camembert-sentiment-finetuned"
-    if (local_ft / "config.json").exists():
-        models["finetuned_local"] = str(local_ft)
+    # Priorité : config .env > sentiment_fr (meilleur bench) > camembert
+    try:
+        from src.config import get_settings
+        cfg = get_settings()
+        if cfg.sentiment_finetuned_model_path:
+            p = Path(cfg.sentiment_finetuned_model_path)
+            if not p.is_absolute():
+                p = project_root / p
+            if (p / "config.json").exists():
+                models["finetuned_local"] = str(p.resolve())
+                return models
+    except Exception:
+        pass
+    for preferred in ["sentiment_fr-sentiment-finetuned", "camembert-sentiment-finetuned"]:
+        local_ft = project_root / "models" / preferred
+        if (local_ft / "config.json").exists():
+            models["finetuned_local"] = str(local_ft)
+            break
     return models
 
 
