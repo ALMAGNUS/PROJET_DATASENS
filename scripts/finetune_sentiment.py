@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 """
-Fine-tuning CamemBERT/FlauBERT pour l'analyse de sentiment (3 classes).
+Fine-tuning CamemBERT / FlauBERT / sentiment_fr pour l'analyse de sentiment (3 classes).
 Utilise la copie IA (train/val) préparée par create_ia_copy.py.
-Usage: python scripts/finetune_sentiment.py [--model camembert|flaubert] [--epochs 3] [--batch-size 16]
+Usage: python scripts/finetune_sentiment.py [--model camembert|flaubert|sentiment_fr] [--epochs 3] [--batch-size 16]
+
+Classement benchmark pré-entraîné (données projet):
+  1. sentiment_fr  (ac0hik/Sentiment_Analysis_French) — accuracy 57.5%, f1_macro 0.570 ← RECOMMANDÉ
+  2. finetuned_local                                  — accuracy 54.2%, f1_macro 0.440 (mais f1_pos=0 sans class_weight)
+  3. flaubert                                         — accuracy 42.5%, f1_macro 0.396
+  4. camembert_distil                                 — accuracy 32.9%, f1_macro 0.235
 """
 from __future__ import annotations
 
@@ -13,15 +19,19 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
+import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, f1_score
+from sklearn.utils.class_weight import compute_class_weight
 
 from src.config import get_settings
 
 # Modèles HuggingFace compatibles (sequence classification 3 classes)
 HF_MODELS = {
-    "camembert": "cmarkea/distilcamembert-base",  # Plus léger, rapide
-    "flaubert": "flaubert/flaubert_base_uncased",  # FlauBERT français
+    "sentiment_fr": "ac0hik/Sentiment_Analysis_French",  # MEILLEUR benchmark FR — recommandé
+    "bert_multilingual": "nlptown/bert-base-multilingual-uncased-sentiment",  # BERT 5★, pas CamemBERT
+    "camembert": "cmarkea/distilcamembert-base",         # Léger, rapide, bon sur CPU
+    "flaubert": "flaubert/flaubert_base_uncased",       # FlauBERT français
 }
 
 LABEL2ID = {"négatif": 0, "neutre": 1, "positif": 2}
@@ -51,6 +61,19 @@ def load_ia_dataset(ia_dir: Path, split: str) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"Copie IA introuvable: {path}. Lancez: python scripts/create_ia_copy.py")
     return pd.read_parquet(path)
+
+
+def _filter_by_topics(df: pd.DataFrame, topics: list[str]) -> pd.DataFrame:
+    """Filtre les lignes où topic_1 ou topic_2 est dans la liste des topics autorisés."""
+    if not topics or ("topic_1" not in df.columns and "topic_2" not in df.columns):
+        return df
+    allowed = {t.strip().lower() for t in topics if t.strip()}
+    if not allowed:
+        return df
+    t1 = df.get("topic_1", pd.Series(dtype=object)).fillna("").astype(str).str.strip().str.lower()
+    t2 = df.get("topic_2", pd.Series(dtype=object)).fillna("").astype(str).str.strip().str.lower()
+    mask = t1.isin(allowed) | t2.isin(allowed)
+    return df[mask].reset_index(drop=True)
 
 
 def prepare_text(df: pd.DataFrame) -> tuple[list[str], list[int]]:
@@ -90,9 +113,9 @@ def main() -> int:
     )
     parser.add_argument(
         "--model",
-        choices=["camembert", "flaubert"],
-        default="camembert",
-        help="Modèle de base (défaut: camembert)",
+        choices=["sentiment_fr", "bert_multilingual", "camembert", "flaubert"],
+        default="sentiment_fr",
+        help="Backbone à fine-tuner: sentiment_fr (RECOMMANDÉ — meilleur benchmark 57.5%), camembert (léger/CPU), flaubert (FR)",
     )
     parser.add_argument("--epochs", type=int, default=3, help="Nombre d'epochs (défaut: 3)")
     parser.add_argument("--batch-size", type=int, default=16, help="Batch size (défaut: 16)")
@@ -126,6 +149,12 @@ def main() -> int:
         default=0,
         help="Limiter le nombre d'exemples validation (0 = tous).",
     )
+    parser.add_argument(
+        "--topics",
+        type=str,
+        default="",
+        help="Filtrer par topics (ex: finance,politique). Vide = toutes. Améliore restitution veille.",
+    )
     args = parser.parse_args()
 
     settings = get_settings()
@@ -143,6 +172,15 @@ def main() -> int:
     print("Chargement copie IA (train/val)...")
     train_df = load_ia_dataset(ia_dir, "train")
     val_df = load_ia_dataset(ia_dir, "val")
+
+    # Filtre par topics (finance, politique) pour veille ciblée
+    if args.topics:
+        topics_list = [t.strip() for t in args.topics.split(",") if t.strip()]
+        if topics_list:
+            n_train_before, n_val_before = len(train_df), len(val_df)
+            train_df = _filter_by_topics(train_df, topics_list)
+            val_df = _filter_by_topics(val_df, topics_list)
+            print(f"  Filtre topics [{', '.join(topics_list)}]: train {n_train_before:,}→{len(train_df):,}, val {n_val_before:,}→{len(val_df):,}")
 
     train_texts, train_labels = prepare_text(train_df)
     val_texts, val_labels = prepare_text(val_df)
@@ -186,6 +224,15 @@ def main() -> int:
         print(f"ERREUR: Dépendances manquantes. pip install transformers datasets - {e}")
         return 1
 
+    # --- Calcul des class weights (correctif déséquilibre: positif=13%) ---
+    label_array = np.array(train_labels)
+    classes = np.array([0, 1, 2])
+    raw_weights = compute_class_weight("balanced", classes=classes, y=label_array)
+    class_weights_np = raw_weights
+    dist = {ID2LABEL[c]: int((label_array == c).sum()) for c in classes}
+    print(f"\nDistribution classes (train): {dist}")
+    print(f"Class weights auto: {[f'{ID2LABEL[i]}={w:.2f}' for i, w in enumerate(class_weights_np)]}")
+
     model_name = HF_MODELS[args.model]
     output_dir = args.output_dir or f"models/{args.model}-sentiment-finetuned"
     output_path = Path(output_dir)
@@ -201,6 +248,7 @@ def main() -> int:
         num_labels=3,
         id2label=ID2LABEL,
         label2id=LABEL2ID,
+        ignore_mismatched_sizes=True,  # Nécessaire pour sentiment_fr (head remplacé)
     )
 
     def tokenize_fn(examples):
@@ -228,16 +276,28 @@ def main() -> int:
         desc="Tokenize val",
     )
 
-    # Renommer pour Trainer (input_ids, attention_mask, label)
     train_ds.set_format(type="torch", columns=["input_ids", "attention_mask", "label"])
     val_ds.set_format(type="torch", columns=["input_ids", "attention_mask", "label"])
 
     if args.eval_only:
-        if not (output_path / "config.json").exists():
-            print(f"Modèle fine-tuné introuvable dans {output_path}. Lancez sans --eval-only.")
+        # Pour eval-only : priorité config > output_path par défaut
+        eval_path = output_path
+        if settings.sentiment_finetuned_model_path:
+            p = Path(settings.sentiment_finetuned_model_path)
+            if not p.is_absolute():
+                p = project_root / p
+            if (p / "config.json").exists():
+                eval_path = p
+        if not (eval_path / "config.json").exists():
+            for fallback in ["sentiment_fr-sentiment-finetuned", "camembert-sentiment-finetuned"]:
+                fb = project_root / "models" / fallback
+                if (fb / "config.json").exists():
+                    eval_path = fb
+                    break
+        if not (eval_path / "config.json").exists():
+            print(f"Modèle fine-tuné introuvable. Vérifiez SENTIMENT_FINETUNED_MODEL_PATH ou lancez le fine-tuning.")
             return 1
-        # Évaluation avec pipeline
-        import torch
+        output_path = eval_path
         from transformers import pipeline
         device = 0 if torch.cuda.is_available() else -1
         pipe = pipeline(
@@ -253,8 +313,11 @@ def main() -> int:
             preds.append(LABEL2ID.get(lbl, 1))
         n_eval = min(500, len(val_labels))
         acc = accuracy_score(val_labels[:n_eval], preds)
-        f1 = f1_score(val_labels[:n_eval], preds, average="weighted")
-        print(f"Val accuracy ({n_eval} ex.): {acc:.2%} | F1 weighted: {f1:.4f}")
+        f1_w = f1_score(val_labels[:n_eval], preds, average="weighted")
+        f1_m = f1_score(val_labels[:n_eval], preds, average="macro")
+        f1_pc = f1_score(val_labels[:n_eval], preds, average=None, labels=[0, 1, 2])
+        print(f"Val accuracy ({n_eval} ex.): {acc:.2%} | F1 weighted: {f1_w:.4f} | F1 macro: {f1_m:.4f}")
+        print(f"F1 per class: négatif={f1_pc[0]:.3f}, neutre={f1_pc[1]:.3f}, positif={f1_pc[2]:.3f}")
         return 0
 
     training_args = TrainingArguments(
@@ -269,7 +332,7 @@ def main() -> int:
         eval_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
-        metric_for_best_model="f1",
+        metric_for_best_model="f1_macro",
         greater_is_better=True,
         report_to="none",
         dataloader_pin_memory=torch.cuda.is_available(),
@@ -279,12 +342,35 @@ def main() -> int:
         preds, labels = eval_pred
         preds = preds.argmax(axis=-1)
         acc = accuracy_score(labels, preds)
-        f1 = f1_score(labels, preds, average="weighted")
-        return {"accuracy": acc, "f1": f1}
+        f1_w = f1_score(labels, preds, average="weighted")
+        f1_m = f1_score(labels, preds, average="macro")
+        f1_pc = f1_score(labels, preds, average=None, labels=[0, 1, 2])
+        return {
+            "accuracy": acc,
+            "f1": f1_w,
+            "f1_macro": f1_m,
+            "f1_neg": float(f1_pc[0]),
+            "f1_neu": float(f1_pc[1]),
+            "f1_pos": float(f1_pc[2]),
+        }
 
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer, padding=True)
 
-    trainer = Trainer(
+    # Trainer avec class weights pour corriger le déséquilibre (positif sous-représenté)
+    class_weights_tensor = torch.tensor(class_weights_np, dtype=torch.float)
+
+    class WeightedTrainer(Trainer):
+        """Trainer avec CrossEntropyLoss pondérée par classe."""
+        def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+            labels = inputs.get("labels")
+            outputs = model(**inputs)
+            logits = outputs.get("logits")
+            weight = class_weights_tensor.to(logits.device)
+            loss_fn = torch.nn.CrossEntropyLoss(weight=weight)
+            loss = loss_fn(logits.view(-1, model.config.num_labels), labels.view(-1))
+            return (loss, outputs) if return_outputs else loss
+
+    trainer = WeightedTrainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,
@@ -294,7 +380,7 @@ def main() -> int:
         compute_metrics=compute_metrics,
     )
 
-    print("\nDémarrage fine-tuning...")
+    print(f"\nDémarrage fine-tuning ({args.model} | {args.epochs} epochs | class weights actifs)...")
     trainer.train()
 
     print("\nSauvegarde modèle...")
@@ -303,9 +389,14 @@ def main() -> int:
 
     # Métriques finales sur val
     eval_res = trainer.evaluate()
-    print(f"\nRésultats validation: accuracy={eval_res.get('eval_accuracy', 0):.2%}, f1={eval_res.get('eval_f1', 0):.4f}")
+    acc = eval_res.get("eval_accuracy", 0)
+    f1m = eval_res.get("eval_f1_macro", 0)
+    f1w = eval_res.get("eval_f1", 0)
+    f1p = eval_res.get("eval_f1_pos", 0)
+    print(f"\nRésultats val: accuracy={acc:.2%} | F1 macro={f1m:.4f} | F1 weighted={f1w:.4f} | F1 positif={f1p:.4f}")
     print(f"Modèle sauvegardé: {output_path.absolute()}")
-    print("\nPour utiliser ce modèle: définir SENTIMENT_FINETUNED_MODEL_PATH dans .env")
+    print(f"\nPour utiliser ce modèle, ajoutez dans .env :")
+    print(f"  SENTIMENT_FINETUNED_MODEL_PATH=models/{args.model}-sentiment-finetuned")
     return 0
 
 
