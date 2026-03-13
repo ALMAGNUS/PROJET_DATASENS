@@ -116,3 +116,10 @@ celerybeat.pid
 # ============================================================
 mlruns/
 mlflow.db
+
+Veille Techno
+# --- Exceptions E2 : annexes de veille à versionner ---
+!docs/
+!docs/e2/
+!docs/e2/ANNEXE_C6_VEILLE_*.json
+!docs/e2/ANNEXE_C6_VEILLE_*.md
