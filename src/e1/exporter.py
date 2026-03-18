@@ -8,6 +8,7 @@ import pandas as pd
 class GoldExporter:
     def __init__(self, base_dir: Path | None = None):
         self.base_dir = base_dir or Path("data/gold")
+        self.silver_dir = Path("data/silver")
         self.export_dir = Path("exports")
         self.export_dir.mkdir(exist_ok=True)
 
@@ -17,11 +18,21 @@ class GoldExporter:
         df.to_csv(csv_file, index=False, encoding="utf-8")
         return {"csv": csv_file, "rows": len(df), "columns": list(df.columns)}
 
-    def export_silver(self, df: pd.DataFrame) -> dict:
-        """Export SILVER: RAW + topics"""
-        csv_file = self.export_dir / "silver.csv"
-        df.to_csv(csv_file, index=False, encoding="utf-8")
-        return {"csv": csv_file, "rows": len(df), "columns": list(df.columns)}
+    def export_silver(self, df: pd.DataFrame, partition_date: date | None = None) -> dict:
+        """Export SILVER : CSV partitionné par date + CSV global."""
+        d = partition_date or date.today()
+
+        # Partition datée en CSV (même convention que RAW)
+        p_path = self.silver_dir / f"date={d:%Y-%m-%d}"
+        p_path.mkdir(parents=True, exist_ok=True)
+        csv_partitioned = p_path / "silver_articles.csv"
+        df.to_csv(csv_partitioned, index=False, encoding="utf-8")
+
+        # CSV global (écrasé, pour compatibilité)
+        csv_global = self.export_dir / "silver.csv"
+        df.to_csv(csv_global, index=False, encoding="utf-8")
+
+        return {"csv": csv_partitioned, "csv_global": csv_global, "rows": len(df), "columns": list(df.columns)}
 
     def export_all(self, df: pd.DataFrame, partition_date: date | None = None) -> dict:
         """Export GOLD: SILVER + sentiment (Parquet + CSV) avec partitionnement par date et source"""
@@ -31,11 +42,14 @@ class GoldExporter:
         p_path = self.base_dir / f"date={d:%Y-%m-%d}"
         p_path.mkdir(parents=True, exist_ok=True)
 
-        # Export global (toutes sources)
+        # Export global (toutes sources) — Parquet + CSV dans la partition
         parquet = p_path / "articles.parquet"
-        csv = self.export_dir / "gold.csv"
+        csv_partitioned = p_path / "articles.csv"
+        csv_global = self.export_dir / "gold.csv"
         df.to_parquet(parquet, index=False, engine="pyarrow")
-        df.to_csv(csv, index=False, encoding="utf-8")
+        df.to_csv(csv_partitioned, index=False, encoding="utf-8")
+        df.to_csv(csv_global, index=False, encoding="utf-8")
+        csv = csv_global
 
         # Partitionnement spécifique ZZDB (isolation données synthétiques)
         if "source" in df.columns:

@@ -18,10 +18,10 @@ rule_files:
 
 # Scrape configurations
 scrape_configs:
-  # DataSens E1 Pipeline Metrics
+  # DataSens E1 Metrics (serveur continu run_e1_metrics.py)
   - job_name: 'datasens-e1'
     static_configs:
-      - targets: ['datasens-e1:8000']
+      - targets: ['datasens-e1-metrics:8000']
     metrics_path: '/metrics'
     scrape_interval: 10s
     scrape_timeout: 5s

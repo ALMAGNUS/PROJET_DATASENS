@@ -54,3 +54,50 @@ groups:
           summary: "Database growth stalled"
           description: "Database is not growing at expected rate"
 
+  # API E2 & Drift (MLOps)
+  - name: datasens_api_drift_alerts
+    interval: 30s
+    rules:
+      # Drift score élevé — envisager réentraînement
+      - alert: DriftScoreHigh
+        expr: datasens_drift_score > 0.7
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Drift score élevé — envisager réentraînement"
+          description: "Drift score = {{ $value }} (seuil 0.7). Vérifier distribution sentiment/topics."
+
+      # Taux d'erreur API élevé
+      - alert: APIHighErrorRate
+        expr: |
+          sum(rate(datasens_e2_api_errors_total[5m])) 
+          / sum(rate(datasens_e2_api_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Taux d'erreur API > 5%"
+          description: "Taux erreurs = {{ $value | humanizePercentage }}"
+
+      # Latence p95 excessive
+      - alert: APIHighLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(datasens_e2_api_request_duration_seconds_bucket[5m])) by (le)) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latence p95 API > 5s"
+          description: "Latence p95 = {{ $value }}s"
+
+      # Échecs authentification (brute-force possible)
+      - alert: APIAuthFailuresHigh
+        expr: sum(rate(datasens_e2_api_authentications_total{status="failed"}[5m])) * 60 > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Échecs auth > 10/min"
+          description: "Tentatives auth échouées = {{ $value }}/min"
+

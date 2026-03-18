@@ -417,7 +417,9 @@ Package `src/e1/` isolé. E2/E3 lisent via `E1DataReader` uniquement — pas de 
 
 **RGPD / sécu** : Registre traitements, procédure tri DP, OWASP Top 10 (dans README_E2_API).
 
-**Monitoring / incidents** : Métriques, seuils, alertes, Prometheus/Grafana, Uptime Kuma, accessibilité. Procédure incidents prête. Guide captures (ReDoc, Prometheus, Grafana) : `docs/E1_CAPTURES_MONITORING.md`. Uptime Kuma est lancé via Docker (`docker-compose` / `start_uptime_kuma.bat`), pas via `pip`.
+**Monitoring / incidents** : Métriques, seuils, alertes, Prometheus/Grafana, Uptime Kuma, accessibilité. Procédure incidents prête. Guide captures (ReDoc, Prometheus, Grafana) : `docs/E1_CAPTURES_MONITORING.md`. Uptime Kuma est lancé via Docker (`docker-compose` / `start_uptime_kuma.bat`), pas via `pip`. **Métriques E1** : service `datasens-e1-metrics` (Docker) ou `python scripts/run_e1_metrics.py` en local.
+
+**Plan de lancement** : `PLANCHE_LANCEMENT.md` — ordre démarrage MLflow, Docker, API, monitoring.
 
 Index complet : `docs/README.md`.
 
@@ -445,7 +447,7 @@ pytest tests/test_spark_integration.py -v
 
 Endpoints : `sentiment/distribution`, `source/aggregation`, `statistics`, `available-dates`.
 
-Phase 4 : FlauBERT/CamemBERT fine-tuning, MLflow.  
+Phase 4 : FlauBERT/CamemBERT fine-tuning, **MLflow** (versioning automatique dans `finetune_sentiment.py`).  
 Phase 5 : Dashboard Streamlit.  
 Phase 6 : Mistral insights.  
 
@@ -543,6 +545,19 @@ Le mode `--full` enleve les bornes d'echantillonnage et relance un entrainement 
 - `docs/e2/AI_REQUIREMENTS.md`
 - `models/camembert-sentiment-finetuned/`
 
+### MLflow — Versioning des modèles
+
+Chaque run de `finetune_sentiment.py` enregistre automatiquement dans MLflow (local `mlruns/`) :
+- **Params** : model, epochs, mode, train/val samples
+- **Metrics** : eval_accuracy, eval_f1_macro, eval_loss, train_runtime_seconds
+- **Artifact** : config.json du modèle
+
+```bash
+# Consulter les runs après entraînement
+mlflow ui
+# → http://localhost:5000
+```
+
 ---
 
 ## Journal de session (2026-03-09)
@@ -575,6 +590,6 @@ python scripts/run_e3_quality_gate.py
 ---
 
 **Last Updated:** March 9, 2026  
-**Version:** 1.5.2  
+**Version:** 1.5.3  
 **Status:** Production Ready  
-E1/E2/E3 boucles. GoldAI merge operationnel. Quality gates E2/E3 et docs de soutenance structures.
+E1/E2/E3 boucles. GoldAI merge operationnel. MLflow versioning. E1-metrics en continu (Docker). Quality gates E2/E3. Docs E5 complètes. **Plan complet** : `PLANCHE_LANCEMENT.md`.

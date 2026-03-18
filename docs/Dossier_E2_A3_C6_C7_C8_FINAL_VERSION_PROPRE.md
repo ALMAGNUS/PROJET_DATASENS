@@ -165,6 +165,8 @@ Tableau détaillé par classe (modèle `finetuned_local` — run v2, backbone se
 
 **Historique v1 → v2 :** Le run v1 (backbone CamemBERT distil, sans class weights) produisait F1 pos = 0. La **version 2** corrige ce problème par : (1) `class_weight='balanced'` via `WeightedTrainer`, (2) backbone changé de `camembert` à `sentiment_fr` (meilleur pré-entraîné), (3) métrique de sélection `f1_macro`. Le modèle fine-tuné v2 dépasse désormais `sentiment_fr` sur toutes les classes.
 
+> **Glossaire :** Le *backbone* est le modèle pré-entraîné sur lequel on fait le fine-tuning (ex. sentiment_fr, camembert). À ne pas confondre avec *barebone* (système minimal) ou *blackbone* (non standard en ML).
+
 Au-delà du résultat brut, la méthode de benchmark est essentielle. Elle formalise un cadre d'évaluation reproductible qui permet de rejouer les comparaisons lors d'un changement de modèle, d'un nouveau besoin métier ou d'une évolution réglementaire. Le benchmark devient ainsi un outil de pilotage et non un exercice ponctuel figé à la date du dossier.
 
 Une limite méthodologique est explicitement assumée : les labels de référence utilisés pour ce benchmark proviennent d'une annotation sémantique automatisée (pseudo-labels), et non d'une campagne d'annotation manuelle exhaustive. Les scores sont donc interprétés comme une comparaison relative robuste entre modèles. La validation finale de performance métier reste adossée à un échantillon de contrôle annoté manuellement.
@@ -184,16 +186,16 @@ Tableau d'arbitrage de mise en production (post v2) :
 
 Visualisation graphique des résultats (preuve C7/C8) :
 
+- Métriques de validation entraînement (quick ou full) : `docs/e2/figures/e2_training_{quick|full}_validation_metrics.png`
 - Vue d'ensemble benchmark (qualité + latence) : `docs/e2/figures/e2_benchmark_overview.png`
 - F1 par classe et par modèle (révèle le F1 pos = 0) : `docs/e2/figures/e2_benchmark_f1_per_class.png`
 - Déséquilibre de classes et impact sur F1 positif : `docs/e2/figures/e2_benchmark_class_imbalance.png`
 - Courbes multi-critères normalisées (qualité, confiance, efficience latence) : `docs/e2/figures/e2_benchmark_curves_normalized.png`
 - Frontière de Pareto qualité/latence (aide à la décision) : `docs/e2/figures/e2_innovation_pareto_quality_latency.png`
-- Métriques de validation entraînement quick : `docs/e2/figures/e2_training_quick_validation_metrics.png`
-- Performance d'exécution entraînement quick : `docs/e2/figures/e2_training_quick_runtime.png`
-- Courbe de perte entraînement quick (visualisation pédagogique) : `docs/e2/figures/e2_training_quick_loss_curve.png`
+- Performance d'exécution entraînement : `docs/e2/figures/e2_training_{quick|full}_runtime.png`
+- Courbe de perte entraînement (visualisation pédagogique) : `docs/e2/figures/e2_training_{quick|full}_loss_curve.png`
 
-Ces graphes sont générés automatiquement depuis `python scripts/plot_e2_results.py`, en s'appuyant sur `docs/e2/AI_BENCHMARK_RESULTS.json` (benchmark) et `docs/e2/TRAINING_RESULTS_QUICK.json` (entraînement).
+Ces graphes sont générés automatiquement depuis `python scripts/plot_e2_results.py`, en s'appuyant sur `docs/e2/AI_BENCHMARK_RESULTS.json` (benchmark) et `docs/e2/TRAINING_RESULTS.json` (entraînement, écrit par `finetune_sentiment.py`).
 
 Lecture pédagogique des métriques (niveau développeur junior) :
 

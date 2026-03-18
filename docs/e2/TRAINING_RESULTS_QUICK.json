@@ -1,0 +1,15 @@
+{
+  "run_date": "2026-03-11",
+  "mode": "quick",
+  "train_samples": 3000,
+  "val_samples": 800,
+  "epochs": 1,
+  "train_loss_final": 0.7778,
+  "eval_loss": 0.7068,
+  "eval_accuracy": 0.68625,
+  "eval_f1_weighted": 0.6362,
+  "train_runtime_seconds": 1478.6,
+  "train_samples_per_second": 2.029,
+  "train_steps_per_second": 0.254
+}
+

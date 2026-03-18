@@ -1,0 +1,66 @@
+BLOC E2 - Intégration de services d'Intelligence Artificielle
+
+Projet : DATASENS
+Candidat : Alan Jaffre
+
+Introduction - Positionnement du bloc E2 dans DATASENS
+
+Le projet DATASENS vise l'analyse de sentiments à partir de sources textuelles hétérogènes afin de produire des indicateurs exploitables. Le bloc E1 a posé les fondations de collecte, de structuration et de stockage des données. Le bloc E2 prolonge ce socle en intégrant l'intelligence artificielle comme levier de transformation de données textuelles en informations interprétables par des utilisateurs métier.
+
+L'objectif du bloc E2 n'est pas de développer un modèle from scratch, mais d'identifier, d'évaluer, de paramétrer et d'intégrer des services IA préexistants de manière robuste et justifiable. Cette posture est alignée avec un contexte professionnel réel, dans lequel la maîtrise du risque, l'explicabilité des choix et la traçabilité des décisions techniques sont des exigences de premier niveau.
+
+Le socle E2 est déjà visible dans le code. L'API FastAPI est portée par run_e2_api.py et src/e2/api/main.py, avec un préfixe d'API /api/v1 et une documentation exploitable sur /docs, /redoc et /openapi.json. La sécurité est gérée par JWT et RBAC dans src/e2/auth/security.py. La couche IA est structurée autour de src/e2/api/routes/ai.py, du service Mistral dans src/e3/mistral/service.py et de l'inférence locale dans src/ml/inference/local_hf_service.py. Le monitoring est assuré par le middleware Prometheus dans src/e2/api/middleware/prometheus.py.
+
+A3 - Accompagner le choix et l'intégration d'un service IA préexistant
+
+Le besoin IA de DATASENS est concret : analyser automatiquement des textes en français, produire des sorties fiables incluant le sentiment et la confiance, puis exposer ces fonctions via API de manière sécurisée et monitorable. L'architecture implémentée répond déjà à ce besoin grâce à une approche hybride qui distingue clairement les usages coeur et les usages d'enrichissement.
+
+Le traitement principal du sentiment repose sur l'inférence locale Hugging Face, ce qui garantit une meilleure maîtrise des coûts, de la confidentialité et de la disponibilité du service. En parallèle, l'API Mistral est mobilisée pour les fonctions génératives à forte valeur ajoutée, notamment le chat, le résumé et l'assistance. Ce choix évite un verrouillage fournisseur tout en conservant une capacité d'évolution rapide.
+
+L'intégration est déjà opérationnelle dans les routes /api/v1/ai/status, /api/v1/ai/chat, /api/v1/ai/summarize, /api/v1/ai/sentiment, /api/v1/ai/predict et /api/v1/ai/insight. Le service local fournit des signaux directement exploitables, en particulier label, confidence et sentiment_score, ce qui permet un pilotage qualité progressif fondé sur des indicateurs mesurables.
+
+C6 - Veille technologique et réglementaire
+
+La veille du bloc E2 est structurée autour de trois axes complémentaires : l'évolution des modèles NLP francophones pour le sentiment, les pratiques d'intégration IA dans une API légère orientée CPU-first, et le cadre réglementaire applicable aux usages IA et à la protection des données.
+
+Cette veille n'est pas opportuniste ; elle est outillée et planifiée. Les sources sont configurées dans scripts/veille_sources.json, l'agrégation RSS est traitée dans scripts/veille_digest.py, et les synthèses sont générées de manière versionnée dans docs/veille/. Cette organisation crée une chaîne claire entre information collectée, synthèse produite et décision technique prise dans le projet.
+
+La fiabilité des sources est explicitement qualifiée dans la configuration, avec un périmètre couvrant à la fois les dimensions techniques et réglementaires. Les références suivies incluent notamment OpenAI, Mistral, Hugging Face, l'ANSSI et la CNIL. Sur l'actualité récente, l'analyse intègre les obligations GPAI de l'AI Act applicables depuis le 2 août 2025, les lignes directrices associées publiées par la Commission européenne, ainsi que le leaderboard MTEB comme référentiel complémentaire pour l'évaluation des modèles de représentation sémantique.
+
+Les sources externes mobilisées sont les suivantes : General-purpose AI obligations under the AI Act (https://digital-strategy.ec.europa.eu/en/factpages/general-purpose-ai-obligations-under-ai-act), Guidelines for providers of GPAI models (https://digital-strategy.ec.europa.eu/en/policies/guidelines-gpai-providers), et MTEB Leaderboard (https://huggingface.co/spaces/mteb/leaderboard).
+
+C7 - Identification et benchmark des services IA
+
+La problématique traitée dans E2 consiste à classifier le sentiment de textes hétérogènes en français à un niveau opérationnel, tout en conservant une interprétation claire de la fiabilité de la prédiction. Les contraintes structurantes sont fortes : exécution CPU sans dépendance GPU obligatoire, coût maîtrisé, continuité de service même en mode déconnecté cloud, et minimisation des flux externes de données.
+
+Le benchmark est industrialisé dans scripts/ai_benchmark.py et alimente les livrables docs/e2/AI_BENCHMARK.md et docs/e2/AI_REQUIREMENTS.md. L'analyse compare une approche locale fondée sur les modèles francophones Hugging Face à une approche cloud orientée génération. La décision E2 est cohérente avec les résultats observés et avec l'architecture en place : le moteur principal pour le sentiment est local, tandis que le cloud reste un moteur secondaire pour l'enrichissement génératif.
+
+Cette décision est justifiée sur les plans technique et économique. Elle aligne le besoin métier avec les contraintes d'infrastructure, protège la gouvernance des données et laisse une trajectoire d'évolution progressive sans rupture de stack ni dépendance excessive à un fournisseur externe.
+
+C8 - Paramétrage et intégration d'un service IA
+
+L'environnement d'exécution est déjà prêt avec les dépendances clés transformers, torch et mistralai présentes dans requirements.txt. Le paramétrage applicatif est explicité dans .env.example à travers des variables dédiées aux modèles de sentiment, aux réglages d'inférence CPU et à l'activation du service cloud, ce qui rend l'exploitation lisible et reproductible.
+
+L'intégration dans l'architecture applicative est opérationnelle. L'API est lancée via python run_e2_api.py, la sécurité s'appuie sur JWT et RBAC, la route /api/v1/ai/status permet de contrôler rapidement la disponibilité de la couche cloud, et la documentation d'interface reste accessible sur /docs, /redoc et /openapi.json.
+
+Le pilotage d'exploitation est renforcé par le middleware Prometheus, qui expose des métriques de trafic, de latence, d'erreurs et de dérive. Ces mesures permettent un suivi pragmatique de la performance et de la qualité de service, en cohérence avec une démarche d'amélioration continue.
+
+Le fine-tuning est implémenté de manière concrète via scripts/finetune_sentiment.py, avec un apprentissage à trois classes (négatif, neutre, positif) sur les jeux data/goldai/ia/train.parquet et data/goldai/ia/val.parquet. Le script prévoit un mode de préparation préalable des données IA si nécessaire, supporte plusieurs bases de modèles, et conserve le meilleur résultat selon un score F1 pondéré avec calcul de l'accuracy. Le modèle final est stocké dans models/{model}-sentiment-finetuned et peut être activé dans .env via SENTIMENT_FINETUNED_MODEL_PATH.
+
+Les limites sont identifiées et assumées : ambiguïté sémantique, ironie, variabilité des domaines lexicaux et nécessité de cadrer les seuils de confiance. La trajectoire recommandée consiste à renforcer l'orchestration de décision plutôt qu'à multiplier les composants.
+
+Proposition à la pointe sans rupture de stack : Sentiment Intelligence Gateway (SIG)
+
+La proposition d'innovation est l'introduction d'un Sentiment Intelligence Gateway (SIG), conçu comme une couche d'orchestration au-dessus de l'existant. Le principe est de traiter localement par défaut, d'escalader vers le cloud uniquement en cas de faible confiance, puis de journaliser systématiquement la décision afin d'alimenter une boucle d'amélioration continue.
+
+Cette approche est réaliste et professionnelle car elle réutilise les composants déjà en place, optimise le compromis coût/qualité, renforce la confidentialité par défaut et facilite la gouvernance technique et réglementaire. Les évolutions recommandées restent incrémentales, notamment la création d'un endpoint routeur dédié, l'introduction d'un seuil configurable et l'ajout de métriques spécifiques d'escalade.
+
+Conclusion
+
+Le bloc E2 de DATASENS présente une architecture cohérente, opérationnelle et évolutive. Le choix des services IA est argumenté par les contraintes réelles du projet, l'intégration API est sécurisée et monitorable, la veille est outillée et traçable, et le fine-tuning est implémenté de manière concrète.
+
+La stratégie la plus pertinente pour la suite est d'industrialiser l'orchestration existante plutôt que d'ajouter des briques non maîtrisées. Une logique local-first, complétée par du cloud sur exception utile, pilotée par des métriques et adossée à une veille réglementaire continue, constitue une trajectoire crédible et solide pour la certification.
+
+Annexes - Preuves internes
+
+Les preuves internes mobilisées dans ce dossier sont VEILLE_SENTIMENT_MODELS.md, docs/e2/AI_BENCHMARK.md, docs/e2/AI_REQUIREMENTS.md, scripts/veille_sources.json, scripts/veille_digest.py, docs/veille/veille_2026-03-09.md, src/e2/api/routes/ai.py, src/e3/mistral/service.py, src/ml/inference/local_hf_service.py, src/e2/api/middleware/prometheus.py, src/e2/auth/security.py et tests/test_e2_api.py.

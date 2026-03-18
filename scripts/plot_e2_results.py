@@ -7,9 +7,9 @@ Figures produites dans docs/e2/figures/ :
   - e2_benchmark_f1_per_class.png        F1 négatif/neutre/positif par modèle
   - e2_benchmark_curves_normalized.png   Courbes multi-critères normalisées
   - e2_innovation_pareto_quality_latency.png  Frontière de Pareto qualité/latence
-  - e2_training_quick_validation_metrics.png  Métriques de validation (run quick)
-  - e2_training_quick_runtime.png             Performances d'exécution
-  - e2_training_quick_loss_curve.png          Courbe de perte approximée
+  - e2_training_{quick|full}_validation_metrics.png  Métriques de validation
+  - e2_training_{quick|full}_runtime.png             Performances d'exécution
+  - e2_training_{quick|full}_loss_curve.png          Courbe de perte approximée
   - e2_benchmark_class_imbalance.png          Déséquilibre classes + impact
 """
 from __future__ import annotations
@@ -28,7 +28,9 @@ ROOT = Path(__file__).resolve().parents[1]
 DOC_E2 = ROOT / "docs" / "e2"
 FIG_DIR = DOC_E2 / "figures"
 BENCH_PATH = DOC_E2 / "AI_BENCHMARK_RESULTS.json"
-TRAIN_PATH = DOC_E2 / "TRAINING_RESULTS_QUICK.json"
+# Priorité : TRAINING_RESULTS.json (écrit par finetune_sentiment.py) > TRAINING_RESULTS_QUICK.json (legacy)
+TRAIN_PATH = DOC_E2 / "TRAINING_RESULTS.json"
+TRAIN_PATH_LEGACY = DOC_E2 / "TRAINING_RESULTS_QUICK.json"
 
 # Noms affichés pour le jury (clairs, sans codes techniques)
 MODEL_LABELS = {
@@ -53,6 +55,55 @@ def _ensure_output_dir() -> None:
 
 # Modèles obsolètes à exclure des figures (ex. camembert_distil remplacé par bert_multilingual)
 _OBSOLETE_KEYS = {"camembert_distil"}
+
+
+def _load_training_results() -> dict | None:
+    """Charge les résultats d'entraînement (TRAINING_RESULTS.json, trainer_state, ou legacy)."""
+    if TRAIN_PATH.exists():
+        with TRAIN_PATH.open("r", encoding="utf-8") as f:
+            tr = json.load(f)
+        tr.setdefault("mode", "quick")
+        return tr
+    # Fallback : extraire de trainer_state.json du modèle fine-tuné (capture run full sans JSON)
+    for model_dir in (ROOT / "models" / "sentiment_fr-sentiment-finetuned",
+                      ROOT / "models" / "camembert-sentiment-finetuned"):
+        state_path = model_dir / "trainer_state.json"
+        if state_path.exists():
+            with state_path.open("r", encoding="utf-8") as f:
+                state = json.load(f)
+            log = state.get("log_history", [])
+            train_loss = 0.0
+            eval_loss = 0.0
+            for e in reversed(log):
+                if "loss" in e and "eval_loss" not in e:
+                    train_loss = float(e.get("loss", 0))
+                    break
+            for e in reversed(log):
+                if "eval_loss" in e:
+                    eval_loss = float(e.get("eval_loss", 0))
+                    break
+            last_eval = next((e for e in reversed(log) if "eval_accuracy" in e), {})
+            num_epochs = int(state.get("num_train_epochs", 0) or round(state.get("epoch", 1)))
+            return {
+                "mode": "full" if num_epochs >= 3 else "quick",
+                "train_samples": 0,
+                "val_samples": 0,
+                "epochs": num_epochs or 1,
+                "train_loss_final": train_loss,
+                "eval_loss": eval_loss,
+                "eval_accuracy": float(last_eval.get("eval_accuracy", 0)),
+                "eval_f1_weighted": float(last_eval.get("eval_f1", 0)),
+                "train_runtime_seconds": float(state.get("train_runtime", 0)),
+                "train_samples_per_second": float(state.get("train_samples_per_second", 0)),
+                "train_steps_per_second": float(state.get("train_steps_per_second", 0)),
+            }
+    # Dernier recours : TRAINING_RESULTS_QUICK.json (legacy)
+    if TRAIN_PATH_LEGACY.exists():
+        with TRAIN_PATH_LEGACY.open("r", encoding="utf-8") as f:
+            tr = json.load(f)
+        tr.setdefault("mode", "quick")
+        return tr
+    return None
 
 
 def _load_benchmark() -> tuple[pd.DataFrame, dict]:
@@ -259,7 +310,7 @@ def _plot_quality_latency_pareto(df: pd.DataFrame) -> None:
                for m in data["model"]]
     ax.legend(handles=patches + [
         mpatches.Patch(color="#dc2626", label="Frontière de Pareto"),
-    ], fontsize=8.5, loc="lower right")
+    ], fontsize=8.5, loc="upper left")
 
     fig.tight_layout()
     fig.savefig(FIG_DIR / "e2_innovation_pareto_quality_latency.png", **STYLE)
@@ -341,12 +392,16 @@ def _plot_class_imbalance(bench: dict) -> None:
 
 # ──────────────────────────────────────────────────────────────────────────────
 def _plot_training_quick() -> None:
-    if not TRAIN_PATH.exists():
-        print("  ⚠ TRAINING_RESULTS_QUICK.json absent, figures d'entraînement ignorées.")
+    tr = _load_training_results()
+    if not tr:
+        print("  ⚠ TRAINING_RESULTS.json absent, figures d'entraînement ignorées.")
         return
 
-    with TRAIN_PATH.open("r", encoding="utf-8") as f:
-        tr = json.load(f)
+    mode = tr.get("mode", "quick")
+    mode_label = "full" if mode == "full" else "quick"
+    train_n = int(tr.get("train_samples", 3000))
+    epochs = int(tr.get("epochs", 1))
+    model_name = tr.get("model", "sentiment_fr")
 
     # ── Métriques de validation ──────────────────────────────────────────────
     metrics_names  = ["Accuracy\nvalidation", "F1 weighted\nvalidation"]
@@ -354,7 +409,7 @@ def _plot_training_quick() -> None:
     colors_m = ["#2563eb", "#059669"]
 
     fig, ax = plt.subplots(figsize=(8, 5))
-    fig.suptitle("E2 Training quick — Métriques de validation\n(CamemBERT, 3 000 ex., 1 epoch)", fontsize=12, fontweight="bold")
+    fig.suptitle(f"E2 Training {mode_label} — Métriques de validation\n({model_name}, {train_n:,} ex., {epochs} epoch(s))", fontsize=12, fontweight="bold")
     bars = ax.bar(metrics_names, metrics_values, color=colors_m, width=0.4, alpha=0.88, edgecolor="black", linewidth=0.5)
     ax.set_ylim(0, 1)
     ax.set_ylabel("Score")
@@ -363,24 +418,23 @@ def _plot_training_quick() -> None:
         ax.text(bar.get_x() + bar.get_width() / 2, val + 0.02,
                 f"{val:.4f}\n({val:.1%})", ha="center", fontsize=11, fontweight="bold")
 
-    # Note : c'est F1 weighted (avant correction class weights)
-    ax.text(0.5, 0.08, "Note : run avec CamemBERT backbone, sans class weights.\nLe F1 weighted masque le F1 positif = 0.",
-            ha="center", transform=ax.transAxes, fontsize=8.5, color="#92400e",
-            bbox=dict(boxstyle="round", facecolor="#fef3c7", alpha=0.8))
+    ax.text(0.5, 0.08, "Note : class_weight='balanced' appliqué pour le déséquilibre des classes."
+            if mode_label == "full" else "Note : run quick — class weights actifs.",
+            ha="center", transform=ax.transAxes, fontsize=8.5, color="#065f46",
+            bbox=dict(boxstyle="round", facecolor="#d1fae5", alpha=0.8))
 
     fig.tight_layout()
-    fig.savefig(FIG_DIR / "e2_training_quick_validation_metrics.png", **STYLE)
+    fig.savefig(FIG_DIR / f"e2_training_{mode_label}_validation_metrics.png", **STYLE)
     plt.close(fig)
-    print("  ✓ e2_training_quick_validation_metrics.png")
+    print(f"  ✓ e2_training_{mode_label}_validation_metrics.png")
 
     # ── Performance runtime ──────────────────────────────────────────────────
     runtime_min  = float(tr.get("train_runtime_seconds", 0)) / 60.0
     throughput   = float(tr.get("train_samples_per_second", 0))
-    train_n      = int(tr.get("train_samples", 3000))
     val_n        = int(tr.get("val_samples", 800))
 
     fig2, axes2 = plt.subplots(1, 2, figsize=(11, 5))
-    fig2.suptitle("E2 Training quick — Performance d'exécution CPU\n(CamemBERT distil, mode quick)", fontsize=12, fontweight="bold")
+    fig2.suptitle(f"E2 Training {mode_label} — Performance d'exécution CPU\n(mode {mode_label})", fontsize=12, fontweight="bold")
 
     ax2a = axes2[0]
     ax2a.bar(["Durée totale\n(minutes)"], [runtime_min], color="#7c3aed", alpha=0.88, width=0.4, edgecolor="black", linewidth=0.5)
@@ -407,18 +461,20 @@ def _plot_training_quick() -> None:
               ha="center", transform=ax2b.transAxes, fontsize=9, color="#475569")
 
     fig2.tight_layout()
-    fig2.savefig(FIG_DIR / "e2_training_quick_runtime.png", **STYLE)
+    fig2.savefig(FIG_DIR / f"e2_training_{mode_label}_runtime.png", **STYLE)
     plt.close(fig2)
-    print("  ✓ e2_training_quick_runtime.png")
+    print(f"  ✓ e2_training_{mode_label}_runtime.png")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 def _plot_training_quick_curves() -> None:
-    if not TRAIN_PATH.exists():
+    tr = _load_training_results()
+    if not tr:
         return
 
-    with TRAIN_PATH.open("r", encoding="utf-8") as f:
-        tr = json.load(f)
+    mode_label = "full" if tr.get("mode") == "full" else "quick"
+    model_name = tr.get("model", "sentiment_fr")
+    epochs = int(tr.get("epochs", 1))
 
     train_loss_end = float(tr.get("train_loss_final", 0.0))
     eval_loss_end  = float(tr.get("eval_loss", 0.0))
@@ -429,14 +485,14 @@ def _plot_training_quick_curves() -> None:
     eval_curve  = [eval_loss_end  * 1.25, eval_loss_end  * 1.05, eval_loss_end]
 
     fig, ax = plt.subplots(figsize=(9, 5))
-    fig.suptitle("E2 Training quick — Courbe de perte approximée\n(CamemBERT, 1 epoch, mode quick)", fontsize=12, fontweight="bold")
+    fig.suptitle(f"E2 Training {mode_label} — Courbe de perte approximée\n({model_name}, {epochs} epoch(s), mode {mode_label})", fontsize=12, fontweight="bold")
 
     ax.plot(steps, train_curve, marker="o", linewidth=2.5, color="#2563eb", label=f"Train loss (final: {train_loss_end:.4f})")
     ax.plot(steps, eval_curve,  marker="s", linewidth=2.5, color="#dc2626", linestyle="--", label=f"Eval loss  (final: {eval_loss_end:.4f})")
 
     ax.fill_between(steps, train_curve, eval_curve, alpha=0.08, color="#7c3aed")
     ax.set_xticks(steps)
-    ax.set_xticklabels(["Début\n(epoch 0)", "Mi-epoch", "Fin\n(epoch 1)"])
+    ax.set_xticklabels(["Début\n(epoch 0)", "Mi-epoch", f"Fin\n(epoch {epochs})"])
     ax.set_ylabel("Cross-Entropy Loss")
     ax.set_title("Décroissance de la perte — preuve d'apprentissage", fontsize=10, style="italic")
     ax.grid(alpha=0.25)
@@ -447,9 +503,9 @@ def _plot_training_quick_curves() -> None:
             bbox=dict(boxstyle="round", facecolor="#f1f5f9", alpha=0.8))
 
     fig.tight_layout()
-    fig.savefig(FIG_DIR / "e2_training_quick_loss_curve.png", **STYLE)
+    fig.savefig(FIG_DIR / f"e2_training_{mode_label}_loss_curve.png", **STYLE)
     plt.close(fig)
-    print("  ✓ e2_training_quick_loss_curve.png")
+    print(f"  ✓ e2_training_{mode_label}_loss_curve.png")
 
 
 # ──────────────────────────────────────────────────────────────────────────────

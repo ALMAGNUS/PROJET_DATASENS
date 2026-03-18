@@ -1,5 +1,25 @@
 services:
-  # DataSens E1 Pipeline (Isolated)
+  # DataSens E1 Metrics — métriques pipeline en continu (Prometheus)
+  datasens-e1-metrics:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: datasens-e1-metrics
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DB_PATH=/app/data/datasens.db
+      - METRICS_PORT=8000
+      - METRICS_UPDATE_INTERVAL=30
+      - PYTHONPATH=/app
+    ports:
+      - "8000:8000"
+    networks:
+      - datasens-network
+    restart: unless-stopped
+    command: ["python", "scripts/run_e1_metrics.py"]
+
+  # DataSens E1 Pipeline (Isolated) — exécution manuelle ou cron: docker-compose run datasens-e1
   datasens-e1:
     build:
       context: .
@@ -12,10 +32,7 @@ services:
       - ./zzdb:/app/zzdb:ro  # ZZDB en lecture seule
     environment:
       - DB_PATH=/app/data/datasens.db
-      - METRICS_PORT=8000
       - PYTHONPATH=/app
-    ports:
-      - "8000:8000"  # Prometheus metrics
     networks:
       - datasens-network
     restart: unless-stopped
@@ -30,6 +47,8 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: datasens-prometheus
+    depends_on:
+      - datasens-e2-api
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
       - ./monitoring/prometheus_rules.yml:/etc/prometheus/prometheus_rules.yml
@@ -56,6 +75,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./exports:/app/exports
+      - ./models:/app/models
       - ./sources_config.json:/app/sources_config.json
     environment:
       - DB_PATH=/app/data/datasens.db
