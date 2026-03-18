@@ -1,0 +1,174 @@
+{
+  "theme": "veille_ia_datasens",
+  "sources": [
+    {
+      "name": "OpenAI Blog",
+      "url": "https://openai.com/blog/rss.xml",
+      "category": "ia",
+      "reliability": "high",
+      "keywords": [
+        "sentiment",
+        "evaluation",
+        "benchmark",
+        "safety",
+        "model"
+      ]
+    },
+    {
+      "name": "Mistral AI Blog",
+      "url": "https://mistral.ai/news/rss.xml",
+      "fallback_urls": [
+        "https://news.google.com/rss/search?q=Mistral+AI+model+release&hl=en-US&gl=US&ceid=US:en"
+      ],
+      "category": "ia",
+      "reliability": "high",
+      "keywords": [
+        "mistral",
+        "model",
+        "release",
+        "api",
+        "evaluation"
+      ]
+    },
+    {
+      "name": "Hugging Face Blog",
+      "url": "https://huggingface.co/blog/feed.xml",
+      "category": "ia",
+      "reliability": "high",
+      "keywords": [
+        "sentiment",
+        "transformers",
+        "evaluation",
+        "leaderboard",
+        "french"
+      ]
+    },
+    {
+      "name": "Google News - Analyse de sentiment (FR)",
+      "url": "https://news.google.com/rss/search?q=%22sentiment+analysis%22+NLP+model&hl=en-US&gl=US&ceid=US:en",
+      "category": "ia",
+      "reliability": "medium",
+      "keywords": [
+        "sentiment",
+        "analysis",
+        "nlp",
+        "model",
+        "classification"
+      ]
+    },
+    {
+      "name": "Google News - LLM Benchmark",
+      "url": "https://news.google.com/rss/search?q=large+language+model+benchmark&hl=en-US&gl=US&ceid=US:en",
+      "category": "ia",
+      "reliability": "medium",
+      "keywords": [
+        "benchmark",
+        "leaderboard",
+        "evaluation",
+        "llm"
+      ]
+    },
+    {
+      "name": "Google News - AI Act emotion recognition",
+      "url": "https://news.google.com/rss/search?q=AI+Act+emotion+recognition+ban+EU&hl=en-US&gl=US&ceid=US:en",
+      "category": "reglementaire",
+      "reliability": "medium",
+      "keywords": [
+        "ai act",
+        "emotion recognition",
+        "eu",
+        "ban",
+        "compliance"
+      ]
+    },
+    {
+      "name": "Google News - CamemBERT / FlauBERT",
+      "url": "https://news.google.com/rss/search?q=CamemBERT+FlauBERT+sentiment+classification&hl=en-US&gl=US&ceid=US:en",
+      "category": "ia",
+      "reliability": "medium",
+      "keywords": [
+        "camembert",
+        "flaubert",
+        "sentiment",
+        "classification"
+      ]
+    },
+    {
+      "name": "Google News - Sentiment bias",
+      "url": "https://news.google.com/rss/search?q=sentiment+bias+AI+model+evaluation&hl=en-US&gl=US&ceid=US:en",
+      "category": "ia",
+      "reliability": "medium",
+      "keywords": [
+        "sentiment",
+        "bias",
+        "evaluation",
+        "model"
+      ]
+    },
+    {
+      "name": "Google News - Inria NLP",
+      "url": "https://news.google.com/rss/search?q=Inria+NLP+CamemBERT+FlauBERT&hl=en-US&gl=US&ceid=US:en",
+      "category": "ia",
+      "reliability": "medium",
+      "keywords": [
+        "inria",
+        "nlp",
+        "camembert",
+        "flaubert"
+      ]
+    },
+    {
+      "name": "arXiv cs.CL",
+      "url": "https://export.arxiv.org/rss/cs.CL",
+      "category": "ia",
+      "reliability": "high",
+      "keywords": [
+        "sentiment",
+        "classification",
+        "french",
+        "evaluation",
+        "benchmark"
+      ]
+    },
+    {
+      "name": "ANSSI",
+      "url": "https://www.ssi.gouv.fr/feed/",
+      "category": "reglementaire",
+      "reliability": "high",
+      "keywords": []
+    },
+    {
+      "name": "CNIL",
+      "url": "https://www.cnil.fr/fr/rss.xml",
+      "category": "reglementaire",
+      "reliability": "high",
+      "keywords": []
+    },
+    {
+      "name": "Google Alerts - IA / sentiment (à configurer)",
+      "url": "https://www.google.com/alerts/feeds/REPLACE_WITH_YOUR_FEED_ID",
+      "category": "ia",
+      "reliability": "medium",
+      "enabled": false,
+      "keywords": [
+        "sentiment",
+        "analyse",
+        "model",
+        "benchmark"
+      ]
+    },
+    {
+      "name": "Feedly - Export RSS ciblé (à configurer)",
+      "url": "https://feedly.com/i/subscription/feed%2FREPLACE_WITH_FEEDLY_ID",
+      "category": "ia",
+      "reliability": "medium",
+      "enabled": false,
+      "keywords": [
+        "sentiment",
+        "nlp",
+        "french",
+        "evaluation"
+      ]
+    }
+  ]
+}

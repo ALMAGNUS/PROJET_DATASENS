@@ -9,6 +9,19 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Correctif NumPy 2.2 / bottleneck / scipy (2026-03-09)
+
+- **Bug** : `mlflow ui` et API plantaient avec *"A module that was compiled using NumPy 1.x cannot be run in NumPy 2.2.6"* (bottleneck, numexpr, scipy).
+- **Fix** : `numpy>=2.1,<2.2`, `bottleneck>=1.4.0`, `numexpr>=2.8.7`, `scipy>=1.14.0` dans requirements.txt.
+- **Dépannage** : section PLANCHE_LANCEMENT.md.
+
+### E5 / MCO — MLflow, E1-metrics, documentation (2026-03-09)
+
+- **MLflow** : Intégration dans `finetune_sentiment.py` — versioning automatique des runs (params, metrics, config.json) dans `mlruns/`. Tracking local `file:./mlruns`, expérience `datasens-sentiment`. Optionnel (try/except) pour ne pas bloquer le fine-tuning.
+- **Service E1 metrics** : `datasens-e1-metrics` dans Docker Compose — expose les métriques pipeline E1 en continu sur le port 8000 pour Prometheus. Alternative locale : `python scripts/run_e1_metrics.py`.
+- **Prometheus** : Config Docker scrape `datasens-e1-metrics:8000` et `datasens-e2-api:8001`. Config locale `prometheus.local.yml` : `localhost:8000` (E1) et `localhost:8001` (API).
+- **Documentation E5** : `docs/e5/PROCEDURE_INSTALLATION_MONITORING.md` mis à jour (ordre démarrage, E1-metrics). `PLANCHE_LANCEMENT.md` : plan complet pour lancer MLflow, Docker, API, monitoring.
+
 ### E2 - Fine-tuning sentiment_fr, Mistral, filtres topics (2026-03-12)
 
 - **Fine-tuning** : Backbone recommandé `sentiment_fr` (ac0hik, CamemBERT sentiment FR) — meilleur benchmark 57–64 %. Détection automatique du modèle fine-tuné via `SENTIMENT_FINETUNED_MODEL_PATH` ou chemins `sentiment_fr-sentiment-finetuned` / `camembert-sentiment-finetuned`.

@@ -2,6 +2,8 @@
 
 Toutes les commandes à exécuter **dans l’ordre**. À faire depuis la **racine du projet** (dossier contenant `main.py`, `start_full.bat`, etc.).
 
+> **Plan complet** : voir `PLANCHE_LANCEMENT.md` pour tous les scénarios (Docker Compose, local, MLflow, fine-tuning).
+
 ---
 
 ## Ce qui demande Docker
@@ -18,7 +20,7 @@ Si vous n’avez pas Docker : vous pouvez quand même lancer le **cockpit**, l�
 ### 1. Activer l’environnement Python (dans chaque terminal où vous lancez des commandes)
 
 ```bat
-cd /d "C:\Users\Utilisateur\Desktop\DEV IA 2025\PROJET_DATASENS"
+cd /d "C:\Users\Utilisateur\Desktop\PROJET_DATASENS"
 .venv\Scripts\activate.bat
 ```
 
@@ -26,7 +28,17 @@ cd /d "C:\Users\Utilisateur\Desktop\DEV IA 2025\PROJET_DATASENS"
 
 ---
 
-### 2. [Optionnel] Démarrer Prometheus (pour les métriques / Grafana)
+### 2. [Optionnel] Démarrer les métriques E1 (pour Prometheus)
+
+Pour que Prometheus collecte les métriques du pipeline E1 :
+
+```bat
+python scripts/run_e1_metrics.py
+```
+
+→ Expose `/metrics` sur http://localhost:8000 (garder le terminal ouvert).
+
+### 3. [Optionnel] Démarrer Prometheus (pour les métriques / Grafana)
 
 **A. Avec Docker (si installé) :**
 
@@ -50,7 +62,7 @@ prometheus --config.file=monitoring/prometheus.local.yml --web.enable-lifecycle
 
 ---
 
-### 3. [Optionnel] Démarrer Grafana (nécessite Docker)
+### 4. [Optionnel] Démarrer Grafana (nécessite Docker)
 
 ```bat
 start_grafana.bat
@@ -66,12 +78,12 @@ Attendre 5–10 s puis ouvrir : http://localhost:3000 (login : **admin** / **adm
 
 ---
 
-### 4. Démarrer l’API E2 (Backend)
+### 5. Démarrer l’API E2 (Backend)
 
 **Dans un premier terminal :**
 
 ```bat
-cd /d "C:\Users\Utilisateur\Desktop\DEV IA 2025\PROJET_DATASENS"
+cd /d "C:\Users\Utilisateur\Desktop\PROJET_DATASENS"
 .venv\Scripts\activate.bat
 python run_e2_api.py
 ```
@@ -82,12 +94,12 @@ Ou double‑cliquer sur un script qui fait ça (voir **Script unique** plus bas)
 
 ---
 
-### 5. Démarrer le Cockpit Streamlit (Frontend)
+### 6. Démarrer le Cockpit Streamlit (Frontend)
 
 **Dans un second terminal :**
 
 ```bat
-cd /d "C:\Users\Utilisateur\Desktop\DEV IA 2025\PROJET_DATASENS"
+cd /d "C:\Users\Utilisateur\Desktop\PROJET_DATASENS"
 .venv\Scripts\activate.bat
 streamlit run src\streamlit\app.py
 ```
@@ -102,7 +114,7 @@ start_cockpit.bat
 
 ---
 
-### 6. [Optionnel] Lancer le pipeline E1 depuis le cockpit
+### 7. [Optionnel] Lancer le pipeline E1 depuis le cockpit
 
 Une fois le cockpit ouvert : onglet **Pilotage** → bouton **Lancer pipeline (main.py)**. Pas de commande à taper.
 
@@ -114,8 +126,10 @@ Une fois le cockpit ouvert : onglet **Pilotage** → bouton **Lancer pipeline (m
 |-----------|----------------------|--------------------------------------------|
 | Cockpit   | http://localhost:8501 | `start_cockpit.bat` ou `streamlit run src\streamlit\app.py` |
 | API E2    | http://localhost:8001 | `python run_e2_api.py` (terminal dédié)     |
-| Prometheus| http://localhost:9090 | `start_prometheus.bat` ou Docker (voir 2)  |
+| Métriques E1 | http://localhost:8000 | `python scripts/run_e1_metrics.py`       |
+| Prometheus| http://localhost:9090 | `start_prometheus.bat` ou Docker (voir 3)  |
 | Grafana   | http://localhost:3000 | `start_grafana.bat` (Docker requis)        |
+| MLflow    | http://localhost:5000 | `mlflow ui` (après entraînement)           |
 
 ---
 

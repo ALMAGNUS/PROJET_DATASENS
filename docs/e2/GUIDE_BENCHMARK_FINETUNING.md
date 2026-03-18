@@ -11,7 +11,8 @@ Les figures dans `docs/e2/figures/` sont générées à partir des **fichiers JS
 | Fichier | Contenu |
 |---|---|
 | `docs/e2/AI_BENCHMARK_RESULTS.json` | Résultats du dernier benchmark (accuracy, F1, latence, per_class) |
-| `docs/e2/TRAINING_RESULTS_QUICK.json` | Résultats du dernier run training quick (optionnel) |
+| `docs/e2/TRAINING_RESULTS.json` | Résultats du dernier entraînement (quick ou full) — écrit par `finetune_sentiment.py` |
+| `docs/e2/TRAINING_RESULTS_QUICK.json` | Legacy — utilisé en fallback si TRAINING_RESULTS.json absent |
 
 **Commande de régénération :**
 ```bash
@@ -21,8 +22,12 @@ python scripts/plot_e2_results.py
 Cette commande **lit** les JSON et **regénère** les PNG. Elle ne lance pas de benchmark ni d'entraînement. Pour obtenir des figures à jour :
 
 1. Lancer le benchmark ou le fine-tuning
-2. Les scripts mettent à jour les JSON (ou le `trainer_state.json` pour le training)
+2. Les scripts mettent à jour les JSON (`finetune_sentiment.py` écrit `TRAINING_RESULTS.json` à la fin de chaque run)
 3. Relancer `python scripts/plot_e2_results.py`
+
+**Figures training vs benchmark :**
+- Les figures `e2_training_{quick|full}_*.png` reflètent le **dernier entraînement** (quick ou full selon le mode).
+- Les figures `e2_benchmark_*.png` reflètent le **dernier benchmark** (qui évalue le modèle fine-tuné actif).
 
 ---
 
@@ -214,7 +219,7 @@ La loss utilisée est la **Cross-Entropy** :
 
 ---
 
-## 6. Checklist "pilote vieux dev rusé"
+## 6. Checklist "pilotage"
 
 1. **Avant** : lancer un benchmark pour connaître le niveau de base.
 2. **Backbone** : partir du meilleur pré-entraîné (`sentiment_fr`).
@@ -234,7 +239,7 @@ La loss utilisée est la **Cross-Entropy** :
 | Benchmark | `scripts/ai_benchmark.py` |
 | Fine-tuning | `scripts/finetune_sentiment.py` |
 | Résultats benchmark | `docs/e2/AI_BENCHMARK_RESULTS.json` |
-| Résultats training | `models/*/trainer_state.json` |
+| Résultats training | `docs/e2/TRAINING_RESULTS.json` (écrit par finetune) + `models/*/trainer_state.json` |
 | Figures | `python scripts/plot_e2_results.py` → `docs/e2/figures/` |
 | Modèle actif | `.env` → `SENTIMENT_FINETUNED_MODEL_PATH` |
 
@@ -262,6 +267,16 @@ python scripts/plot_e2_results.py
 # Ou en une commande : scripts/run_benchmark_et_plots.bat
 ```
 
+### Différence : run_benchmark_et_plots.bat vs run_training_loop_e2.bat
+
+| Script | Entraînement | Benchmark | Figures |
+|--------|--------------|-----------|---------|
+| `run_benchmark_et_plots.bat` | **Non** | Oui | Oui |
+| `run_training_loop_e2.bat` | **Oui** (quick par défaut, `--full` pour full) | Oui | Oui |
+
+**Pourquoi le benchmark « relance » l'entraînement ?**  
+Si vous lancez `run_training_loop_e2.bat`, ce script exécute la **boucle complète** : copie IA → fine-tuning → benchmark → figures. Il lance donc toujours un entraînement (quick par défaut). Pour **uniquement** benchmark + figures sans ré-entraîner : utilisez `run_benchmark_et_plots.bat`.
+
 ---
 
 ## 9. Modèles benchmark — identité technique
@@ -272,3 +287,11 @@ python scripts/plot_e2_results.py
 | `finetuned_local` | Config `.env` ou `models/sentiment_fr-sentiment-finetuned` (priorité) ou `models/camembert-sentiment-finetuned` | Modèle fine-tuné sur données projet |
 | `flaubert_multilingual` | `cardiffnlp/twitter-xlm-roberta-base-sentiment-multilingual` | XLM-RoBERTa multilingue Twitter — **N.B. : ce n'est pas FlauBERT** |
 | `bert_multilingual` | `nlptown/bert-base-multilingual-uncased-sentiment` | BERT multilingue 5★ (1-2→neg, 3→neu, 4-5→pos) — pas CamemBERT |
+
+### Glossaire : backbone (à ne pas confondre)
+
+Le **backbone** (modèle de base) est le modèle pré-entraîné sur lequel on effectue le fine-tuning. C'est l'architecture + les poids initiaux qu'on adapte à nos données. Dans ce projet : `sentiment_fr`, `camembert`, `bert_multilingual`, `flaubert` sont des backbones.
+
+**À ne pas confondre avec :**
+- **Barebone** : système minimal (ex. PC sans composants) — terme informatique général
+- **Blackbone** : pas un terme standard en ML

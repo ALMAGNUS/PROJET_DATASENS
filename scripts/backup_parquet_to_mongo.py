@@ -61,54 +61,81 @@ def main() -> int:
     )
     date_re = re.compile(r"^date=(\d{4}-\d{2}-\d{2})$")
     stored = 0
+    skipped = 0
+    errors = 0
+
+    def _backup(path: Path, logical_name: str, extra_meta: dict | None = None) -> None:
+        nonlocal stored, skipped, errors
+        if not path.exists():
+            print(f"  -- ABSENT  {path.name}")
+            return
+        meta: dict = {
+            "logical_name": logical_name,
+            "partition_date": date.today().isoformat(),
+            "source": "backup_manual",
+            "size_mb": round(path.stat().st_size / 1024 / 1024, 2),
+        }
+        if extra_meta:
+            meta.update(extra_meta)
+        try:
+            r = store.store_file(path, metadata=meta)
+            status = r["status"]
+            mb = meta["size_mb"]
+            print(f"  {status.upper():<8} {logical_name:<35} {path.name}  ({mb} MB)")
+            if status == "stored":
+                stored += 1
+            else:
+                skipped += 1
+        except Exception as exc:
+            print(f"  ERREUR   {logical_name}: {exc!s}")
+            errors += 1
+
     try:
+        print("\n--- Parquets GOLD & GoldAI ---")
+
+        # Dernier GOLD partitionné
         latest_gold = _latest_partition(gold_base, date_re)
         if latest_gold:
-            r = store.store_file(
-                latest_gold,
-                metadata={
-                    "logical_name": "gold_articles",
-                    "partition_date": latest_gold.parent.name.replace("date=", ""),
-                    "source": "backup_manual",
-                },
-            )
-            print(f"GOLD: {r['status']} {latest_gold}")
-            if r["status"] == "stored":
-                stored += 1
+            partition_date = latest_gold.parent.name.replace("date=", "")
+            _backup(latest_gold, "gold_articles", {"partition_date": partition_date})
+        else:
+            print("  -- ABSENT  Aucun GOLD partitionné trouvé")
 
-        if goldai_merged.exists():
-            r = store.store_file(
-                goldai_merged,
-                metadata={
-                    "logical_name": "goldai_merged",
-                    "partition_date": date.today().isoformat(),
-                    "source": "backup_manual",
-                },
-            )
-            print(f"GoldAI merged: {r['status']} {goldai_merged}")
-            if r["status"] == "stored":
-                stored += 1
+        # GoldAI fusionné
+        _backup(goldai_merged, "goldai_merged")
 
-        if goldai_ia.exists():
-            r = store.store_file(
-                goldai_ia,
-                metadata={
-                    "logical_name": "goldai_annotated",
-                    "partition_date": date.today().isoformat(),
-                    "source": "backup_manual",
-                },
-            )
-            print(f"GoldAI IA: {r['status']} {goldai_ia}")
-            if r["status"] == "stored":
-                stored += 1
+        # Copie IA annotée + splits train/val/test
+        ia_dir = goldai_base / "ia"
+        _backup(ia_dir / "merged_all_dates_annotated.parquet", "goldai_ia_annotated")
+        for split in ["train", "val", "test"]:
+            _backup(ia_dir / f"{split}.parquet", f"goldai_ia_{split}")
+
+        print("\n--- Modèle IA entraîné ---")
+
+        # Modèle fine-tuné (model.safetensors + config + tokenizer)
+        models_dir = project_root / "models"
+        for model_dir in sorted(models_dir.iterdir()) if models_dir.exists() else []:
+            if not model_dir.is_dir():
+                continue
+            model_name = model_dir.name
+            # Fichiers essentiels du modèle (pas le checkpoint intermédiaire ni optimizer)
+            for fname in ["model.safetensors", "config.json", "tokenizer.json",
+                          "tokenizer_config.json", "sentencepiece.bpe.model",
+                          "special_tokens_map.json"]:
+                fp = model_dir / fname
+                _backup(fp, f"model_{model_name}_{fname}", {
+                    "model_name": model_name,
+                    "file_type": "model_artifact",
+                })
+
     except Exception as e:
-        print(f"Erreur: {e}")
+        print(f"Erreur générale: {e}")
         return 1
     finally:
         store.close()
 
-    print(f"Backup terminé. Fichiers nouveaux stockés: {stored}")
-    return 0
+    print(f"\nBackup terminé — stockés: {stored}  |  déjà présents: {skipped}  |  erreurs: {errors}")
+    return 0 if errors == 0 else 1
 
 
 if __name__ == "__main__":

@@ -11,7 +11,9 @@
 # E1: Core Data Processing
 # ============================================================
 pandas==2.3.3
-numpy>=2.1,<2.3
+numpy>=2.1,<2.2  # Évite 2.2.x (bottleneck/scipy/numexpr incompatibles)
+bottleneck>=1.4.0  # Compatible NumPy 2.x (pandas optional)
+numexpr>=2.8.7  # Compatible NumPy 2.x (pandas optional)
 pyarrow==22.0.0  # Required for parquet export in exporter.py
 fastparquet==2024.11.0
 
@@ -30,7 +32,7 @@ botasaurus
 # ============================================================
 # E1: Database & ORM
 # ============================================================
-sqlalchemy==2.0.30
+sqlalchemy>=2.0.36  # 2.0.30 incompatible Python 3.13 (symbol/__firstlineno__)
 sqlmodel==0.0.21
 pymongo
 
@@ -67,6 +69,7 @@ openai==1.54.0  # Alternative/compatible API client
 # E3: ML & NLP (FlauBERT, CamemBERT, Fine-tuning)
 # ============================================================
 scikit-learn>=1.7,<1.8
+scipy>=1.14.0  # Compatible NumPy 2.x (mlflow, sklearn)
 transformers>=4.46.0
 accelerate>=0.26.0  # Requis par Trainer (fine-tuning)
 datasets>=4.0.0  # Hugging Face datasets (fine-tuning sentiment)
@@ -92,7 +95,7 @@ kaleido==0.2.1
 # ============================================================
 # E3: Experiment Tracking & Monitoring
 # ============================================================
-mlflow==3.7.0
+mlflow==3.7.0  # Versioning modèles (finetune_sentiment.py → mlruns/)
 prometheus-client==0.20.0
 grafana-api==1.0.3  # Grafana API client (optional)
 

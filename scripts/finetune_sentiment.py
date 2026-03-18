@@ -13,6 +13,7 @@ Classement benchmark pré-entraîné (données projet):
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -395,6 +396,70 @@ def main() -> int:
     f1p = eval_res.get("eval_f1_pos", 0)
     print(f"\nRésultats val: accuracy={acc:.2%} | F1 macro={f1m:.4f} | F1 weighted={f1w:.4f} | F1 positif={f1p:.4f}")
     print(f"Modèle sauvegardé: {output_path.absolute()}")
+
+    # Écriture TRAINING_RESULTS.json pour plot_e2_results.py (quick ou full)
+    mode = "quick" if args.max_train_samples and args.max_train_samples > 0 else "full"
+    state = trainer.state
+    log_hist = getattr(state, "log_history", []) or []
+    train_loss_final = 0.0
+    for e in reversed(log_hist):
+        if "loss" in e and "eval_loss" not in e:
+            train_loss_final = float(e.get("loss", 0))
+            break
+    eval_loss = float(eval_res.get("eval_loss", 0))
+    train_runtime = float(getattr(state, "train_runtime", 0) or 0)
+    train_sps = float(getattr(state, "train_samples_per_second", 0) or 0)
+    train_stps = float(getattr(state, "train_steps_per_second", 0) or 0)
+    from datetime import datetime
+    results_json = {
+        "run_date": datetime.now().strftime("%Y-%m-%d"),
+        "mode": mode,
+        "model": args.model,
+        "train_samples": len(train_texts),
+        "val_samples": len(val_texts),
+        "epochs": args.epochs,
+        "train_loss_final": train_loss_final,
+        "eval_loss": eval_loss,
+        "eval_accuracy": float(acc),
+        "eval_f1_weighted": float(f1w),
+        "eval_f1_macro": float(f1m),
+        "train_runtime_seconds": train_runtime,
+        "train_samples_per_second": train_sps,
+        "train_steps_per_second": train_stps,
+    }
+    results_path = project_root / "docs" / "e2" / "TRAINING_RESULTS.json"
+    results_path.parent.mkdir(parents=True, exist_ok=True)
+    with results_path.open("w", encoding="utf-8") as f:
+        json.dump(results_json, f, indent=2, ensure_ascii=False)
+    print(f"Résultats training écrits: {results_path}")
+
+    # MLflow — versioning simple (params, metrics, path)
+    try:
+        import mlflow
+        mlflow.set_tracking_uri(f"file:{project_root / 'mlruns'}")
+        mlflow.set_experiment("datasens-sentiment")
+        with mlflow.start_run():
+            mlflow.log_params({
+                "model": args.model,
+                "epochs": args.epochs,
+                "mode": mode,
+                "train_samples": len(train_texts),
+                "val_samples": len(val_texts),
+            })
+            mlflow.log_metrics({
+                "eval_accuracy": float(acc),
+                "eval_f1_macro": float(f1m),
+                "eval_f1_weighted": float(f1w),
+                "eval_loss": eval_loss,
+                "train_runtime_seconds": train_runtime,
+            })
+            mlflow.set_tag("model_path", str(output_path.relative_to(project_root)))
+            if (output_path / "config.json").exists():
+                mlflow.log_artifact(str(output_path / "config.json"), "model")
+        print(f"MLflow run enregistré: mlruns/")
+    except Exception as e:
+        print(f"MLflow (optionnel): {e}")
+
     print(f"\nPour utiliser ce modèle, ajoutez dans .env :")
     print(f"  SENTIMENT_FINETUNED_MODEL_PATH=models/{args.model}-sentiment-finetuned")
     return 0

@@ -1,0 +1,501 @@
+{
+  "theme": "veille_ia_datasens",
+  "generated_at": "2026-03-16 10:23",
+  "sources": [
+    {
+      "name": "OpenAI Blog",
+      "url": "https://openai.com/blog/rss.xml",
+      "source_url_used": "https://openai.com/blog/rss.xml",
+      "category": "ia",
+      "reliability": "high",
+      "keywords": [
+        "sentiment",
+        "evaluation",
+        "benchmark",
+        "safety",
+        "model"
+      ],
+      "items": [
+        {
+          "title": "From model to agent: Equipping the Responses API with a computer environment",
+          "link": "https://openai.com/index/equip-responses-api-computer-environment",
+          "published": "Wed, 11 Mar 2026 11:00:00 GMT"
+        }
+      ]
+    },
+    {
+      "name": "Mistral AI Blog",
+      "url": "https://mistral.ai/news/rss.xml",
+      "source_url_used": "https://news.google.com/rss/search?q=Mistral+AI+model+release&hl=en-US&gl=US&ceid=US:en",
+      "category": "ia",
+      "reliability": "high",
+      "keywords": [
+        "mistral",
+        "model",
+        "release",
+        "api",
+        "evaluation"
+      ],
+      "items": [
+        {
+          "title": "Mistral AI: Models, Capabilities and Latest Developments - Built In",
+          "link": "https://news.google.com/rss/articles/CBMiUEFVX3lxTE9lM2N4UDQxbzZ0YjBzdEFNZjN5SDRsT0RGcnU3Q1hwYW8xd0l0c0NzaHBpTlFIV2hGQVRqeXRqdGk5NGZkZHZVOFMzYXQxVC1P?oc=5",
+          "published": "Tue, 03 Mar 2026 08:00:00 GMT"
+        },
+        {
+          "title": "French AI lab Mistral releases new AI models as it looks to keep pace with OpenAI and Google - CNBC",
+          "link": "https://news.google.com/rss/articles/CBMipgFBVV95cUxOMzNXWkdOSm5xek00QnZhYVJKY2FnaGdrWmxXUTZHdXhtazlvOGN4a3VPcnQ1UUZaSEdQeXZGUjBlRFJwa1U1WnMyTWlCMU1yN3NJaDBNZW5DdjJSY3E1SG8zYTVZdUUzeER1LWg2RktBZm9JeW54Tzllc3dMZUVxV1JnMEFUUElJcWZRMzNWRFFsc1h6LXVBa2ctMGlGeUVZUkZibUlB0gGrAUFVX3lxTE5rUUh6S0dBQkNBdXlZQTZIWW9WenQtMkZRZDJva1BCeEptek5MLWI3TGhlbGRXcS1ES1pYaHlKZGFvR21SclAyZmxpQWg5NHJjQlU1RC1JdjJ3cUlJRGJlbi1nVGp3Wm1PX1JSa08yYmw3OWUxb0xPcFBRS0ZlVTB0Q01qTWZxeENpcS1ZV1NCZ0ZoN0h0c0sweGVpemloM2xEeTFpYlFBSl9mTQ?oc=5",
+          "published": "Tue, 02 Dec 2025 08:00:00 GMT"
+        },
+        {
+          "title": "Magistral - Mistral AI",
+          "link": "https://news.google.com/rss/articles/CBMiSEFVX3lxTFBQMlo3TGlVNmZ3Q2xta1lYaURHbUxobEd6cDIzVEtuLVFiXzd5VXIybGdkR0I4YUhNamEyTTg5dk9rSE05Ti15NA?oc=5",
+          "published": "Tue, 10 Jun 2025 07:00:00 GMT"
+        },
+        {
+          "title": "Mistral closes in on Big AI rivals with new open-weight frontier and small models - TechCrunch",
+          "link": "https://news.google.com/rss/articles/CBMivwFBVV95cUxQNl9HMmlTN0tYN3JPYWxIVl9XMFNSNF9NMHBaS01TaElvSXBncFlzOVJOazJMekVQbm40V1B2eml1ellkLVdBRER1Q2RycjUwZjZ2cWhDdGdITkZBRzNXRDhCUTMwdDRQb3pRZE44cjFVWmVMNFdEbHZNdUQzcXpfb2pDcG54WHU4SmZhSjNSY1YyUzZjLTNjdGwtZ3VtbWhqWVlpa0hndmZfVmNvZzJjdEtlT1dUY2dxUVpNUTBFcw?oc=5",
+          "published": "Tue, 02 Dec 2025 08:00:00 GMT"
+        },
+        {
+          "title": "Mistral's New Ultra-Fast Translation Model Gives Big AI Labs a Run for Their Money - WIRED",
+          "link": "https://news.google.com/rss/articles/CBMieEFVX3lxTFBiR00wQVRKZkZOX0QyNWZKcUpjZVhKcUduZ0JsWnhtNEJNeWN5UVloRUptNURCclNRZjh6SGc4SlN1eHViOVE1UnJxNGpIekpMWXZZbGZpdWtKNnhtQm9qOFlTNkR5V1RPaGI0U3VKQ3pRZVJ3Q3R6eA?oc=5",
+          "published": "Wed, 04 Feb 2026 08:00:00 GMT"
+        },
+        {
+          "title": "Accenture and Mistral AI Accelerate Enterprise Reinvention with Scalable AI that Delivers Strategic Autonomy for Customers - Accenture",
+          "link": "https://news.google.com/rss/articles/CBMi9gFBVV95cUxQZTB3Z2YwWDBRQmp0WnlnVGtEQUlMWUtJMU11c2N1bFdRWHp4cjNYN1FUSXk3M2xsdzJZYTI2RjR5ZzZEd2dxMUM3MXVnMUlNTnl2U1lPMHlKOUxkYi1LTmFDdWxlaFlLeWNrUllrYlNZNW12V1dsbzdLMmlKTVBXOHI5YzZBVjVMQUtrSlVZUUM4UlNlSnZCS1FHa2NMSE0teXJ0dGJwOTRWUGx3QnRIekI3Rk02QnRSV1pzZmp3Q2R0OGQxLXlVT3lwVGJOTjQyVVZqVFpKdFNYTUw3d3g0Q0VTR0NmdTRLYUhQRl9HX2hyckRmZXc?oc=5",
+          "published": "Thu, 26 Feb 2026 08:00:00 GMT"
+        },
+        {
+          "title": "Mistral has announced the release of a new AI audio model called Voxtral - MSN",
+          "link": "https://news.google.com/rss/articles/CBMi3wJBVV95cUxQaHVUY0VYcUhMb3VQQ0tGM1lFV0xROHJzcXpVWWdVWEpmZlI3Xy00RlJlMHZvQy1RWHNXX0FoTGRtU0tHajBRWkF4bC1zUlBTYXJ3SlM4dFU5RlhaR2JfblNaa3lXXy1DUjdLMHBLMWZUR0Q2MXNpV2xtWk10cUVGZGM5TXhKa3BOcnJYSWRMcGhzT1dVYi0taVJ4dkdMVG82UkpER01TYTFyNDlKZHZLZzNpd3pfN05IamdHaGdScjhYTVVTSUo2YjRDQmVvbU01QThNM2g4bHJCYzcxTkh4aV9ycm1oTFRXS3p1TU5CSzRBVFBEMDY3a2ZDbzNnbGlLMEFMTnVfSTF4ZmhiaHljdWg4MjV5YUx5OWlReTJRYTFWS01LQ0xNQjZhNS1GVkJpUnRudlBTMldrVy1vOXlWV2dKSTBsX1Z6OVlQZnRmUW5MbzNWakdCOXFKR09aa2s?oc=5",
+          "published": "Wed, 11 Mar 2026 21:54:33 GMT"
+        },
+        {
+          "title": "Mistral launches Mistral 3, a family of open models designed to run on laptops, drones, and edge devices - VentureBeat",
+          "link": "https://news.google.com/rss/articles/CBMinAFBVV95cUxPZVp3Nl9kczk3TXVKbWVhZzFXeTg4ZXd2QkFYanhlUWRvMHMwUTBJWWZGMXU2dDIyWEZjOXFjeUJ6ZlhvQVdDWkk2VW9GbmE3M1hpTTNlTEVQODZTY2lDZkdRb2M5RGg3YmRwb2RkOWF3emdSYkRWWWhzU3lKRVREVjNpenhRUHBjOC1EVjVKQW5FejNMSVpJRUZ5T0s?oc=5",
+          "published": "Tue, 02 Dec 2025 08:00:00 GMT"
+        },
+        {
+          "title": "Mistral Releases New Family of AI Models, Promoting Performance-to-Cost Ratio - PYMNTS.com",
+          "link": "https://news.google.com/rss/articles/CBMiywFBVV95cUxOeVQtREhUV3U1TlQzQVdEX2ZCMUhoMmZOSVRFNTV3TmNKVHhqTzhOSDdFX3F2bm40a3NudVMxMi1UR2NlUjBCa3JXeWlOc2NLa0wxenFSQ0UwTWxlc293RHQwM0RPR2xlWmRFSVc2TklkblZFUHdfOG9qdFUyekRfWF9VVTlBWnpiNU4xaDZzLU8zQXA2MVVTQktUT0YzSmFzMUVyR0lreDNmTnROU0RqemJ5R0dBaHg0QzU2STd2dFAtREZmTWhqYkNGMA?oc=5",
+          "published": "Tue, 02 Dec 2025 08:00:00 GMT"
+        },
+        {
+          "title": "Mistral Drops Two New AI Models to Challenge OpenAI's Dominance - The Tech Buzz",
+          "link": "https://news.google.com/rss/articles/CBMinAFBVV95cUxNMjU3aXVsMENuUjk3TG9KRkVFOWo5RmczaHVwMzlURENNUUlqWURlOElkMG5IZlREMHRlNXkzUXJDYWN4eTdPdjh5MGUxdnJ5Yi0xVk1FXzlCTmpNV1JBMzF2akdScnhnejRmM20ybTZLLWxWMG91bFlndTU1TGZ0YVpvT2tKZllFYkFLTUNCS0UyaTgyOThMYlpSZm8?oc=5",
+          "published": "Tue, 02 Dec 2025 08:00:00 GMT"
+        }
+      ]
+    },
+    {
+      "name": "Hugging Face Blog",
+      "url": "https://huggingface.co/blog/feed.xml",
+      "source_url_used": "https://huggingface.co/blog/feed.xml",
+      "category": "ia",
+      "reliability": "high",
+      "keywords": [
+        "sentiment",
+        "transformers",
+        "evaluation",
+        "leaderboard",
+        "french"
+      ],
+      "items": [
+        {
+          "title": "Mixture of Experts (MoEs) in Transformers",
+          "link": "https://huggingface.co/blog/moe-transformers",
+          "published": "Thu, 26 Feb 2026 00:00:00 GMT"
+        }
+      ]
+    },
+    {
+      "name": "Google News - Analyse de sentiment (FR)",
+      "url": "https://news.google.com/rss/search?q=%22sentiment+analysis%22+NLP+model&hl=en-US&gl=US&ceid=US:en",
+      "source_url_used": "https://news.google.com/rss/search?q=%22sentiment+analysis%22+NLP+model&hl=en-US&gl=US&ceid=US:en",
+      "category": "ia",
+      "reliability": "medium",
+      "keywords": [
+        "sentiment",
+        "analysis",
+        "nlp",
+        "model",
+        "classification"
+      ],
+      "items": [
+        {
+          "title": "Analyzing student mental health with RoBERTa-Large: a sentiment analysis and data analytics approach - Frontiers",
+          "link": "https://news.google.com/rss/articles/CBMijwFBVV95cUxQVE10N0Utd3g0UVFETE1ZX2lMbEpyYkVaQV9sNkNVMUdfRERabklrcGlxWVVXbGpSSTVXWXBwN29sT2J2a3NPQjZRMDZBY09BZjEtOWRyVnZBZ1otcGFPTG5TbU0xeWc1bmJtZ2d6QmF0cTlkRHAyaHJOT3lCZ2d0dE85SkdoSXdXQm5yajk5MA?oc=5",
+          "published": "Thu, 16 Oct 2025 07:00:00 GMT"
+        },
+        {
+          "title": "How to Analyze Call Sentiment With Open-Source NLP Libraries - HackerNoon",
+          "link": "https://news.google.com/rss/articles/CBMiiwFBVV95cUxPekpqaGtIUjBFWGVoY2xSSVBjeHhnM0tyR2dIdEJCcC1YZEdrbUE0TThBZWpMaXg3bl9zaXVmN2sxM1dlNU9sOEg5RVRKd0xTb3FDRFA3RVZQV3Mxc25OZVJ4RW9QZUtmTzVpbWpXR1ZIRXM1UE1MVHZuUkxDRHJzSkZ1NjQxaXVuZjU4?oc=5",
+          "published": "Tue, 20 Jan 2026 05:29:44 GMT"
+        },
+        {
+          "title": "Hugging Face Transformers in Action: Learning How To Leverage AI for NLP - Towards Data Science",
+          "link": "https://news.google.com/rss/articles/CBMipgFBVV95cUxPV09XUC1jMzQ1cjd0RkFfN3BZeHpoVHNsb0JWTGRTeU5QVUdXQkJ1OS1hOTU3S2pjcGJpUkhsZHo1QnFTQzY1NzFtNkltZ1ZlVmZHeFBXYkRxbzZpMmZzY0tYUmdLYlZMeGJ2a2xRcEdCRjZ0WUwxa19DNGNsdS1LclEzRHJjSjM2WlF1c1d2dlJMU3JKZHJoTUlSdnBTejltYXpOMEFR?oc=5",
+          "published": "Sun, 28 Dec 2025 08:00:00 GMT"
+        },
+        {
+          "title": "Top 16 sentiment analysis tools to consider in 2026 - Sprout Social",
+          "link": "https://news.google.com/rss/articles/CBMia0FVX3lxTFBRMXNXQ1pUbG9fT0RpcjZPcFk5dllQS1VTNFgxMVI0ejRyN216Z1lubV9HM0VVNVZta1pPeG10T0tyLVVCNFJFWUhiQ2ZUR0w0eko3WUE2YkE3bUdYTERzZlprSWk4NmF5SDZj0gFwQVVfeXFMUDI2RndaZEdpTWVQOHlnTGdsY2NYZEJtTllGdi1aSkVEZF93ZzVuT2F0dkxLcFpPV2VpN2wzTHhrcDFHbG1ra0xaM1diRFF0dUpHXzFPX2tmdkZkci15b01ZalhRbG56WkxmYWtJcl9tcQ?oc=5",
+          "published": "Wed, 23 Jul 2025 07:00:00 GMT"
+        },
+        {
+          "title": "Prompt-based fine-tuning with multilingual transformers for language-independent sentiment analysis - Nature",
+          "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE15Q0VfSmdlN09RTHdqcXhERkJ5WVYyYzFqWUJlVHRaLXRJV1MtYlhIRmNRbnpxYWt6T0xDRjAwd0s1aFhGMUctTWNuNklsMTVIRUVHYjg3WUVwanRoU21F?oc=5",
+          "published": "Tue, 01 Jul 2025 07:00:00 GMT"
+        },
+        {
+          "title": "The meaning of sentiment analysis of UN speeches on the Russia-Ukraine war: a comparative study using VADER and BERT NLP techniques - Frontiers",
+          "link": "https://news.google.com/rss/articles/CBMimgFBVV95cUxNZ0lva0JtS0w5Yjk2dVRYTkI3MHdnOVIwQlVQSk50UFkxQlNveGlEODFTNXNJSURnSFRUWXVMMGgwZjdTOVNjV2hFZHBkZFFUcUlCVWxKYmhMLURCUmhiV1ZuYmwyRzVodkpXYUNpeHBnTzBPdmtuT1g0Y2NfLUp0UUNkM0FDSDhoRXpXTVNlYjJVT2pwUTJIcW9B?oc=5",
+          "published": "Thu, 03 Apr 2025 07:00:00 GMT"
+        },
+        {
+          "title": "A multilingual BERT-based classification of reviews for enhanced visitors’ experience analysis - Nature",
+          "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE5EaW9SSVBEV2VkZEp0bGdzTTB3YTdjcFUxZ2o5QnZDR28yaDhGVzUwcVdVY0o3dGZ1NEhDVXlsOS1aTS1OZldGdXpTeEtlSXZZRC1Tb1ZJa1U1R2lFSU1F?oc=5",
+          "published": "Tue, 26 Aug 2025 07:00:00 GMT"
+        },
+        {
+          "title": "Topic Modelling and Sentiment Analysis via News Headlines, NLP Methods on Australian Broadcasting Commission - Scielo.org.mx",
+          "link": "https://news.google.com/rss/articles/CBMiiwFBVV95cUxPaUVXUmtGVnZLMXZzQ3ZkMnBKcEZ0dU9OcS1WVkk4Vlp4Wlh0UDZFa2Z5dzdERGRla0lUOUR1N0NmQ2lVVFdCOUt5eVRMdGk5NDNyc1NaeUxuMGEtYUhmdWdvOERRS09tTDA3SFB5S1BaQ3JPNmc0LWJfWmJiZ2x4RUN4dkZEWjdKNk9B?oc=5",
+          "published": "Wed, 26 Mar 2025 07:37:22 GMT"
+        }
+      ]
+    },
+    {
+      "name": "Google News - LLM Benchmark",
+      "url": "https://news.google.com/rss/search?q=large+language+model+benchmark&hl=en-US&gl=US&ceid=US:en",
+      "source_url_used": "https://news.google.com/rss/search?q=large+language+model+benchmark&hl=en-US&gl=US&ceid=US:en",
+      "category": "ia",
+      "reliability": "medium",
+      "keywords": [
+        "benchmark",
+        "leaderboard",
+        "evaluation",
+        "llm"
+      ],
+      "items": [
+        {
+          "title": "AI benchmark numbers are meaningless — here’s what to look for instead - MakeUseOf",
+          "link": "https://news.google.com/rss/articles/CBMimgFBVV95cUxQUUhaV3pOcFRJV3NTSnlIb0ppYklKc3UtMk5jeXlhdlF2MEthUURtTGhwb1gwcTluWnRZUC1kU3BxZHN3NFJTZXpqMmlhQ0lWNmZzYTBxTEdCTWxncWZyVTUwQXk3YTBMdVNydWUxN1VCRmItVHl4Ti15Z1NSQjFaTnh3SC1OSkx2b1gwNWdYTWVPeG9ua0Z6Wkln?oc=5",
+          "published": "Sun, 15 Mar 2026 22:00:16 GMT"
+        },
+        {
+          "title": "Benchmarking large language models for personalized, biomarker-based health intervention recommendations - Nature",
+          "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE42dVQzVjAzWHc0aGxKMUVXRW03WVctZm56TkJBRUZrQ04tVG1KX0xfelRMYUpUdFpvNzEyZVIwbFRFLWNKVDdwVFIwcllXckQzaGp0bmNkS1VDN3dXc0Qw?oc=5",
+          "published": "Mon, 27 Oct 2025 07:00:00 GMT"
+        },
+        {
+          "title": "FACTS Benchmark Suite: a new way to systematically evaluate LLMs factuality - Google DeepMind",
+          "link": "https://news.google.com/rss/articles/CBMiuAFBVV95cUxORVctLUpKZE9IVUZPY0t1T3dRa0I1MjNfczEtOWJjUzhKT0pZX1FKenA5dzN2WEVjZGZsYjZvRTBlbE1mblNlaVd1Umh3S3luS1lFZ2d5a25WZHlTSVlsUExfa1hFSDd5ekowZlVPME85dG1NaGxqbF9RQXp6ejByZGpyLUtfUjBhd0lWTGN4TlNKbkVHVEZGb2JhQ2R3Nkc5YUNYM3FTUGg0R1Rjd0U5VkFKNURETms4?oc=5",
+          "published": "Tue, 09 Dec 2025 08:00:00 GMT"
+        },
+        {
+          "title": "Best Local LLM Models 2026 | Developer Comparison - SitePoint",
+          "link": "https://news.google.com/rss/articles/CBMiY0FVX3lxTE5DdUgydlBRZjNkZ0Y2UVZEalQ0ckMyeUl4TTJudlE2cmdWV09ERm5VbV9fN3RhelYxWG9Lb3FnSUdqM3luRVVrTUx6QXd2RGZrLTRmMFF5MzZTSUFqRExkYk9Faw?oc=5",
+          "published": "Fri, 13 Mar 2026 20:37:11 GMT"
+        },
+        {
+          "title": "New 'renewable' benchmark streamlines LLM jailbreak safety tests with minimal human effort - Tech Xplore",
+          "link": "https://news.google.com/rss/articles/CBMiiAFBVV95cUxPVEoxcFBmcUlQbHBLR3FMeDVzN3k0a3R1dlFXVDNHaVUtYnR2X0dpLVY5VEZKT2N3bXlMc242UUdFMnhYdWtIaWV0SzlkNTNDSHJBY0FzNExmeWx3UDdjWnptZ21BQ1d0NWNILXFweHVNZXVrcVctNmNMUkFHOGRHX0dvQUtwMjFE?oc=5",
+          "published": "Wed, 11 Mar 2026 19:00:07 GMT"
+        },
+        {
+          "title": "Benchmark-to-benchmark comparisons made easier - IBM Research",
+          "link": "https://news.google.com/rss/articles/CBMib0FVX3lxTE1IX1BVaEZoNnFOS1AtZmVfaUhMeXY5Z0dGa1VMVWNzbTRFamxodEFyOGNINnNNRm93cktrbDkydDhLejJRQlVTREhIVmU1NEhiRGZpMG5rMlhfVWpZRF93eW5QUWJHTDlWSEZTRG5rQQ?oc=5",
+          "published": "Tue, 16 Dec 2025 08:00:00 GMT"
+        },
+        {
+          "title": "Italian Benchmark Evaluates Large Language Models, Includes AI Translation - Slator",
+          "link": "https://news.google.com/rss/articles/CBMijAFBVV95cUxNdy1PWHRfZVJGcDJOSHl3c0tPc01XU2dkcVAxVVl2UUs4VnR5cHZfbGM1NWRjek1BMjZ5YzUzTWdac0ZTV0M1Tk9MVF9ndnAyRG1hUHZNcHp2alJwYUtDWTBpYjlVRFQwTklGbEJTWU9DLTJ5amNZV2xQX2xqbjhONDZoVFpYejJiUzEyMw?oc=5",
+          "published": "Thu, 08 Jan 2026 08:00:00 GMT"
+        },
+        {
+          "title": "FACTS Benchmark Suite Introduced to Evaluate Factual Accuracy of Large Language Models - infoq.com",
+          "link": "https://news.google.com/rss/articles/CBMiaEFVX3lxTE9NNXV1RllXTWhkT0xuYVh2SW45d1ZYcE91RUJXbnczeEtqMWQtZUd4ZGV2S3habmlYaDRlbU1TTUNCTC0tNURIQkUtMkRfMmRDMnhSSF9sd1hHdUlaYWpGLVdXV2dPeVhV?oc=5",
+          "published": "Mon, 12 Jan 2026 08:00:00 GMT"
+        },
+        {
+          "title": "Benchmarking large language models on safety risks in scientific laboratories - Nature",
+          "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE41NDZYY082MThvb2V3elZNSjNRc0wyYm0zTV9CeGs1UnNtcF94U0t6N2xGOFVJb0tqT21ZSjRNS1p2UFpwSFBaSTlObW5NQm9Vb0lDNVUwTUhKNXc0aFZ3?oc=5",
+          "published": "Wed, 14 Jan 2026 08:00:00 GMT"
+        }
+      ]
+    },
+    {
+      "name": "Google News - AI Act emotion recognition",
+      "url": "https://news.google.com/rss/search?q=AI+Act+emotion+recognition+ban+EU&hl=en-US&gl=US&ceid=US:en",
+      "source_url_used": "https://news.google.com/rss/search?q=AI+Act+emotion+recognition+ban+EU&hl=en-US&gl=US&ceid=US:en",
+      "category": "reglementaire",
+      "reliability": "medium",
+      "keywords": [
+        "ai act",
+        "emotion recognition",
+        "eu",
+        "ban",
+        "compliance"
+      ],
+      "items": [
+        {
+          "title": "The Prohibition of AI Emotion Recognition Technologies in the Workplace under the AI Act - Wolters Kluwer",
+          "link": "https://news.google.com/rss/articles/CBMi7wFBVV95cUxNb0xCaUwybDdRaEVESm5tb2VZOXczWThkN0pIZlA4RkdLdFVmOFdQLU9Odmlfcmd5alFkamd0bmNfc3lnVVhySm5LbmluaDI5dXZjbl8tMmcyZUZWN2tPaDVDY3c4bFQycDdsTXRTZk5QdTd3NVlRRXVsbmJvZVZJVlI4VzNmeERLaHE2REZKOGM2ck5YRE9xQVN2aDZjdTVTRk1VZGRmdHdnemVZSUM5TnRrQXJ6SXF1WkNaWlRKczFHa3hrZExyb0ZHcXZPMXBEbDY3ZjBtZFpDbjZTNHc5VFdzYzlCeUgxRkJpWUtKdw?oc=5",
+          "published": "Mon, 14 Apr 2025 07:00:00 GMT"
+        },
+        {
+          "title": "Biometrics in the EU: Navigating the GDPR, AI Act - IAPP",
+          "link": "https://news.google.com/rss/articles/CBMie0FVX3lxTE9PT2FPREpLTERxRjk2Wjg3b1d0NGlPM0toTEhJa0NIQ3hmdUs0TXBUbVBXOW56OERSbUxSRUxGc1NMX25BZ2RXRlRHOHVSSWJES20wZnNIeXo0eFBRV3c2and0UWZ4c0Q2bmNVWTB0cHhhWDVwSUYyVGs2cw?oc=5",
+          "published": "Wed, 23 Apr 2025 07:00:00 GMT"
+        },
+        {
+          "title": "These are the major loopholes on emotion-recognition in EU Artificial Intelligence Act - EUobserver",
+          "link": "https://news.google.com/rss/articles/CBMitgFBVV95cUxOLUZIU25ISlF0Rld0UXp0d3BfYktkc1o0aWVBemRwOWJ2blpMdndyZWVuRTQyQjZZTThIM1I5YzE2WWFNMU5SUHR4Mk9NOGxDNDQxc21ZT0pQQkVJWTYxakV0ZDRyWGNzbm5QRVpBNm5aQ1phbUJGLWlNMWRhU0gtbERxV3lrYldHLVdOY0VDdmJKUG5qUWxIMEZtdEs2Uzd6LVJQU0ttcGlMV3JCQzR4MDliRGJvQQ?oc=5",
+          "published": "Fri, 07 Nov 2025 08:00:00 GMT"
+        },
+        {
+          "title": "EU's new AI Act restricts emotion recognition systems in workplaces - hcamag.com",
+          "link": "https://news.google.com/rss/articles/CBMiyAFBVV95cUxQcWdjV3lGQWxJa3VKNGxXQ3lQcndmLWFqR1Z3bzB0YkZDWnM0MzhNVG5RaThIT3p5N01xUXM4cERrYTdDLUFBSFNmX1NvSENqTTEzMG41U0ZtQm1UZzZjcksxc0J2OHlNbWpaSHhjV29iNEUzSEROUjBwWWIxclZQVGxucTZYbUdHdDlSN0xrd19qNWVhYWpfbnpxelZnbUlvTkRVWTg1RlVsT1ZtTVVqLXJBb3p1eXFydHVYMk9EXzBHS3Q5TTZZRw?oc=5",
+          "published": "Tue, 11 Feb 2025 08:00:00 GMT"
+        },
+        {
+          "title": "Artificial Intelligence Act: MEPs adopt landmark law - European Parliament",
+          "link": "https://news.google.com/rss/articles/CBMiugFBVV95cUxQZFFBT1UtMlV0OGNEWDFaeUFYNzZfT01aTHdVTHFlVk1uU3MtRTVPNU1KbldmcTJvZFJjampEZThnWWctUGNuN19XMnhpd2gydVNTajRiekpRSjZjTlZZNjlhTVNoREVyUFExakphMmhHb3VsODRTdEpKeXBvUklUQWxRVThTOUF2MEVLMWNkaUdnREhVMm9Mdmk0Q3c3djI1RnNzTHkybm1XQW1mOXl5S0x2cm5BeDNEV1E?oc=5",
+          "published": "Wed, 13 Mar 2024 07:00:00 GMT"
+        },
+        {
+          "title": "EU's AI Act: Tread the Guidelines Lightly - Tech Policy Press",
+          "link": "https://news.google.com/rss/articles/CBMicEFVX3lxTE8tanhlNWNLM21UYTM0M0ZkQ3VNQXBNRTl5QUFSNjVlaGtmd1MtWHJSX2RfT1dRTVBBUHBXdTdjUEYxbFV6cy1xZVZjTV91S2VaUXdYSUZvSHVvdU9aZjQteUFZNEtGM1Axb1NxcHJxNzQ?oc=5",
+          "published": "Fri, 21 Feb 2025 08:00:00 GMT"
+        },
+        {
+          "title": "EU: Ban on most harmful use of AI moves a step closer - Amnesty International",
+          "link": "https://news.google.com/rss/articles/CBMiogFBVV95cUxQbzFDWUJhc2dOcWhzUlAwd2t0M3FaSnJvMFdMdUtWNkpKR3FhdW5nbTM3dC1OQ3VXWVMtV3pHTHM2Si1vQmQxNG80WWZjakdfZHBNbWt5aXZUenpnTFN0NXNaQnVPQ0tWSFJkVVIxdXB0di0ySFdqMGI0TFFfRlpUYWJCM0ZISTZfU201SGcwRmhXOER0YUdyckd5bkJjNHZNV0E?oc=5",
+          "published": "Thu, 11 May 2023 07:00:00 GMT"
+        },
+        {
+          "title": "EU Commission Issues Guidelines on Prohibited AI Practices Under EU AI Act - Wilson Sonsini",
+          "link": "https://news.google.com/rss/articles/CBMisgFBVV95cUxPQTFGN0VWS0dUY0FkaTBjTTQ4aDBXdFpkZWNnWUNQRHY3S280S2ZpYndETk9yZ204TzNkdUltWm5YbmpjQ0dNa0xhbkxIYW4xYTFJYWJYUzE4QU8xeFN4djZMMGVkTUduVVFVeG1FNHJsVUloSlJvUEIybUliaEVLSnlveWU5SVRIVm9GcHoyM1pfQi1TMGtuYzJxMUk2WGpILXZfd0VLRldFU3BNWEVPT1Jn?oc=5",
+          "published": "Tue, 11 Feb 2025 08:00:00 GMT"
+        },
+        {
+          "title": "Dutch Regulators Call for Clarity on AI Emotion Recognition Ban in Workplaces and Schools - BABL AI",
+          "link": "https://news.google.com/rss/articles/CBMiqgFBVV95cUxPRmtkQTMzZmxxM29PdFVXTzl0NHd6VENTb215RElzX21sVU4yWGZkVld4Z3hjb0dhckdLUTFVNG14UDM2YXZDVjA1a0hfWGltTV9sMUZtWnA3Z0U2dlJJN0pibGNYTlBBZEc4U3JxaGdQXy1seXo1ZW9zRDN1bVpHQ3oyOU83RWxzazVkU2lRbkFZWUh2VGh1TFhUOTBYeGo5UldpVC1EZ19Ldw?oc=5",
+          "published": "Tue, 25 Feb 2025 08:00:00 GMT"
+        },
+        {
+          "title": "Human rights protections…with exceptions: what’s (not) in the EU’s AI Act deal - Access Now",
+          "link": "https://news.google.com/rss/articles/CBMiakFVX3lxTE0tZjFsbGJCaG9NVERXVnR0X0RuMVZWRTBUUDhlUGRuTDR2clVtYVpac3lRX3hwRVpFX3k5cjF6MUVrOFZnXzVoelpHNFduMldOaFFPekJXOHprYy0zVllaTVFtS2M0UjNoOEE?oc=5",
+          "published": "Thu, 14 Dec 2023 08:00:00 GMT"
+        }
+      ]
+    },
+    {
+      "name": "Google News - CamemBERT / FlauBERT",
+      "url": "https://news.google.com/rss/search?q=CamemBERT+FlauBERT+sentiment+classification&hl=en-US&gl=US&ceid=US:en",
+      "source_url_used": "https://news.google.com/rss/search?q=CamemBERT+FlauBERT+sentiment+classification&hl=en-US&gl=US&ceid=US:en",
+      "category": "ia",
+      "reliability": "medium",
+      "keywords": [
+        "camembert",
+        "flaubert",
+        "sentiment",
+        "classification"
+      ],
+      "items": []
+    },
+    {
+      "name": "Google News - Sentiment bias",
+      "url": "https://news.google.com/rss/search?q=sentiment+bias+AI+model+evaluation&hl=en-US&gl=US&ceid=US:en",
+      "source_url_used": "https://news.google.com/rss/search?q=sentiment+bias+AI+model+evaluation&hl=en-US&gl=US&ceid=US:en",
+      "category": "ia",
+      "reliability": "medium",
+      "keywords": [
+        "sentiment",
+        "bias",
+        "evaluation",
+        "model"
+      ],
+      "items": [
+        {
+          "title": "A scalable framework for evaluating multiple language models through cross-domain generation and hallucination detection - Nature",
+          "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE5hYnQ5ZGZXUW9PVUxqdklmNVB6dWpfc3M2bFVtb1dnRmY1SXBVa3F6dFBDMFBzZmRYd0ZXeHdaa2tOSFdobS14M3IyMXlzWDFlb1lYc3ZtVG1lLUdnOUw4?oc=5",
+          "published": "Sat, 16 Aug 2025 07:00:00 GMT"
+        },
+        {
+          "title": "Evaluating generative AI models with Amazon Nova LLM-as-a-Judge on Amazon SageMaker AI - Amazon Web Services",
+          "link": "https://news.google.com/rss/articles/CBMizgFBVV95cUxNbTdSSnpkeHdHU1AwdWdDbkRzZFdPb2ZFX3d4Ul85bmZ5eFpGQ3BXdG1XbmlVUy1jU0pfZDJ6WGduTFlpWHhHVFlRaWEzTU9kaWFDNlppOUYxOGZTdUdGdVk5aHhBei1JREZ0OUFTS2ZLS1NOMHJjSTh0cEF1Njk3MzlJRzk1X0VxS1Qtek1SSjYyNGpScWhJR01wR0tXMmNMQTNmMVZYcGlnSFdtSDdja0pSb0MzY1BDaURYV1FEU1lBanR1NW5ISkMtTUhGdw?oc=5",
+          "published": "Fri, 30 Jan 2026 08:00:00 GMT"
+        },
+        {
+          "title": "Positive sentiments in early academic literature on DeepSeek: a cross-disciplinary mini review - Frontiers",
+          "link": "https://news.google.com/rss/articles/CBMiogFBVV95cUxQNW9UdHFhYXBOSDdUd2RSS3p4NVQ0N2RjOU56TjNqaGlaNENUbjFkQkZSMHc3d0ZMQ0szS0J3NFZzY1pabmJVOTNWa2dDNnJxd2dqUFBvZVlEQmZUZW1LZ01rS3NvaEVubGY1N1gzNlp2WHRER1NHbXBqNGpfQlRQNTZmWmttOW9RYnk1UnVkdUFRMTZxd2V0XzhxZFNRMThCT1E?oc=5",
+          "published": "Wed, 10 Dec 2025 16:22:25 GMT"
+        },
+        {
+          "title": "Financial language models carry bias across gender, race and body attributes - Devdiscourse",
+          "link": "https://news.google.com/rss/articles/CBMiywFBVV95cUxOVlkwUldTQWJLcGxDRnQ4OC16TjJRYU5oUW9tOEt6WHVlcUxfMFJCckJ5UVVaTGhpVnFkVmdYTVRsQ2VIRk9nbzFrVkk2MXEtb3ZuNG5xMHZRYzRJN21lakxnRnhSU0YwVjh6bmMyY09yQnNYb2dqWGxmdTZkVWdBeVlTOXNWekpqMm54Z0JGRGpqSEFxazFNSmtQbWJEeDJyNzE0ZzByOTlDSmxlYmhOY0ktRUZWYnFnNjVfMllLZ1V0MUhRUnRDMFZyY9IB0AFBVV95cUxOUnRQSE9icjZ6VW9oZDMxRnRPUnRvRUNMVXFUWU4zd20zTGp2REJ3VXlCd2dkMnRxNlRGVTduMXZ3OVZoLUJjeFZCeTBwbXQ4VlFXeFhuRXAtNDdreHZGV1FXblhGcGpxYU5xdTJPY2syUmlnT2E4bGhlS1VVX3F6MGlqbFhLWXJiTTJYVU5BWmNfXy1Ecy0tZkhQdmdWWl9mSzlyeS1ZdDN3cWxQbUJueHJSckt1US1UdnQzU19keWRGc1g2RGtCTTBqdk5heWV2?oc=5",
+          "published": "Thu, 12 Mar 2026 14:27:18 GMT"
+        },
+        {
+          "title": "Bias in AI: Examples and 6 Ways to Fix it in 2026 - AIMultiple",
+          "link": "https://news.google.com/rss/articles/CBMiUkFVX3lxTE5wWHhQS0lnMnBuc1B3M3lwMVlCbEZBNlRSMDRhcVZ2VTgwV19RM0NGcTZjRm9uY1Ntb2tjMW9qYmJmSzZBdTJOOTVLcG1sVVQ0U1E?oc=5",
+          "published": "Thu, 22 Jan 2026 08:00:00 GMT"
+        },
+        {
+          "title": "Empathy, bias, and data responsibility: evaluating AI chatbots for gender-based violence support - Frontiers",
+          "link": "https://news.google.com/rss/articles/CBMimgFBVV95cUxPT1JNOUozVnh5XzlaVlo1OHUwc2czU29HY2F5eHBjb3lKY3FBTUNfX0p4aW5TRDNib1d0WGVYdXNrWVF3RnNKVVc4QnJ3VTVXdzRpNEtyWjFuN2IwYmxBRFROUDF4endyVkNsX0UwUWMxN19CcXd5OHNMcy1QZ2FLd1ZobllISkNzZHJqS0doazhmWUNVN2NqZW1R?oc=5",
+          "published": "Mon, 07 Jul 2025 18:11:00 GMT"
+        },
+        {
+          "title": "Multi stage sentiment analysis for product reviews on Twitter using optimized machine learning algorithm - Nature",
+          "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTFA5WmFmemNhcDN0bEZnQ2VCbk0waGlPd1hrMU43RkYyVEFPVWZXUXdNeVhfOVM1VTVUQkU4XzBwSUwxQTg3c3k1N1ppSks3ZFNuZXV2cmZEdVBKR0kyQjlv?oc=5",
+          "published": "Thu, 13 Nov 2025 08:00:00 GMT"
+        },
+        {
+          "title": "ADL report uncovers bias in AI models - www.israelhayom.com",
+          "link": "https://news.google.com/rss/articles/CBMigwFBVV95cUxOMlNTLWVZODhpNm14eU5maThPN1FVT0VoajAyQ2lUeG1DMm10Mi1SLVVzTXBiZ3hOOFMwRWJjRkM5NjEwNWlyaElTV2p1ZWlKUERwcVVKSkowMnJJQzJPckJYZkxYaE40UEk2RERyeHR5LWE2b2FFNmpZSHRBcWtncTRacw?oc=5",
+          "published": "Tue, 25 Mar 2025 07:00:00 GMT"
+        },
+        {
+          "title": "AI Models Rate ‘Right’ Think Tanks Lower in Terms of Morality, Objectivity, and Quality Than Those on the ‘Left’ - American Enterprise Institute - AEI",
+          "link": "https://news.google.com/rss/articles/CBMi5wFBVV95cUxOVDdNRUxNOFFMS1J5bHJKT05nbnFzT01kZ0VxcWRrS2VzV3ZXUER6dDRXSm5yY1F5LWNIUkdSU1ZtTVBTcWo5ZnRxNWN2LWhIRDhwb3FXRXBaVEFQSTZLU1NXaGJjV1BaN1RFUVR3aDl1RnEtNFNrQ25idlR6dmxoLWVyRXQ0UHpWYm56aFNnazhyUXJBNFFTRURfb19pNjNsamhKVlpsMjNVMHAzRnJKQnhrVTBwN3gzRk93UkE5ZUlvSmJ4aXctT2N5eU8xbUM4b19QUDBJa1VJeHd4THFWbUNWX2U4SXM?oc=5",
+          "published": "Mon, 25 Aug 2025 07:00:00 GMT"
+        },
+        {
+          "title": "How to avoid replicating bias and human error in LLMs - Orange.com",
+          "link": "https://news.google.com/rss/articles/CBMikgFBVV95cUxOVVBOUzRSNjdKcEMyS0NXNWJtR2xtWUZlcTNFdVptcmNLSGxLRm56dVpBckZ4bGNKZGR4MFdLc0JWUXplWFFHSGdEREp6aGpxZ29oVUFIWEQtaTRzLTNtRTlqazFCYjJ1MEwwNzEzYmtGNlpCck5hY2kxdmpFS09UazBYekNqY2FlUE9MSUw0dnRxUQ?oc=5",
+          "published": "Tue, 24 Sep 2024 07:00:00 GMT"
+        }
+      ]
+    },
+    {
+      "name": "Google News - Inria NLP",
+      "url": "https://news.google.com/rss/search?q=Inria+NLP+CamemBERT+FlauBERT&hl=en-US&gl=US&ceid=US:en",
+      "source_url_used": "https://news.google.com/rss/search?q=Inria+NLP+CamemBERT+FlauBERT&hl=en-US&gl=US&ceid=US:en",
+      "category": "ia",
+      "reliability": "medium",
+      "keywords": [
+        "inria",
+        "nlp",
+        "camembert",
+        "flaubert"
+      ],
+      "items": []
+    },
+    {
+      "name": "arXiv cs.CL",
+      "url": "https://export.arxiv.org/rss/cs.CL",
+      "source_url_used": "https://export.arxiv.org/rss/cs.CL",
+      "category": "ia",
+      "reliability": "high",
+      "keywords": [
+        "sentiment",
+        "classification",
+        "french",
+        "evaluation",
+        "benchmark"
+      ],
+      "items": []
+    },
+    {
+      "name": "ANSSI",
+      "url": "https://www.ssi.gouv.fr/feed/",
+      "source_url_used": "https://www.ssi.gouv.fr/feed/",
+      "category": "reglementaire",
+      "reliability": "high",
+      "keywords": [],
+      "items": []
+    },
+    {
+      "name": "CNIL",
+      "url": "https://www.cnil.fr/fr/rss.xml",
+      "source_url_used": "https://www.cnil.fr/fr/rss.xml",
+      "category": "reglementaire",
+      "reliability": "high",
+      "keywords": [],
+      "items": [
+        {
+          "title": "Serveur mandataire web filtrant : les recommandations de la CNIL",
+          "link": "https://www.cnil.fr/fr/recommandation-serveur-mandataire-web-filtrant",
+          "published": "Fri, 13 Mar 2026 13:00:00 +0100"
+        },
+        {
+          "title": "Ordre du jour de la séance plénière du 12 mars 2026",
+          "link": "https://www.cnil.fr/fr/ordre-du-jour-de-la-seance-pleniere-du-12-mars-2026",
+          "published": "Thu, 12 Mar 2026 13:00:00 +0100"
+        },
+        {
+          "title": "Réglementation européenne sur les biotechnologies : le CEPD et le Contrôleur européen de la protection des données publient un avis",
+          "link": "https://www.cnil.fr/fr/reglementation-europeenne-sur-les-biotechnologies-le-cepd-et-le-controleur-europeen-de-la-protection",
+          "published": "Thu, 12 Mar 2026 13:00:00 +0100"
+        },
+        {
+          "title": "La CNIL sera présente au Forum InCyber (FIC) du 31 mars au 2 avril 2026",
+          "link": "https://www.cnil.fr/fr/forum-incyber-2026",
+          "published": "Thu, 12 Mar 2026 13:00:00 +0100"
+        },
+        {
+          "title": "Numérique en santé : la CNIL et la HAS s’engagent pour renforcer les bonnes pratiques",
+          "link": "https://www.cnil.fr/fr/numerique-en-sante-la-cnil-et-la-has-sengagent",
+          "published": "Wed, 11 Mar 2026 13:00:00 +0100"
+        },
+        {
+          "title": "Règlement sur la gouvernance des données : FAQ sur les organisations altruistes des données reconnues dans l’Union européenne",
+          "link": "https://www.cnil.fr/fr/reglement-sur-la-gouvernance-des-donnees-faq-sur-les-organisations-altruistes-des-donnees-reconnues",
+          "published": "Tue, 10 Mar 2026 13:00:00 +0100"
+        },
+        {
+          "title": "Le 8 mars à la CNIL : paroles et regards autour des droits des femmes et de l’égalité professionnelle",
+          "link": "https://www.cnil.fr/fr/journee-internationale-droits-des-femmes-2026",
+          "published": "Mon, 09 Mar 2026 13:00:00 +0100"
+        },
+        {
+          "title": "Clôture de l’injonction prononcée à l’encontre de la société KASPR",
+          "link": "https://www.cnil.fr/fr/cloture-de-linjonction-prononcee-lencontre-de-la-societe-kaspr",
+          "published": "Fri, 06 Mar 2026 13:00:00 +0100"
+        },
+        {
+          "title": "Ordre du jour de la séance plénière du 5 mars 2026",
+          "link": "https://www.cnil.fr/fr/ordre-du-jour-de-la-seance-pleniere-du-5-mars-2026",
+          "published": "Thu, 05 Mar 2026 13:00:00 +0100"
+        },
+        {
+          "title": "IA et santé : la HAS et la CNIL lancent une consultation publique sur un projet de guide",
+          "link": "https://www.cnil.fr/fr/ia-et-sante-la-has-et-la-cnil-lancent-une-consultation-publique-sur-un-projet-de-guide",
+          "published": "Thu, 05 Mar 2026 13:00:00 +0100"
+        }
+      ]
+    },
+    {
+      "name": "Google Alerts - IA / sentiment (à configurer)",
+      "url": "https://www.google.com/alerts/feeds/REPLACE_WITH_YOUR_FEED_ID",
+      "source_url_used": "source_disabled",
+      "category": "ia",
+      "reliability": "medium",
+      "keywords": [
+        "sentiment",
+        "analyse",
+        "model",
+        "benchmark"
+      ],
+      "items": []
+    },
+    {
+      "name": "Feedly - Export RSS ciblé (à configurer)",
+      "url": "https://feedly.com/i/subscription/feed%2FREPLACE_WITH_FEEDLY_ID",
+      "source_url_used": "source_disabled",
+      "category": "ia",
+      "reliability": "medium",
+      "keywords": [
+        "sentiment",
+        "nlp",
+        "french",
+        "evaluation"
+      ],
+      "items": []
+    }
+  ]
+}
