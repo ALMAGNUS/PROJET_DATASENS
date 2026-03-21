@@ -1,4 +1,4 @@
-# Annexe 4 — Extraits de code E5 (illustration jury)
+# Annexe 4 — Extraits de code E5 (illustration livrable)
 
 Cette annexe regroupe **trois extraits de code** représentatifs du bloc E5. Ils illustrent respectivement l'exposition des métriques (C20), la configuration des alertes (C20) et la procédure de résolution d'incidents (C21).
 

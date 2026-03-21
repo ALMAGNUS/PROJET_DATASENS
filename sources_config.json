@@ -25,7 +25,7 @@
     {
       "source_name": "reddit_france",
       "description": "Posts and comments from r/france",
-      "acquisition_type": "api_scraping",
+      "acquisition_type": "api",
       "theme": "society",
       "url": "https://www.reddit.com/r/france",
       "partition_path": "/data/raw/reddit_france/date=YYYY-MM-DD/",
@@ -185,12 +185,12 @@
       "partition_path": "/data/raw/monavis_citoyen/date=YYYY-MM-DD/",
       "file_naming": "monavis_citoyen_france_YYYYMMDD_HHMMSS.parquet",
       "refresh_frequency": "Daily",
-      "active": false
+      "active": true
     },
     {
       "source_name": "agora_consultations",
       "description": "Consultations citoyennes (Agora) - participation-citoyenne.gouv.fr",
-      "acquisition_type": "api_scraping",
+      "acquisition_type": "api",
       "theme": "society",
       "url": "https://api.agora.gouv.fr/consultations",
       "partition_path": "/data/raw/agora_consultations/date=YYYY-MM-DD/",

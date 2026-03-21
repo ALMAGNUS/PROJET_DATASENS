@@ -1,4 +1,4 @@
-# Annexe 4 — Extraits de code E4 (illustration jury)
+# Annexe 4 — Extraits de code E4 (illustration livrable)
 
 Cette annexe regroupe **trois extraits de code** représentatifs du bloc E4 : cockpit Streamlit, authentification et chaîne CI/CD.
 
@@ -162,7 +162,7 @@ jobs:
 
 ---
 
-## Synthèse pour le jury
+## Synthèse (revue livrable)
 
 | Extrait | Compétence | Message clé |
 |---------|------------|-------------|

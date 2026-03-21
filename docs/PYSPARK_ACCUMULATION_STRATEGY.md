@@ -287,7 +287,7 @@ class GoldAccumulationService:
    - Parquet jour J : date=2025-01-16/articles.parquet
    - Résultat : Union des deux
 
-3. Jury voit :
+3. Visualisation :
    - Parquet 1 (2025-01-15) + Parquet jour J (2025-01-16)
 ```
 
@@ -304,13 +304,13 @@ class GoldAccumulationService:
    - Parquet jour J : date=2025-01-17/articles.parquet
    - Résultat : Union des deux
 
-3. Jury voit :
+3. Visualisation :
    - Parquet 2 (2025-01-16) + Parquet jour J (2025-01-17)
 ```
 
 ---
 
-## 📊 Visualisation pour le Jury
+## 📊 Visualisation pour la revue
 
 ### **Endpoint Statistiques**
 
@@ -356,7 +356,7 @@ async def get_stats_accumulated():
 - ✅ **Cache** : Option de mise en cache (si nécessaire)
 
 ### **3. Traçabilité**
-- ✅ **Dates claires** : Jury voit quelles partitions sont lues
+- ✅ **Dates claires** : on voit quelles partitions sont lues
 - ✅ **Statistiques** : Info sur les données accumulées
 - ✅ **Logs** : Traçabilité des opérations
 

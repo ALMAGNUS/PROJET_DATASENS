@@ -203,9 +203,11 @@ class DataSensDashboard:
         console_write(f"   Topics utilisés:       {self.stats['topics']['topics_used']}")
         console_write(f"   Confiance moyenne:     {self.stats['topics']['avg_confidence']:.2f}")
         if self.stats["topics_dist"]:
-            console_write("   Distribution:")
+            console_write("   Distribution (liaisons document-topic, max 2 par article):")
+            links_total = sum(self.stats["topics_dist"].values())
             for topic, count in sorted(self.stats["topics_dist"].items(), key=lambda x: -x[1])[:5]:
-                console_write(f"      • {topic:20s}: {count:4d} articles")
+                pct = (count / max(links_total, 1)) * 100
+                console_write(f"      • {topic:20s}: {count:5d} ({pct:5.1f}%)")
 
         # Enrichissement Sentiment - AFFICHAGE COMPLET (positif, négatif, neutre)
         console_write("\n" + UiMessages.dashboard_sentiment_title())

@@ -3,6 +3,7 @@ import csv
 import hashlib
 import re
 import sqlite3
+import time
 import unicodedata
 import warnings
 from abc import ABC, abstractmethod
@@ -18,6 +19,43 @@ from loguru import logger
 # Suppress BeautifulSoup warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="bs4")
 warnings.filterwarnings("ignore", message=".*looks more like a filename.*", category=UserWarning)
+
+_DEFAULT_BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.5",
+}
+
+
+def _http_get_with_retries(
+    url: str, *, timeout: int = 20, attempts: int = 3
+) -> requests.Response | None:
+    """GET avec reprises (RemoteDisconnected / timeouts fréquents sur certains sites)."""
+    last_err: Exception | None = None
+    for i in range(attempts):
+        try:
+            resp = requests.get(url, headers=_DEFAULT_BROWSER_HEADERS, timeout=timeout)
+            if resp.status_code == 200 and resp.text and len(resp.text) > 10:
+                return resp
+            if resp.status_code != 200:
+                logger.warning("Scraping HTTP {} for {}", resp.status_code, url[:70])
+        except Exception as e:
+            last_err = e
+            logger.warning(
+                "Scraping GET tentative {}/{} — {} : {}",
+                i + 1,
+                attempts,
+                url[:55],
+                str(e)[:100],
+            )
+        if i < attempts - 1:
+            time.sleep(1.2 * (i + 1))
+    if last_err:
+        logger.error("Scraping GET échec après {} tentatives : {}", attempts, str(last_err)[:120])
+    return None
 
 
 @dataclass
@@ -46,6 +84,31 @@ class Source:
     file_naming: str = ""
     refresh_frequency: str = ""
     active: bool = True
+
+
+def collection_mode_description(source: Source) -> str:
+    """Mode effectif de collecte (aligné sur create_extractor). Libellés courts pour console / rapport."""
+    acq = (source.acquisition_type or "").lower().strip()
+    name = source.source_name.lower()
+    if acq == "rss":
+        return "RSS"
+    if acq == "bigdata":
+        return "GDELT (fichiers)"
+    if acq == "mongodb":
+        return "MongoDB"
+    if acq == "csv" or "zzdb" in name:
+        return "CSV"
+    if acq == "dataset":
+        return "Dataset"
+    if acq == "scraping":
+        return "Scraping HTML"
+    if acq == "api":
+        if any(k in name for k in ["reddit", "weather", "meteo"]):
+            return "API (JSON)"
+        if any(k in name for k in ["insee", "citoyen", "opinion"]):
+            return "Scraping HTML"
+        return "API (JSON)"
+    return acq or "—"
 
 
 class BaseExtractor(ABC):
@@ -243,14 +306,11 @@ class ScrapingExtractor(BaseExtractor):
         articles, src_low = [], self.name.lower()
         try:
             if "trustpilot" in src_low:
-                soup = BeautifulSoup(
-                    requests.get(
-                        "https://www.trustpilot.com",
-                        headers={"User-Agent": "Mozilla/5.0"},
-                        timeout=10,
-                    ).text,
-                    "html.parser",
-                )
+                tp_url = (self.url or "https://www.trustpilot.com").rstrip("/")
+                resp = _http_get_with_retries(tp_url, timeout=15, attempts=2)
+                if not resp:
+                    return articles
+                soup = BeautifulSoup(resp.text, "html.parser")
                 for review in soup.find_all(
                     ["article", "div"], class_=re.compile(r".*review|rating.*", re.I)
                 )[:30]:
@@ -259,36 +319,69 @@ class ScrapingExtractor(BaseExtractor):
                         a = Article(
                             title=f"[TRUSTPILOT] {title.get_text().strip()}"[:500],
                             content=review.get_text().strip()[:2000],
-                            url="https://www.trustpilot.com",
+                            url=tp_url,
                             source_name=self.name,
                         )
                         if a.is_valid():
                             articles.append(a)
             elif "ifop" in src_low:
-                soup = BeautifulSoup(
-                    requests.get(
-                        "https://www.ifop.com/?rubrique=fiches-signalitiques",
-                        headers={"User-Agent": "Mozilla/5.0"},
-                        timeout=10,
-                    ).text,
-                    "html.parser",
-                )
+                base = "https://www.ifop.com"
+                urls_try = []
+                if self.url:
+                    u0 = self.url.split("?")[0].strip()
+                    if not u0.endswith("/"):
+                        u0 = u0 + "/"
+                    urls_try.append(u0)
+                if f"{base}/publications/" not in urls_try:
+                    urls_try.append(f"{base}/publications/")
+                seen_u = set()
+                urls_try = [u for u in urls_try if u not in seen_u and not seen_u.add(u)]
+                soup = None
+                for u in urls_try:
+                    resp = _http_get_with_retries(u, timeout=20, attempts=3)
+                    if resp:
+                        soup = BeautifulSoup(resp.text, "html.parser")
+                        break
+                if not soup:
+                    return articles
                 for item in soup.find_all(
-                    ["div", "article", "li"], class_=re.compile(r".*sondage|barometre.*", re.I)
+                    ["div", "article", "li"],
+                    class_=re.compile(r".*sondage|barometre|publication|actus|card.*", re.I),
                 )[:30]:
                     title_e = item.find(["h2", "h3", "h4", "a"])
                     if title_e and title_e.get_text().strip():
+                        href = ""
+                        if title_e.name == "a":
+                            href = title_e.get("href", "") or ""
+                        if href and not href.startswith("http"):
+                            href = base + href if href.startswith("/") else f"{base}/{href}"
                         a = Article(
                             title=f"[IFOP] {title_e.get_text().strip()}"[:500],
                             content=item.get_text().strip()[:2000],
-                            url=title_e.get("href", "")
-                            if title_e.name == "a"
-                            else "https://www.ifop.com",
+                            url=href or base,
                             source_name=self.name,
                         )
                         if a.is_valid():
                             articles.append(a)
-            elif "monaviscitoyen" in src_low:
+                if not articles:
+                    for link in soup.find_all("a", href=re.compile(r"/publications/|/sondages/", re.I))[
+                        :40
+                    ]:
+                        title = link.get_text(strip=True)
+                        if len(title) < 8:
+                            continue
+                        href = link.get("href", "")
+                        if href and not href.startswith("http"):
+                            href = base + href if href.startswith("/") else f"{base}/{href}"
+                        a = Article(
+                            title=f"[IFOP] {title}"[:500],
+                            content=title[:2000],
+                            url=href or base,
+                            source_name=self.name,
+                        )
+                        if a.is_valid():
+                            articles.append(a)
+            elif "monavis" in src_low or "monaviscitoyen" in src_low:
                 base_url = "https://www.monaviscitoyen.fr"
                 seen = set()
 
@@ -380,19 +473,18 @@ class ScrapingExtractor(BaseExtractor):
 
                 # Fallback: classic requests
                 if not articles:
-                    resp = requests.get(self.url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
-                    if resp.status_code != 200:
+                    resp = _http_get_with_retries(self.url or base_url, timeout=15, attempts=3)
+                    if not resp:
                         logger.warning(
-                            "Scraping blocked for {}: HTTP {}", self.name, resp.status_code
+                            "Scraping sans réponse HTTP 200 pour {} (403/WAF ou réseau).",
+                            self.name,
                         )
-                        return articles
-                    if not resp.text or len(resp.text) < 10:
                         return articles
                     soup = BeautifulSoup(resp.text, "html.parser")
                     parse_from_soup(soup)
             else:
-                resp = requests.get(self.url, timeout=5, headers={"User-Agent": "Mozilla/5.0"})
-                if not resp.text or len(resp.text) < 10:
+                resp = _http_get_with_retries(self.url, timeout=12, attempts=2)
+                if not resp:
                     return articles
                 soup = BeautifulSoup(resp.text, "html.parser")
                 for item in soup.find_all(
@@ -900,7 +992,7 @@ def create_extractor(source: Source) -> BaseExtractor:
         if "kaggle" in src_low:
             return KaggleExtractor(source.source_name, source.url)
         return KaggleExtractor(source.source_name, source.url)
-    elif acq_type in ["api", "api_scraping"]:
+    elif acq_type == "api":
         if any(k in src_low for k in ["reddit", "weather", "meteo"]):
             return APIExtractor(source.source_name, source.url)
         elif any(k in src_low for k in ["insee", "citoyen", "opinion"]):

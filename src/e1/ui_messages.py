@@ -12,7 +12,7 @@ class UiMessages:
     @staticmethod
     def extraction_title() -> list[str]:
         line = "=" * 70
-        return [line, "[EXTRACTION] All sources", line]
+        return [line, "[EXTRACTION] Sources actives", line]
 
     @staticmethod
     def cleaning_title() -> list[str]:
@@ -62,7 +62,7 @@ class UiMessages:
     @staticmethod
     def report_title() -> list[str]:
         line = "=" * 80
-        return [line, "[RAPPORT] COLLECTE SESSION ACTUELLE", line]
+        return [line, "[RAPPORT SESSION] Synthèse de collecte", line]
 
     @staticmethod
     def dashboard_title() -> list[str]:
@@ -75,11 +75,17 @@ class UiMessages:
 
     @staticmethod
     def sources_detail_title() -> str:
-        return "[SOURCES] DETAIL PAR SOURCE"
+        return "[SOURCES] DETAIL PAR SOURCE (avec mode de collecte)"
 
     @staticmethod
     def topics_distribution_title() -> str:
         return "[TOPICS] DISTRIBUTION DES TOPICS (SESSION)"
+
+    @staticmethod
+    def topics_distribution_note() -> str:
+        return (
+            "   Base : liaisons document_topic (≤ 2 par article) ; les pourcentages portent sur ces liaisons."
+        )
 
     @staticmethod
     def sentiment_distribution_title() -> str:

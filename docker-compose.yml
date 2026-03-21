@@ -30,11 +30,14 @@ services:
       - ./exports:/app/exports
       - ./sources_config.json:/app/sources_config.json
       - ./zzdb:/app/zzdb:ro  # ZZDB en lecture seule
+      - ./output:/app/output  # Botasaurus (scraping) — même arbre que en local
     environment:
       - DB_PATH=/app/data/datasens.db
       - PYTHONPATH=/app
     networks:
       - datasens-network
+    # Run unique du pipeline E1 (extract RSS/API/scraping → DB → exports)
+    command: ["python", "main.py"]
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "from src.e1.pipeline import E1Pipeline; import sqlite3; import os; db_path = os.getenv('DB_PATH', '/app/data/datasens.db'); conn = sqlite3.connect(db_path); conn.close(); print('✅ Health check OK')"]

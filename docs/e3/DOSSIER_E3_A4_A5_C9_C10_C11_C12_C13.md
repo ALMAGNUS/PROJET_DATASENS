@@ -217,7 +217,7 @@ Les sources des tests et les données de test (fichiers CSV vides, mocks) sont v
 
 #### Rédiger la documentation technique.
 
-La documentation technique des tests est fournie dans `docs/e3/ANNEXE_1_PREUVES_EXECUTION_QUALITY_GATE.md` (description des cas, commandes, résultats attendus) et `docs/e3/ANNEXE_4_EXTRAITS_CODE_E3.md` (extraits de code illustratifs). Les annexes facilitent la compréhension par le jury et la reprise par un autre développeur.
+La documentation technique des tests est fournie dans `docs/e3/ANNEXE_1_PREUVES_EXECUTION_QUALITY_GATE.md` (description des cas, commandes, résultats attendus) et `docs/e3/ANNEXE_4_EXTRAITS_CODE_E3.md` (extraits de code illustratifs). Les annexes facilitent la compréhension par un lecteur externe et la reprise par un autre développeur.
 
 ---
 
@@ -293,6 +293,6 @@ La checklist des captures à produire est fournie dans [docs/e3/ANNEXE_2_CAPTURE
 
 Le script de démonstration minute par minute est disponible dans [docs/e3/ANNEXE_3_PLAN_DEMO_E3_15MIN.md](ANNEXE_3_PLAN_DEMO_E3_15MIN.md). Il structure la soutenance en séquences alignées sur les compétences C9 à C13 et sur les preuves visuelles correspondantes.
 
-### Annexe 4 : Extraits de code E3 (illustration jury)
+### Annexe 4 : Extraits de code E3 (illustration livrable)
 
-Trois extraits de code représentatifs sont regroupés dans [docs/e3/ANNEXE_4_EXTRAITS_CODE_E3.md](ANNEXE_4_EXTRAITS_CODE_E3.md) : exposition API predict (C9), résilience drift-metrics (C11), test automatisé du fallback (C12). Chaque extrait est accompagné du contexte, du lien vers le fichier complet et d'une synthèse pour le jury.
+Trois extraits de code représentatifs sont regroupés dans [docs/e3/ANNEXE_4_EXTRAITS_CODE_E3.md](ANNEXE_4_EXTRAITS_CODE_E3.md) : exposition API predict (C9), résilience drift-metrics (C11), test automatisé du fallback (C12). Chaque extrait est accompagné du contexte, du lien vers le fichier complet et d'une synthèse pour la revue.

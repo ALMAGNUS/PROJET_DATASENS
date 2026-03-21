@@ -1,4 +1,4 @@
-# Annexe 4 — Extraits de code E3 (illustration jury)
+# Annexe 4 — Extraits de code E3 (illustration livrable)
 
 Cette annexe regroupe **trois extraits de code** représentatifs du bloc E3. Ils illustrent respectivement l'exposition API (C9), la résilience du monitorage (C11) et la vérification automatisée (C12). Chaque extrait est accompagné du chemin du fichier source pour consultation complète.
 
@@ -126,7 +126,7 @@ def test_drift_metrics_endpoint_uses_pandas_fallback_when_spark_fails(tmp_path, 
 
 ---
 
-## Synthèse pour le jury
+## Synthèse (revue livrable)
 
 | Extrait | Compétence | Message clé |
 |---------|------------|-------------|

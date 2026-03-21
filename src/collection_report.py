@@ -1,10 +1,13 @@
 """Rapport de collecte détaillé - Session actuelle"""
+import json
 import sqlite3
 from datetime import datetime
+from pathlib import Path
 
 from loguru import logger
 
 from .e1.console import ConsolePrinter
+from .e1.core import Source, collection_mode_description
 from .e1.ui_messages import UiMessages
 
 
@@ -19,6 +22,26 @@ class CollectionReport:
         self.session_start = session_start_time or datetime.now().isoformat()
         self.stats = {}
         self.console = console or ConsolePrinter()
+        self._source_acquisition: dict[str, str] = self._load_source_acquisition_types()
+
+    def _load_source_acquisition_types(self) -> dict[str, str]:
+        """Mappe source_name -> acquisition_type depuis sources_config.json."""
+        cfg = Path(__file__).resolve().parent.parent / "sources_config.json"
+        if not cfg.exists():
+            return {}
+        try:
+            with open(cfg, encoding="utf-8") as f:
+                data = json.load(f)
+            return {
+                s["source_name"]: s.get("acquisition_type", "")
+                for s in data.get("sources", [])
+            }
+        except Exception:
+            return {}
+
+    def _mode_for_source(self, source_name: str) -> str:
+        acq = self._source_acquisition.get(source_name, "")
+        return collection_mode_description(Source(source_name, acq, ""))
 
     def _is_foundation_source(self, source_name: str) -> bool:
         """Détermine si une source est statique (fondation) : Kaggle, GDELT_events, ZZDB (toutes)
@@ -146,7 +169,8 @@ class CollectionReport:
 
         self.stats["sentiment"] = {r[0]: r[1] for r in c.fetchall()}
 
-        # Distribution topics session
+        # Distribution topics session : une ligne document_topic = une liaison article-topic
+        # (le tagger en assigne jusqu'à 2 par article → somme des counts ≥ articles taggés).
         c.execute(
             """
             SELECT t.name, COUNT(dt.raw_data_id) as count
@@ -183,9 +207,9 @@ class CollectionReport:
         if self.stats["by_source"]:
             console_write("\n" + UiMessages.sources_detail_title())
             console_write(
-                f"   {'Source':<30s} {'Collectés':>10s} {'Taggés':>10s} {'Analysés':>10s}"
+                f"   {'Source':<28s} {'Mode':<24s} {'Collectés':>10s} {'Taggés':>10s} {'Analysés':>10s}"
             )
-            console_write(f"   {'-'*30} {'-'*10} {'-'*10} {'-'*10}")
+            console_write(f"   {'-'*28} {'-'*24} {'-'*10} {'-'*10} {'-'*10}")
             zzdb_total = 0
             zzdb_sources = []
             self.zzdb_total = 0  # Pour utilisation dans les notes
@@ -200,17 +224,21 @@ class CollectionReport:
                     zzdb_sources.append((source_name, s))
                     continue  # On affichera après
 
+                mode = self._mode_for_source(source_name)
                 console_write(
-                    f"   {source_name:<30s} {s['collected']:>10d} {s['tagged']:>10d} {s['analyzed']:>10d}"
+                    f"   {source_name:<28s} {mode:<16s} {s['collected']:>10d} {s['tagged']:>10d} {s['analyzed']:>10d}"
                 )
 
             # Afficher ZZDB regroupé
             if zzdb_sources:
-                console_write(f"   {'ZZDB (TOTAL)':<30s} {zzdb_total:>10d} {'':>10s} {'':>10s}")
+                console_write(
+                    f"   {'ZZDB (TOTAL)':<28s} {'CSV':<16s} {zzdb_total:>10d} {'':>10s} {'':>10s}"
+                )
                 for source_name, s in zzdb_sources:
                     status = "(désactivé)" if "synthetic" in source_name.lower() else "(actif)"
+                    zm = self._mode_for_source(source_name)
                     console_write(
-                        f"      └─ {source_name:<27s} {s['collected']:>10d} {s['tagged']:>10d} {s['analyzed']:>10d} {status}"
+                        f"      └─ {source_name:<25s} {zm:<16s} {s['collected']:>10d} {s['tagged']:>10d} {s['analyzed']:>10d} {status}"
                     )
 
         # IA - Sentiment (session)
@@ -223,11 +251,14 @@ class CollectionReport:
             console_write(f"   {label:10s}: {count:4d} ({pct:5.1f}%)")
 
         # IA - Topics (Top 5 session)
+        # Comptage = nombre de LIAISONS document_topic (jusqu'à 2 par article), pas d'articles.
         if self.stats.get("topics"):
             console_write("\n" + UiMessages.topics_distribution_title())
+            topic_links_total = sum(self.stats["topics"].values())
             for topic, count in sorted(self.stats["topics"].items(), key=lambda x: -x[1])[:5]:
-                pct = (count / max(self.stats["session"]["tagged"], 1)) * 100
-                console_write(f"   • {topic:25s}: {count:4d} ({pct:5.1f}%)")
+                pct = (count / max(topic_links_total, 1)) * 100
+                console_write(f"   • {topic:25s}: {count:4d} liaisons ({pct:5.1f}%)")
+            console_write(UiMessages.topics_distribution_note())
 
         console_write("\n" + "=" * 80 + "\n")
         logger.info("CollectionReport print complete")

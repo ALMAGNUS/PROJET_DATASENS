@@ -29,15 +29,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Prometheus client
-RUN pip install --no-cache-dir prometheus-client==0.20.0
+# Copy application code (only what's needed for runtime)
+COPY src/ ./src/
+COPY scripts/ ./scripts/
+COPY main.py run_e2_api.py ./
+COPY sources_config.json ./
 
-# Copy application code (E1 isolated structure)
-COPY . .
-
-# Create data directories with proper permissions
-RUN mkdir -p /app/data/raw /app/data/silver /app/data/gold /app/exports /app/zzdb && \
-    chmod -R 755 /app/data /app/exports
+# Create data directories (mounted as volumes at runtime)
+RUN mkdir -p /app/data/raw /app/data/silver /app/data/gold /app/exports /app/zzdb /app/models /app/output && \
+    chmod -R 755 /app/data /app/exports /app/models /app/output
 
 # Verify E1 structure
 RUN python -c "from src.e1.pipeline import E1Pipeline; print('✅ E1 Pipeline importable')" && \

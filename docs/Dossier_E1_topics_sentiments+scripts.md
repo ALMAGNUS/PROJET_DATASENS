@@ -1,6 +1,6 @@
 # 📋 Dossier E1 — Guide 2 : Annotations Topics et Sentiments
 
-**Pour le jury** : Une fois les articles nettoyés et chargés en base, nous les enrichissons automatiquement avec deux types d’annotations. D’abord les topics : chaque article reçoit jusqu’à deux catégories (finance, politique, technologie, etc.) via une classification par mots-clés. Ensuite le sentiment : nous classifions chaque texte comme positif, neutre ou négatif à l’aide d’un analyseur par mots-clés pondérés. Ces annotations alimentent les zones SILVER et GOLD du pipeline et servent de base aux analyses et au fine-tuning des modèles IA. Les scripts présentés montrent comment exploiter ces composants et interroger les résultats en SQL.
+**Contexte** : Une fois les articles nettoyés et chargés en base, nous les enrichissons automatiquement avec deux types d’annotations. D’abord les topics : chaque article reçoit jusqu’à deux catégories (finance, politique, technologie, etc.) via une classification par mots-clés. Ensuite le sentiment : nous classifions chaque texte comme positif, neutre ou négatif à l’aide d’un analyseur par mots-clés pondérés. Ces annotations alimentent les zones SILVER et GOLD du pipeline et servent de base aux analyses et au fine-tuning des modèles IA. Les scripts présentés montrent comment exploiter ces composants et interroger les résultats en SQL.
 
 **Objectif** : Documenter l'enrichissement des articles (topics + sentiment) et fournir les scripts exécutables.
 

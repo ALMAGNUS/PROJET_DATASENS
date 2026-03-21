@@ -119,7 +119,7 @@ print("\n2. Inserting 11 news sources...")
 sources = [
     ("rss_french_news", "rss", "https://www.france24.com/fr/rss"),
     ("gdelt_events", "bigdata", "https://blog.gdeltproject.org/"),
-    ("reddit_france", "api_scraping", "https://www.reddit.com/r/france"),
+    ("reddit_france", "api", "https://www.reddit.com/r/france"),
     ("trustpilot_reviews", "scraping", "https://fr.trustpilot.com"),
     ("openweather_api", "api", "https://openweathermap.org/api"),
     ("insee_indicators", "api", "https://api.insee.fr"),
