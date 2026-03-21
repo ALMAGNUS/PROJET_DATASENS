@@ -1,6 +1,6 @@
 # Versionner et documenter le processus de nettoyage
 
-**Pour le jury** : Ce document décrit comment le code source du processus de nettoyage est versionné (Git, tags, CHANGELOG) et documenté (docs/, architecture, pipeline, logging).
+**Contexte** : Ce document décrit comment le code source du processus de nettoyage est versionné (Git, tags, CHANGELOG) et documenté (docs/, architecture, pipeline, logging).
 
 ---
 

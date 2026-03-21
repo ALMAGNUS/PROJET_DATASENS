@@ -18,7 +18,7 @@ Composants:
 from .adapters import GoldParquetReader
 from .interfaces import DataProcessor, DataReader
 from .processors import GoldDataProcessor
-from .session import close_spark_session, get_spark_session
+from .session import close_spark_session, get_spark_session, prepare_windows_spark_environment
 
 __version__ = "0.1.0"
 __status__ = "IN_DEVELOPMENT"
@@ -30,4 +30,5 @@ __all__ = [
     "GoldParquetReader",
     "close_spark_session",
     "get_spark_session",
+    "prepare_windows_spark_environment",
 ]

@@ -19,7 +19,12 @@ if sys.platform == "win32":
         # If stdout/stderr don't have buffer attribute, skip wrapping
         pass
 
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+# Répertoire projet = CWD pour chemins relatifs (data/, output/ Botasaurus, etc.)
+_PROJECT_ROOT = Path(__file__).resolve().parent
+os.chdir(_PROJECT_ROOT)
+(_PROJECT_ROOT / "output").mkdir(parents=True, exist_ok=True)
+
+sys.path.insert(0, str(_PROJECT_ROOT / "src"))
 # Import E1 isolé depuis package e1
 from loguru import logger
 

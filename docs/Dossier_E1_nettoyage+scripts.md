@@ -1,6 +1,6 @@
 # 📋 Dossier E1 — Guide 1 : Nettoyage des données
 
-**Pour le jury** : Le pipeline E1 collecte des données hétérogènes (RSS, API, scraping, CSV). Avant tout stockage ou enrichissement, nous appliquons un nettoyage strict : suppression des caractères problématiques (BOM, null bytes), extraction du texte depuis le HTML, normalisation des espaces et déduplication par empreinte SHA256. Ces règles garantissent des données fiables et exploitables en aval. Les scripts ci-dessous sont des extraits exécutables tirés du code de production.
+**Contexte** : Le pipeline E1 collecte des données hétérogènes (RSS, API, scraping, CSV). Avant tout stockage ou enrichissement, nous appliquons un nettoyage strict : suppression des caractères problématiques (BOM, null bytes), extraction du texte depuis le HTML, normalisation des espaces et déduplication par empreinte SHA256. Ces règles garantissent des données fiables et exploitables en aval. Les scripts ci-dessous sont des extraits exécutables tirés du code de production.
 
 **Objectif** : Documenter les étapes de nettoyage des données du pipeline E1 et fournir les scripts exécutables correspondants.
 

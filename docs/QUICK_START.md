@@ -6,10 +6,10 @@ Quand vous lancez `python main.py`, vous voyez automatiquement :
 
 ### 1️⃣ **Extraction** 
 ```
-[EXTRACTION] All sources
-rss_french_news... (rss) OK 23
-yahoo_finance... (rss) OK 40
-reddit_france... (api_scraping) OK 15
+[EXTRACTION] Sources actives
+rss_french_news... [RSS] OK 23
+yahoo_finance... [RSS] OK 40
+reddit_france... [API (JSON)] OK 15
 ...
 OK Total extracted: 95
 ```

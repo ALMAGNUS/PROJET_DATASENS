@@ -48,7 +48,7 @@ from .analyzer import SentimentAnalyzer
 
 # Imports locaux E1
 from .console import ConsolePrinter
-from .core import ContentTransformer, Source, create_extractor
+from .core import ContentTransformer, Source, collection_mode_description, create_extractor
 from .exporter import GoldExporter
 from .repository import Repository
 from .tagger import TopicTagger
@@ -118,8 +118,9 @@ class E1Pipeline:
                 continue
 
             current_source += 1
+            mode_label = collection_mode_description(source)
             console_write(
-                f"[{current_source}/{total_sources}] {source.source_name}... ({source.acquisition_type})",
+                f"[{current_source}/{total_sources}] {source.source_name}... [{mode_label}]",
                 end=" ",
                 flush=True,
             )
@@ -159,6 +160,7 @@ class E1Pipeline:
             except Exception as e:
                 source_errors_total.labels(source=source.source_name).inc()
                 logger.error("Extraction error: {}", str(e)[:40])
+                console_write(f"ERR ({str(e)[:45]})")
 
         logger.info("Extraction complete: {} articles", self.stats["extracted"])
         console_write(f"\nOK Total extracted: {self.stats['extracted']}")

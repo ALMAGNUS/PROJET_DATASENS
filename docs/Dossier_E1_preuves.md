@@ -1,6 +1,6 @@
 # 📋 Dossier E1 — Mode preuve
 
-**Pour le jury** : Ce document fournit des preuves concrètes du fonctionnement du pipeline E1 : exemples réels d'ingestion pour **toutes les sources** (RSS, API, scraping, Kaggle, GDELT, CSV/ZZDB), requêtes SQL démontrées, et règles de nettoyage formelles. Chaque section prouve un aspect technique du système.
+**Contexte** : Ce document fournit des preuves concrètes du fonctionnement du pipeline E1 : exemples réels d'ingestion pour **toutes les sources** (RSS, API, scraping, Kaggle, GDELT, CSV/ZZDB), requêtes SQL démontrées, et règles de nettoyage formelles. Chaque section prouve un aspect technique du système.
 
 ---
 

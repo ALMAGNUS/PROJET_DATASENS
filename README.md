@@ -71,9 +71,11 @@ Creates SQLite database with:
 python main.py
 ```
 
+**Inclus dans le même run** (toutes les sources `active: true` de `sources_config.json`) : RSS, API, **scraping** (`trustpilot_reviews`, `ifop_barometers`, `monavis_citoyen`, etc.). Le scraping MonAvis s’appuie sur **Botasaurus** ; les fichiers générés vont sous `output/` (ignoré par git).
+
 **Output:**
 - Articles extracted to database
-- sync_log updated (10 sources logged)
+- sync_log mis à jour par source
 - **Export RAW/SILVER/GOLD inclus** dans le pipeline
 
 ### 4. Export ou régénération (optionnel)

@@ -1,6 +1,6 @@
 # 📋 Dossier E1 — Guide 3 : Préparer le dataset pour l'IA (E2)
 
-**Pour le jury** : Les données GOLD produites par E1 sont partitionnées par date. Pour l’IA, nous les fusionnons en un dataset unique (GoldAI) en utilisant une approche incrémentale : seules les nouvelles dates sont intégrées, grâce à des métadonnées. Le dataset est dédupliqué, puis divisé en train/validation/test pour l’entraînement et l’évaluation des modèles. Cette chaîne garantit un flux reproductible et scalable, depuis E1 jusqu’au fine-tuning CamemBERT/FlauBERT et à l’inférence via l’API E2. Les scripts décrits sont ceux utilisés en production.
+**Contexte** : Les données GOLD produites par E1 sont partitionnées par date. Pour l’IA, nous les fusionnons en un dataset unique (GoldAI) en utilisant une approche incrémentale : seules les nouvelles dates sont intégrées, grâce à des métadonnées. Le dataset est dédupliqué, puis divisé en train/validation/test pour l’entraînement et l’évaluation des modèles. Cette chaîne garantit un flux reproductible et scalable, depuis E1 jusqu’au fine-tuning CamemBERT/FlauBERT et à l’inférence via l’API E2. Les scripts décrits sont ceux utilisés en production.
 
 **Objectif** : Transformer les données GOLD E1 en dataset exploitable par l'IA E2. Méthodes pro : incrémental, déduplication, split, traçabilité.
 

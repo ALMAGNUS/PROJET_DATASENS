@@ -32,7 +32,7 @@ BENCH_PATH = DOC_E2 / "AI_BENCHMARK_RESULTS.json"
 TRAIN_PATH = DOC_E2 / "TRAINING_RESULTS.json"
 TRAIN_PATH_LEGACY = DOC_E2 / "TRAINING_RESULTS_QUICK.json"
 
-# Noms affichés pour le jury (clairs, sans codes techniques)
+# Noms affichés lisibles métier (sans codes techniques opaques)
 MODEL_LABELS = {
     "bert_multilingual":     "BERT multilingue 5★\n(nlptown)",
     "flaubert_multilingual": "XLM-RoBERTa Twitter\n(multilingue)",

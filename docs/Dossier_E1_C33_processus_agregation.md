@@ -1,6 +1,6 @@
 # C3.3 — Processus automatisé d'agrégation multi-sources
 
-**Pour le jury** : Ce document présente le code qui implémente un processus automatisé pour l'agrégation des données provenant de différentes sources : extraction multi-sources, normalisation des colonnes, déduplication par fingerprint, enrichissement (topics + sentiment).
+**Contexte** : Ce document présente le code qui implémente un processus automatisé pour l'agrégation des données provenant de différentes sources : extraction multi-sources, normalisation des colonnes, déduplication par fingerprint, enrichissement (topics + sentiment).
 
 ---
 
@@ -60,7 +60,7 @@ def create_extractor(source: Source) -> BaseExtractor:
         return CSVExtractor(source.source_name, source.url)
     elif acq_type == "dataset":
         return KaggleExtractor(source.source_name, source.url)
-    elif acq_type in ["api", "api_scraping"]:
+    elif acq_type == "api":
         if any(k in src_low for k in ["reddit", "weather", "meteo"]):
             return APIExtractor(source.source_name, source.url)
         elif any(k in src_low for k in ["insee", "citoyen", "opinion"]):

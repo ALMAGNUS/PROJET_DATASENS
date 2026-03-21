@@ -22,6 +22,9 @@ visualizations/
 pipeline.log
 logs/
 
+# Botasaurus (scraping MonAvis, etc.) — artefacts locaux du run
+output/
+
 # Documentation (excluded from version control)
 docs/
 
@@ -50,6 +53,8 @@ monitoring/grafana/data/
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
+# Brouillon local racine (copier-coller vers annexes E2–E4) — à supprimer quand tu veux ; ne pas commit
+/preuves.ipynb
 
 # Testing
 .pytest_cache/
@@ -80,6 +85,9 @@ _checkpoint/
 
 # PySpark cache
 .cache/pyspark/
+
+# Hadoop Windows helper (téléchargé localement, voir hadoop/README.md)
+hadoop/bin/winutils.exe
 
 # ============================================================
 # E3: FastAPI

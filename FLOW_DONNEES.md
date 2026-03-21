@@ -12,21 +12,42 @@ Config    Articles  Valid   DB    Topics  Sentiment  DataFrame  CSV/Parquet
 
 ## 🎯 ÉTAPE 1 : EXTRACT (Extraction)
 
+### **Affichage console `[n/N] source... [canal]`**
+
+Chaque ligne utilise `collection_mode_description()` (`src/e1/core.py`) : libellé **court**, aligné sur l’extracteur réel (API JSON vs scraping HTML, etc.).
+
+| `acquisition_type` | Cas (nom de source) | Libellé | Extracteur |
+|--------------------|---------------------|---------|------------|
+| `rss` | — | RSS | `RSSExtractor` |
+| `api` | reddit, openweather, agora… | API (JSON) | `APIExtractor` |
+| `api` | insee, *citoyen*, *opinion*… | Scraping HTML | `ScrapingExtractor` |
+| `scraping` | — | Scraping HTML | `ScrapingExtractor` |
+| `bigdata` | — | GDELT (fichiers) | `GDELTFileExtractor` |
+| `dataset` | — | Dataset | `KaggleExtractor` |
+| `csv` | — | CSV | `CSVExtractor` |
+
+Le **rapport session** reprend la même information dans la colonne **Canal**.
+
+> **Analyse du rapport de session (exemple)** : extraction **1358** articles, **66** nouveaux en base (reste dédupliqué). **IFOP** : `OK 0` (réseau / site) ; **INSEE** : `OK 0` (URL racine API → 404) ; **MonAvis** : `OK 14` (Botasaurus). **merge_parquet_goldai** : « 0 nouvelles dates » = partition **2026-03-21** déjà fusionnée ou identique — comportement attendu si relance le même jour.
+
 ### **Sources Actives** (`sources_config.json`)
 - ✅ **RSS** : `rss_french_news`, `google_news_rss`, `yahoo_finance`
-- ✅ **API** : `openweather_api`, `insee_indicators`, `reddit_france`
-- ✅ **Scraping** : `trustpilot_reviews`, `ifop_barometers`
-- ✅ **ZZDB CSV** : `zzdb_csv` (actif) → Lit `zzdb/zzdb_dataset.csv` (1189 articles)
-- ❌ **ZZDB Synthetic** : `zzdb_synthetic` (désactivé) → Source MongoDB (zzdb) non sollicitée
+- ✅ **API** (`acquisition_type: api`) : `reddit_france`, `agora_consultations`, `openweather_api` → **API (JSON)** ; `insee_indicators` → **Scraping HTML** (URL à affiner côté INSEE)
+- ✅ **Scraping HTML** (`acquisition_type: scraping`) : `trustpilot_reviews`, `ifop_barometers`, `monavis_citoyen`
+- ✅ **Big data** : `gdelt_events`, `GDELT_Last15_English`, `GDELT_Master_List`
+- ✅ **Dataset** : `datagouv_datasets`, `kaggle_french_opinions`
+- ✅ **CSV** : `zzdb_csv` → `zzdb/zzdb_dataset.csv`
+- ❌ **ZZDB Synthetic** : non présent dans ce `sources_config` (MongoDB)
 
 ### **Processus**
-1. **Lecture config** : `main.py` → `load_sources()` → Parse `sources_config.json`
-2. **Pour chaque source active** :
+1. **Point d’entrée** : `main.py` fixe le répertoire de travail à la racine du dépôt (`chdir`) pour que le scraping (dont Botasaurus) écrive sous `output/` comme en local.
+2. **Lecture config** : `main.py` → `load_sources()` → Parse `sources_config.json`
+3. **Pour chaque source active** :
    - Crée extractor via `create_extractor(source)`
    - Appelle `extractor.extract()` → Retourne `list[Article]`
    - **ZZDB CSV** : Lit `zzdb/zzdb_dataset.csv` → 1189 articles valides
    - **Garde-fou** : Vérifie si source déjà intégrée (45 articles existants < 1189 → Import complémentaire)
-3. **Résultat** : Liste de tuples `(Article, source_name)`
+4. **Résultat** : Liste de tuples `(Article, source_name)`
 
 ### **Points Critiques ✅**
 - ✅ ZZDB CSV : Import complet (1189 articles) si source incomplète
