@@ -17,7 +17,7 @@ BASE_MODELS = {
     # BERT multilingue 5★ (1-2→neg, 3→neu, 4-5→pos) — PyTorch, pas CamemBERT
     "bert_multilingual": "nlptown/bert-base-multilingual-uncased-sentiment",
     # XLM-RoBERTa Twitter multilingue
-    "flaubert_multilingual": "cardiffnlp/twitter-xlm-roberta-base-sentiment-multilingual",
+    "xlm_roberta_twitter": "cardiffnlp/twitter-xlm-roberta-base-sentiment-multilingual",
     # Modèle FR dédié presse/opinion (ac0hik)
     "sentiment_fr": "ac0hik/Sentiment_Analysis_French",
 }
@@ -333,7 +333,18 @@ def main() -> None:
         class_counts[row["label"]] = class_counts.get(row["label"], 0) + 1
 
     if args.models:
-        selected_models = {k: v for k, v in available_models.items() if k in set(args.models)}
+        alias_to_key = {
+            "flaubert_multilingual": "xlm_roberta_twitter",  # alias historique
+            "xlm_roberta_twitter": "xlm_roberta_twitter",
+            "bert_multilingual": "bert_multilingual",
+            "sentiment_fr": "sentiment_fr",
+            "finetuned_local": "finetuned_local",
+        }
+        wanted = {
+            alias_to_key.get(m, m)
+            for m in args.models
+        }
+        selected_models = {k: v for k, v in available_models.items() if k in wanted}
     else:
         selected_models = available_models
     if not selected_models:

@@ -142,8 +142,20 @@ class DataAggregator:
             df["source_type"] = df["source"].apply(
                 lambda x: "academic" if "zzdb" in str(x).lower() else "real"
             )
+        # Un seul enregistrement sentiment par article (sinon merge multiplie les lignes GOLD
+        # → écart vs COUNT(raw_data), fusion GoldAI incohérente avec la DB).
         sentiment = pd.read_sql_query(
-            "SELECT raw_data_id, label as sentiment, score as sentiment_score FROM model_output WHERE model_name = 'sentiment_keyword'",
+            """
+            SELECT mo.raw_data_id, mo.label AS sentiment, mo.score AS sentiment_score
+            FROM model_output mo
+            INNER JOIN (
+                SELECT raw_data_id, MAX(output_id) AS max_oid
+                FROM model_output
+                WHERE model_name = 'sentiment_keyword'
+                GROUP BY raw_data_id
+            ) pick ON mo.raw_data_id = pick.raw_data_id AND mo.output_id = pick.max_oid
+            WHERE mo.model_name = 'sentiment_keyword'
+            """,
             self.conn,
         )
         df = df.merge(sentiment, left_on="id", right_on="raw_data_id", how="left")

@@ -35,12 +35,14 @@ TRAIN_PATH_LEGACY = DOC_E2 / "TRAINING_RESULTS_QUICK.json"
 # Noms affichés lisibles métier (sans codes techniques opaques)
 MODEL_LABELS = {
     "bert_multilingual":     "BERT multilingue 5★\n(nlptown)",
+    "xlm_roberta_twitter":   "XLM-RoBERTa Twitter\n(multilingue)",
     "flaubert_multilingual": "XLM-RoBERTa Twitter\n(multilingue)",
     "sentiment_fr":          "sentiment_fr ★\n(ac0hik, FR dédié)",
     "finetuned_local":       "Fine-tuné local\n(projet)",
 }
 MODEL_COLORS = {
     "bert_multilingual":     "#94a3b8",
+    "xlm_roberta_twitter":   "#60a5fa",
     "flaubert_multilingual": "#60a5fa",
     "sentiment_fr":          "#16a34a",
     "finetuned_local":       "#f97316",
@@ -55,6 +57,15 @@ def _ensure_output_dir() -> None:
 
 # Modèles obsolètes à exclure des figures (ex. camembert_distil remplacé par bert_multilingual)
 _OBSOLETE_KEYS = {"camembert_distil"}
+
+
+def _normalize_benchmark_keys(bench: dict) -> dict:
+    """Migrate historical benchmark keys to canonical ones."""
+    normalized: dict = {}
+    for key, value in bench.items():
+        canon = "xlm_roberta_twitter" if key == "flaubert_multilingual" else key
+        normalized[canon] = value
+    return normalized
 
 
 def _load_training_results() -> dict | None:
@@ -108,7 +119,7 @@ def _load_training_results() -> dict | None:
 
 def _load_benchmark() -> tuple[pd.DataFrame, dict]:
     with BENCH_PATH.open("r", encoding="utf-8") as f:
-        bench = json.load(f)
+        bench = _normalize_benchmark_keys(json.load(f))
 
     rows = []
     for key, m in bench.items():
@@ -170,13 +181,13 @@ def _plot_benchmark_overview(df: pd.DataFrame) -> None:
     fig.tight_layout()
     fig.savefig(FIG_DIR / "e2_benchmark_overview.png", **STYLE)
     plt.close(fig)
-    print("  ✓ e2_benchmark_overview.png")
+    print("  OK e2_benchmark_overview.png")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 def _plot_benchmark_per_class(bench: dict) -> None:
     """F1 par classe (neg / neu / pos) pour chaque modèle."""
-    order = ["sentiment_fr", "finetuned_local", "bert_multilingual", "flaubert_multilingual"]
+    order = ["sentiment_fr", "finetuned_local", "bert_multilingual", "xlm_roberta_twitter"]
     order = [m for m in order if m in bench and "error" not in bench[m]]
 
     labels  = [MODEL_LABELS.get(m, m) for m in order]
@@ -221,7 +232,7 @@ def _plot_benchmark_per_class(bench: dict) -> None:
     fig.tight_layout()
     fig.savefig(FIG_DIR / "e2_benchmark_f1_per_class.png", **STYLE)
     plt.close(fig)
-    print("  ✓ e2_benchmark_f1_per_class.png")
+    print("  OK e2_benchmark_f1_per_class.png")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -258,7 +269,7 @@ def _plot_benchmark_curves(df: pd.DataFrame) -> None:
     fig.tight_layout()
     fig.savefig(FIG_DIR / "e2_benchmark_curves_normalized.png", **STYLE)
     plt.close(fig)
-    print("  ✓ e2_benchmark_curves_normalized.png")
+    print("  OK e2_benchmark_curves_normalized.png")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -315,7 +326,7 @@ def _plot_quality_latency_pareto(df: pd.DataFrame) -> None:
     fig.tight_layout()
     fig.savefig(FIG_DIR / "e2_innovation_pareto_quality_latency.png", **STYLE)
     plt.close(fig)
-    print("  ✓ e2_innovation_pareto_quality_latency.png")
+    print("  OK e2_innovation_pareto_quality_latency.png")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -350,7 +361,7 @@ def _plot_class_imbalance(bench: dict) -> None:
 
     # Droite : impact sur F1 positif avant/après class weights
     ax1 = axes[1]
-    models_show = ["bert_multilingual", "flaubert_multilingual", "finetuned_local", "sentiment_fr"]
+    models_show = ["bert_multilingual", "xlm_roberta_twitter", "finetuned_local", "sentiment_fr"]
     models_show = [m for m in models_show if m in bench and "error" not in bench[m]]
     f1_pos_values = [bench[m]["per_class"].get("pos", {}).get("f1", 0) for m in models_show]
     xlabels = [MODEL_LABELS.get(m, m) for m in models_show]
@@ -387,7 +398,7 @@ def _plot_class_imbalance(bench: dict) -> None:
     fig.tight_layout()
     fig.savefig(FIG_DIR / "e2_benchmark_class_imbalance.png", **STYLE)
     plt.close(fig)
-    print("  ✓ e2_benchmark_class_imbalance.png")
+    print("  OK e2_benchmark_class_imbalance.png")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -426,7 +437,7 @@ def _plot_training_quick() -> None:
     fig.tight_layout()
     fig.savefig(FIG_DIR / f"e2_training_{mode_label}_validation_metrics.png", **STYLE)
     plt.close(fig)
-    print(f"  ✓ e2_training_{mode_label}_validation_metrics.png")
+    print(f"  OK e2_training_{mode_label}_validation_metrics.png")
 
     # ── Performance runtime ──────────────────────────────────────────────────
     runtime_min  = float(tr.get("train_runtime_seconds", 0)) / 60.0
@@ -463,7 +474,7 @@ def _plot_training_quick() -> None:
     fig2.tight_layout()
     fig2.savefig(FIG_DIR / f"e2_training_{mode_label}_runtime.png", **STYLE)
     plt.close(fig2)
-    print(f"  ✓ e2_training_{mode_label}_runtime.png")
+    print(f"  OK e2_training_{mode_label}_runtime.png")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -505,7 +516,7 @@ def _plot_training_quick_curves() -> None:
     fig.tight_layout()
     fig.savefig(FIG_DIR / f"e2_training_{mode_label}_loss_curve.png", **STYLE)
     plt.close(fig)
-    print(f"  ✓ e2_training_{mode_label}_loss_curve.png")
+    print(f"  OK e2_training_{mode_label}_loss_curve.png")
 
 
 # ──────────────────────────────────────────────────────────────────────────────

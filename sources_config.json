@@ -57,10 +57,10 @@
     },
     {
       "source_name": "insee_indicators",
-      "description": "French economic indicators",
+      "description": "Actualités INSEE (site public) ; API api.insee.fr nécessite OAuth",
       "acquisition_type": "api",
       "theme": "economy",
-      "url": "https://api.insee.fr",
+      "url": "https://www.insee.fr/fr/actualites",
       "partition_path": "/data/raw/insee_indicators/date=YYYY-MM-DD/",
       "file_naming": "insee_indicators_france_YYYYMMDD_HHMMSS.parquet",
       "refresh_frequency": "Monthly",
@@ -167,14 +167,14 @@
     },
     {
       "source_name": "ifop_barometers",
-      "description": "French political barometers",
+      "description": "Baromètres IFOP (publications peu fréquentes — activer p.ex. 1×/an dans ce fichier)",
       "acquisition_type": "scraping",
       "theme": "politics",
-      "url": "https://www.ifop.com/publications/",
+      "url": "https://www.ifop.com/",
       "partition_path": "/data/raw/ifop_barometers/date=YYYY-MM-DD/",
       "file_naming": "ifop_barometers_france_YYYYMMDD_HHMMSS.parquet",
-      "refresh_frequency": "Monthly",
-      "active": true
+      "refresh_frequency": "Yearly",
+      "active": false
     },
     {
       "source_name": "monavis_citoyen",

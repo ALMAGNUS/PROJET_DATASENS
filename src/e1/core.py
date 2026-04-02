@@ -1,6 +1,10 @@
 """DataSens E1 - CORE ENGINE (SENIOR MODE - DRY/SOLID - 220 LIGNES)"""
+from __future__ import annotations
+
 import csv
 import hashlib
+import json
+import os
 import re
 import sqlite3
 import time
@@ -31,31 +35,175 @@ _DEFAULT_BROWSER_HEADERS = {
 
 
 def _http_get_with_retries(
-    url: str, *, timeout: int = 20, attempts: int = 3
+    url: str,
+    *,
+    timeout: int = 20,
+    attempts: int = 3,
+    log_failures: bool = True,
 ) -> requests.Response | None:
-    """GET avec reprises (RemoteDisconnected / timeouts fréquents sur certains sites)."""
+    """
+    GET avec reprises sur erreurs réseau (RemoteDisconnected, timeouts).
+    Les 4xx (sauf 429) ne sont pas réessayées — inutile et bruyant dans les logs.
+    Les détails des tentatives vont en DEBUG ; un WARNING (ou DEBUG si log_failures=False) en échec final.
+    """
     last_err: Exception | None = None
     for i in range(attempts):
         try:
             resp = requests.get(url, headers=_DEFAULT_BROWSER_HEADERS, timeout=timeout)
             if resp.status_code == 200 and resp.text and len(resp.text) > 10:
                 return resp
-            if resp.status_code != 200:
-                logger.warning("Scraping HTTP {} for {}", resp.status_code, url[:70])
+            code = resp.status_code
+            if code == 200:
+                logger.debug(
+                    "HTTP 200 corps trop court — {} (tentative {}/{})",
+                    url[:60],
+                    i + 1,
+                    attempts,
+                )
+            elif 400 <= code < 500 and code != 429:
+                logger.debug("HTTP {} — {} (pas de reprise)", code, url[:80])
+                return None
+            else:
+                logger.debug("HTTP {} — {} (tentative {}/{})", code, url[:60], i + 1, attempts)
         except Exception as e:
             last_err = e
-            logger.warning(
-                "Scraping GET tentative {}/{} — {} : {}",
+            logger.debug(
+                "GET tentative {}/{} — {} : {}",
                 i + 1,
                 attempts,
                 url[:55],
-                str(e)[:100],
+                str(e)[:80],
             )
         if i < attempts - 1:
             time.sleep(1.2 * (i + 1))
     if last_err:
-        logger.error("Scraping GET échec après {} tentatives : {}", attempts, str(last_err)[:120])
+        msg = "Scraping: échec réseau après {} tentatives — {} ({})"
+        args = (attempts, url[:65], str(last_err)[:80])
+        if log_failures:
+            logger.warning(msg, *args)
+        else:
+            logger.debug(msg, *args)
+    else:
+        logger.debug("Scraping: aucune réponse exploitable — {}", url[:75])
     return None
+
+
+def _insee_get_bearer_token() -> str | None:
+    """
+    Jeton INSEE : variable INSEE_API_TOKEN (Bearer), ou OAuth2 client_credentials
+    avec INSEE_CONSUMER_KEY + INSEE_CONSUMER_SECRET (portail api.insee.fr).
+    """
+    token = (os.getenv("INSEE_API_TOKEN") or os.getenv("INSEE_API_BEARER") or "").strip()
+    if token:
+        return token
+    key = (os.getenv("INSEE_CONSUMER_KEY") or os.getenv("INSEE_API_KEY") or "").strip()
+    sec = (os.getenv("INSEE_CONSUMER_SECRET") or os.getenv("INSEE_API_SECRET") or "").strip()
+    if not key or not sec:
+        return None
+    try:
+        r = requests.post(
+            "https://api.insee.fr/token",
+            data={"grant_type": "client_credentials"},
+            auth=(key, sec),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=35,
+        )
+        if r.status_code == 200:
+            data = r.json()
+            return (data.get("access_token") or data.get("token") or "").strip() or None
+        logger.warning("INSEE OAuth token: HTTP {} — {}", r.status_code, r.text[:150])
+    except Exception as e:
+        logger.warning("INSEE OAuth: {}", str(e)[:100])
+    return None
+
+
+def _insee_json_items(payload: object) -> list[dict]:
+    """Extrait une liste de dicts depuis un JSON typique API INSEE."""
+    if isinstance(payload, list):
+        return [x for x in payload[:60] if isinstance(x, dict)]
+    if isinstance(payload, dict):
+        for key in ("data", "datasets", "items", "series", "results", "_embedded", "value", "content"):
+            v = payload.get(key)
+            if isinstance(v, list):
+                return [x for x in v[:60] if isinstance(x, dict)]
+            if isinstance(v, dict):
+                nested = _insee_json_items(v)
+                if nested:
+                    return nested
+    return []
+
+
+def _insee_dict_to_article(item: dict, source_name: str, tag: str) -> Article | None:
+    title = (
+        item.get("title")
+        or item.get("label")
+        or item.get("libelle")
+        or item.get("nom")
+        or item.get("name")
+        or item.get("id")
+        or item.get("identifier")
+        or ""
+    )
+    title = str(title).strip()[:500]
+    if len(title) < 4:
+        return None
+    desc = (
+        item.get("description")
+        or item.get("abstract")
+        or item.get("resume")
+        or item.get("comment")
+    )
+    if desc:
+        body = BeautifulSoup(str(desc), "html.parser").get_text(separator=" ", strip=True)[:2000]
+    else:
+        body = json.dumps(item, ensure_ascii=False)[:2000]
+    url = item.get("url") or item.get("uri") or item.get("link") or "https://api.insee.fr"
+    return Article(
+        title=f"[INSEE {tag}] {title}",
+        content=body,
+        url=str(url)[:2000],
+        source_name=source_name,
+    )
+
+
+def _insee_fallback_public_pages(source_name: str) -> list[Article]:
+    """Site public si pas de jeton API (même logique qu’avant)."""
+    articles: list[Article] = []
+    seen_href: set[str] = set()
+    for page_url in (
+        "https://www.insee.fr/fr/statistiques",
+        "https://www.insee.fr/fr",
+        "https://www.insee.fr/fr/actualites",
+    ):
+        resp = _http_get_with_retries(page_url, timeout=18, attempts=2)
+        if not resp:
+            continue
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for link in soup.find_all("a", href=True):
+            t = link.get_text(strip=True)
+            if len(t) < 18:
+                continue
+            href = (link.get("href") or "").strip()
+            if not any(
+                p in href for p in ("/actualites/", "/information/", "/statistiques/", "/fr/statistiques/")
+            ):
+                continue
+            if href in seen_href:
+                continue
+            seen_href.add(href)
+            full = (
+                href
+                if href.startswith("http")
+                else f"https://www.insee.fr{href if href.startswith('/') else '/' + href}"
+            )
+            a = Article(title=f"[INSEE] {t[:500]}", content=t[:2000], url=full, source_name=source_name)
+            if a.is_valid():
+                articles.append(a)
+            if len(articles) >= 35:
+                break
+        if len(articles) >= 12:
+            break
+    return articles
 
 
 @dataclass
@@ -105,6 +253,8 @@ def collection_mode_description(source: Source) -> str:
     if acq == "api":
         if any(k in name for k in ["reddit", "weather", "meteo"]):
             return "API (JSON)"
+        if "insee_indicators" in name or name == "insee_indicators":
+            return "API (JSON)"
         if any(k in name for k in ["insee", "citoyen", "opinion"]):
             return "Scraping HTML"
         return "API (JSON)"
@@ -149,9 +299,46 @@ class RSSExtractor(BaseExtractor):
 
 
 class APIExtractor(BaseExtractor):
+    def _extract_insee_indicators(self) -> list[Article]:
+        """API officielle (métadonnées, Melodi, BDM) + fallback site public sans jeton."""
+        token = _insee_get_bearer_token()
+        articles: list[Article] = []
+        if token:
+            h = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+            for ep_url, tag in (
+                ("https://api.insee.fr/metadonnees", "Métadonnées"),
+                ("https://api.insee.fr/melodi", "Melodi"),
+                ("https://api.insee.fr/series/BDM", "BDM"),
+            ):
+                try:
+                    r = requests.get(ep_url, headers=h, timeout=45)
+                    if r.status_code != 200:
+                        logger.debug("INSEE {} HTTP {} — {}", tag, r.status_code, r.text[:100])
+                        continue
+                    ct = r.headers.get("content-type", "").lower()
+                    if "json" not in ct and r.text.strip()[:1] not in "{[":
+                        continue
+                    data = r.json()
+                    for item in _insee_json_items(data):
+                        a = _insee_dict_to_article(item, self.name, tag)
+                        if a and a.is_valid():
+                            articles.append(a)
+                        if len(articles) >= 50:
+                            break
+                except Exception as e:
+                    logger.warning("INSEE {} : {}", tag, str(e)[:80])
+                if len(articles) >= 50:
+                    break
+        if articles:
+            return articles[:50]
+        logger.info("INSEE: pas de données API exploitables ou pas de jeton — fallback site public")
+        return _insee_fallback_public_pages(self.name)[:50]
+
     def extract(self) -> list[Article]:
         articles, src_low = [], self.name.lower()
         try:
+            if src_low == "insee_indicators":
+                return self._extract_insee_indicators()
             if "reddit" in src_low:
                 for sr in ["france", "actualites"]:
                     try:
@@ -206,28 +393,6 @@ class APIExtractor(BaseExtractor):
                                             articles.append(a)
                     except Exception as e:
                         logger.warning("Reddit {} extraction error: {}", sr, str(e)[:40])
-            elif "insee" in src_low or "citoyen" in src_low:
-                soup = BeautifulSoup(
-                    requests.get(
-                        "https://www.monaviscitoyen.fr/",
-                        headers={"User-Agent": "Mozilla/5.0"},
-                        timeout=10,
-                    ).text,
-                    "html.parser",
-                )
-                for item in soup.find_all(
-                    ["article", "div"], class_=re.compile(r".*avis|opinion.*", re.I)
-                )[:30]:
-                    text = item.get_text(separator=" ").strip()
-                    if len(text) > 20:
-                        a = Article(
-                            title=text[:100],
-                            content=text[:2000],
-                            url="https://www.monaviscitoyen.fr/",
-                            source_name=self.name,
-                        )
-                        if a.is_valid():
-                            articles.append(a)
             elif "weather" in src_low or "meteo" in src_low:
                 for city in ["Paris", "Lyon", "Marseille", "Toulouse", "Nice"]:
                     try:
@@ -325,20 +490,24 @@ class ScrapingExtractor(BaseExtractor):
                         if a.is_valid():
                             articles.append(a)
             elif "ifop" in src_low:
+                # Collecte fluide : HTTP uniquement (pas de Botasaurus — évite EOF, pause débogueur,
+                # mauvaise API Driver). URL configurable dans sources_config.json (défaut : accueil IFOP).
                 base = "https://www.ifop.com"
                 urls_try = []
                 if self.url:
                     u0 = self.url.split("?")[0].strip()
-                    if not u0.endswith("/"):
-                        u0 = u0 + "/"
-                    urls_try.append(u0)
-                if f"{base}/publications/" not in urls_try:
-                    urls_try.append(f"{base}/publications/")
+                    if u0:
+                        urls_try.append(u0 if u0.endswith("/") else u0 + "/")
+                if not urls_try:
+                    urls_try.append(f"{base}/")
                 seen_u = set()
                 urls_try = [u for u in urls_try if u not in seen_u and not seen_u.add(u)]
                 soup = None
                 for u in urls_try:
-                    resp = _http_get_with_retries(u, timeout=20, attempts=3)
+                    # IFOP : site souvent hostile aux bots ; 1 tentative, logs discrets (cadence annuelle)
+                    resp = _http_get_with_retries(
+                        u, timeout=18, attempts=1, log_failures=False
+                    )
                     if resp:
                         soup = BeautifulSoup(resp.text, "html.parser")
                         break
@@ -364,9 +533,13 @@ class ScrapingExtractor(BaseExtractor):
                         if a.is_valid():
                             articles.append(a)
                 if not articles:
-                    for link in soup.find_all("a", href=re.compile(r"/publications/|/sondages/", re.I))[
-                        :40
-                    ]:
+                    for link in soup.find_all(
+                        "a",
+                        href=re.compile(
+                            r"/publications?/|/sondages/|/etudes?/|/les-etudes|/barometre",
+                            re.I,
+                        ),
+                    )[:40]:
                         title = link.get_text(strip=True)
                         if len(title) < 8:
                             continue
@@ -824,6 +997,49 @@ class KaggleExtractor(BaseExtractor):
 
         articles = []
         try:
+            # data.gouv.fr : catalogue JSON (sinon 0 article si aucun CSV local téléchargé)
+            if "datagouv" in self.name.lower():
+                try:
+                    r = requests.get(
+                        "https://www.data.gouv.fr/api/1/datasets/",
+                        params={"sort": "-created", "page_size": "30"},
+                        headers=_DEFAULT_BROWSER_HEADERS,
+                        timeout=25,
+                    )
+                    if r.status_code == 200:
+                        payload = r.json()
+                        rows = payload.get("data") or payload.get("datasets") or []
+                        seen_slug: set[str] = set()
+                        for ds in rows[:30]:
+                            title = (ds.get("title") or "").strip()
+                            raw_desc = ds.get("description") or ""
+                            desc = BeautifulSoup(raw_desc, "html.parser").get_text(
+                                separator=" ", strip=True
+                            )
+                            if not title or len(desc) < 25:
+                                continue
+                            slug = (ds.get("slug") or "").strip()
+                            if slug in seen_slug:
+                                continue
+                            seen_slug.add(slug)
+                            page = (
+                                f"https://www.data.gouv.fr/fr/datasets/{slug}/"
+                                if slug
+                                else "https://www.data.gouv.fr"
+                            )
+                            a = Article(
+                                title=f"[data.gouv] {title[:500]}",
+                                content=desc[:2000],
+                                url=page,
+                                source_name=self.name,
+                            )
+                            if a.is_valid():
+                                articles.append(a)
+                        if articles:
+                            return articles[:50]
+                except Exception as e:
+                    logger.debug("data.gouv API catalogue: {}", str(e)[:80])
+
             # Chercher dans DEUX emplacements (PROJECT et HOME)
             base_dirs = [
                 Path.home()
@@ -993,6 +1209,8 @@ def create_extractor(source: Source) -> BaseExtractor:
             return KaggleExtractor(source.source_name, source.url)
         return KaggleExtractor(source.source_name, source.url)
     elif acq_type == "api":
+        if src_low == "insee_indicators" or source.source_name == "insee_indicators":
+            return APIExtractor(source.source_name, source.url)
         if any(k in src_low for k in ["reddit", "weather", "meteo"]):
             return APIExtractor(source.source_name, source.url)
         elif any(k in src_low for k in ["insee", "citoyen", "opinion"]):

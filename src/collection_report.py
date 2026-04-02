@@ -99,9 +99,12 @@ class CollectionReport:
 
         # Articles collectés dans cette session (après session_start)
         # EXCLURE les sources fondation déjà intégrées (Kaggle, GDELT_events, ZZDB CSV)
+        # COUNT(DISTINCT r.raw_data_id) : obligatoire car les JOINs document_topic / model_output
+        # multiplient les lignes — sinon « Articles collectés » et le détail source sont faux
+        # (ex. 32 affichés vs 16 réellement insérés dans ce run).
         c.execute(
             """
-            SELECT s.name, COUNT(r.raw_data_id) as count,
+            SELECT s.name, COUNT(DISTINCT r.raw_data_id) as count,
                    COUNT(DISTINCT CASE WHEN dt.raw_data_id IS NOT NULL THEN r.raw_data_id END) as tagged,
                    COUNT(DISTINCT CASE WHEN mo.raw_data_id IS NOT NULL THEN r.raw_data_id END) as analyzed
             FROM source s
@@ -111,7 +114,7 @@ class CollectionReport:
             LEFT JOIN model_output mo ON mo.raw_data_id = r.raw_data_id
                 AND mo.model_name = 'sentiment_keyword'
             GROUP BY s.name
-            HAVING COUNT(r.raw_data_id) > 0
+            HAVING COUNT(DISTINCT r.raw_data_id) > 0
             ORDER BY count DESC
         """,
             (self.session_start,),
@@ -136,10 +139,10 @@ class CollectionReport:
                 }
             )
 
-        # Totaux session
+        # Totaux session : DISTINCT sur raw_data_id (les JOINs gonflaient COUNT(*))
         c.execute(
             """
-            SELECT COUNT(*) as total,
+            SELECT COUNT(DISTINCT r.raw_data_id) as total,
                    COUNT(DISTINCT CASE WHEN dt.raw_data_id IS NOT NULL THEN r.raw_data_id END) as tagged,
                    COUNT(DISTINCT CASE WHEN mo.raw_data_id IS NOT NULL THEN r.raw_data_id END) as analyzed
             FROM raw_data r
@@ -202,14 +205,15 @@ class CollectionReport:
         console_write(f"   Articles taggés:    {session['tagged']:,}")
         console_write(f"   Articles analysés:  {session['analyzed']:,}")
         console_write(f"   Début session:      {self.session_start[:19]}")
+        console_write(UiMessages.session_report_note())
 
         # Détail par source (chiffres uniquement)
         if self.stats["by_source"]:
             console_write("\n" + UiMessages.sources_detail_title())
             console_write(
-                f"   {'Source':<28s} {'Mode':<24s} {'Collectés':>10s} {'Taggés':>10s} {'Analysés':>10s}"
+                f"   {'Source':<28s} {'Canal':<16s} {'Collectés':>10s} {'Taggés':>10s} {'Analysés':>10s}"
             )
-            console_write(f"   {'-'*28} {'-'*24} {'-'*10} {'-'*10} {'-'*10}")
+            console_write(f"   {'-'*28} {'-'*16} {'-'*10} {'-'*10} {'-'*10}")
             zzdb_total = 0
             zzdb_sources = []
             self.zzdb_total = 0  # Pour utilisation dans les notes

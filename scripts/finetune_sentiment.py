@@ -108,6 +108,61 @@ def prepare_text(df: pd.DataFrame) -> tuple[list[str], list[int]]:
     return texts, labels
 
 
+def rebalance_positive_class(
+    texts: list[str],
+    labels: list[int],
+    *,
+    target_pos_ratio: float,
+    max_multiplier: float,
+    seed: int = 42,
+) -> tuple[list[str], list[int], dict]:
+    """Oversample positive class to a target ratio for training stability."""
+    if target_pos_ratio <= 0 or target_pos_ratio >= 1:
+        return texts, labels, {"applied": False, "reason": "target_disabled"}
+    if max_multiplier <= 1.0:
+        return texts, labels, {"applied": False, "reason": "max_multiplier<=1"}
+
+    pairs = pd.DataFrame({"text": texts, "label": labels})
+    if pairs.empty:
+        return texts, labels, {"applied": False, "reason": "empty_dataset"}
+
+    pos_id = LABEL2ID["positif"]
+    n_total = int(len(pairs))
+    n_pos = int((pairs["label"] == pos_id).sum())
+    if n_pos == 0:
+        return texts, labels, {"applied": False, "reason": "no_positive_examples"}
+
+    # x = (r*N - P) / (1-r), where only positives are added.
+    desired_extra = int(np.ceil(((target_pos_ratio * n_total) - n_pos) / max(1e-9, (1 - target_pos_ratio))))
+    if desired_extra <= 0:
+        return texts, labels, {"applied": False, "reason": "already_above_target", "before_ratio": n_pos / n_total}
+
+    max_extra = int(np.floor((max_multiplier - 1.0) * n_pos))
+    extra = min(desired_extra, max_extra)
+    if extra <= 0:
+        return texts, labels, {"applied": False, "reason": "capped_to_zero", "before_ratio": n_pos / n_total}
+
+    pos_rows = pairs[pairs["label"] == pos_id]
+    extra_rows = pos_rows.sample(n=extra, replace=True, random_state=seed)
+    out = pd.concat([pairs, extra_rows], ignore_index=True)
+    out = out.sample(frac=1.0, random_state=seed).reset_index(drop=True)
+
+    n_total_after = int(len(out))
+    n_pos_after = int((out["label"] == pos_id).sum())
+    return (
+        out["text"].tolist(),
+        out["label"].tolist(),
+        {
+            "applied": True,
+            "before_ratio": n_pos / n_total,
+            "after_ratio": n_pos_after / n_total_after,
+            "added_positive_rows": extra,
+            "before_total": n_total,
+            "after_total": n_total_after,
+        },
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Fine-tuning CamemBERT/FlauBERT pour sentiment (positif/négatif/neutre)"
@@ -156,6 +211,18 @@ def main() -> int:
         default="",
         help="Filtrer par topics (ex: finance,politique). Vide = toutes. Améliore restitution veille.",
     )
+    parser.add_argument(
+        "--target-pos-ratio",
+        type=float,
+        default=0.0,
+        help="Ratio cible de la classe positif dans TRAIN via sur-échantillonnage (0=off, ex: 0.25).",
+    )
+    parser.add_argument(
+        "--pos-oversample-max-multiplier",
+        type=float,
+        default=3.0,
+        help="Multiplicateur max d'exemples positifs (sécurité anti-sur-apprentissage).",
+    )
     args = parser.parse_args()
 
     settings = get_settings()
@@ -201,6 +268,22 @@ def main() -> int:
         )
         val_texts = val_pairs["text"].tolist()
         val_labels = val_pairs["label"].tolist()
+
+    train_texts, train_labels, rebalance_info = rebalance_positive_class(
+        train_texts,
+        train_labels,
+        target_pos_ratio=args.target_pos_ratio,
+        max_multiplier=args.pos_oversample_max_multiplier,
+        seed=42,
+    )
+    if rebalance_info.get("applied"):
+        print(
+            "Recalibrage positif appliqué: "
+            f"{rebalance_info.get('before_ratio', 0):.2%} -> {rebalance_info.get('after_ratio', 0):.2%} "
+            f"(+{rebalance_info.get('added_positive_rows', 0)} lignes)"
+        )
+    else:
+        print(f"Recalibrage positif: non appliqué ({rebalance_info.get('reason', 'n/a')}).")
 
     if len(train_texts) < 100:
         print(
@@ -426,6 +509,9 @@ def main() -> int:
         "train_runtime_seconds": train_runtime,
         "train_samples_per_second": train_sps,
         "train_steps_per_second": train_stps,
+        "target_pos_ratio": float(args.target_pos_ratio),
+        "pos_oversample_max_multiplier": float(args.pos_oversample_max_multiplier),
+        "positive_rebalance": rebalance_info,
     }
     results_path = project_root / "docs" / "e2" / "TRAINING_RESULTS.json"
     results_path.parent.mkdir(parents=True, exist_ok=True)
@@ -433,32 +519,8 @@ def main() -> int:
         json.dump(results_json, f, indent=2, ensure_ascii=False)
     print(f"Résultats training écrits: {results_path}")
 
-    # MLflow — versioning simple (params, metrics, path)
-    try:
-        import mlflow
-        mlflow.set_tracking_uri(f"file:{project_root / 'mlruns'}")
-        mlflow.set_experiment("datasens-sentiment")
-        with mlflow.start_run():
-            mlflow.log_params({
-                "model": args.model,
-                "epochs": args.epochs,
-                "mode": mode,
-                "train_samples": len(train_texts),
-                "val_samples": len(val_texts),
-            })
-            mlflow.log_metrics({
-                "eval_accuracy": float(acc),
-                "eval_f1_macro": float(f1m),
-                "eval_f1_weighted": float(f1w),
-                "eval_loss": eval_loss,
-                "train_runtime_seconds": train_runtime,
-            })
-            mlflow.set_tag("model_path", str(output_path.relative_to(project_root)))
-            if (output_path / "config.json").exists():
-                mlflow.log_artifact(str(output_path / "config.json"), "model")
-        print(f"MLflow run enregistré: mlruns/")
-    except Exception as e:
-        print(f"MLflow (optionnel): {e}")
+    # MLflow explicitement désactivé sur ce projet (trop lourd pour le run quotidien).
+    print("MLflow: désactivé (versioning local via fichiers JSON + artefacts modèles).")
 
     print(f"\nPour utiliser ce modèle, ajoutez dans .env :")
     print(f"  SENTIMENT_FINETUNED_MODEL_PATH=models/{args.model}-sentiment-finetuned")

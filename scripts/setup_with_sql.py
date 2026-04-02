@@ -126,7 +126,7 @@ sources = [
     ("datagouv_datasets", "dataset", "https://www.data.gouv.fr"),
     ("kaggle_french_opinions", "dataset", "https://www.kaggle.com"),
     ("google_news_rss", "rss", "https://news.google.com/rss"),
-    ("ifop_barometers", "scraping", "https://www.ifop.com/publications/"),
+    ("ifop_barometers", "scraping", "https://www.ifop.com/"),
     ("yahoo_finance", "rss", "https://finance.yahoo.com/news/rss"),
 ]
 

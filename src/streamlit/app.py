@@ -8,18 +8,26 @@ import os
 import re
 import subprocess
 import sys
+import json
+import time
+import csv
 from pathlib import Path
 
 import pandas as pd
 import requests
 
 import streamlit as st
+try:
+    import pyarrow.parquet as pq
+except Exception:
+    pq = None
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from src.config import get_settings
+from src.observability.lineage_service import LineageService
 from src.streamlit.auth_plug import (
     get_token,
     init_session_auth,
@@ -41,16 +49,184 @@ def _inject_css() -> None:
     st.markdown(
         """
     <style>
-    .ds-hero { background: linear-gradient(135deg, #1a237e 0%, #283593 100%); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; }
+    :root {
+      --ds-bg-0: #0a0f1f;
+      --ds-bg-1: #111a33;
+      --ds-card: rgba(20, 28, 52, 0.78);
+      --ds-border: rgba(116, 149, 255, 0.28);
+      --ds-text-soft: #b8c8ff;
+      --ds-accent: #74a3ff;
+      --ds-accent-2: #9c7bff;
+    }
+    [data-testid="stAppViewContainer"] {
+      background:
+        radial-gradient(circle at 15% 12%, rgba(76, 110, 245, 0.25), transparent 30%),
+        radial-gradient(circle at 85% 8%, rgba(156, 123, 255, 0.22), transparent 32%),
+        linear-gradient(180deg, var(--ds-bg-0) 0%, var(--ds-bg-1) 100%);
+    }
+    [data-testid="stSidebar"] {
+      background: linear-gradient(180deg, rgba(10, 16, 33, 0.95) 0%, rgba(16, 25, 49, 0.92) 100%);
+      border-right: 1px solid rgba(116, 149, 255, 0.2);
+    }
+    .ds-hero { background: linear-gradient(135deg, #1f2f63 0%, #2b3f89 55%, #4a3ea5 100%); padding: 1.5rem; border-radius: 14px; margin-bottom: 1.2rem; border: 1px solid rgba(143, 168, 255, 0.35); box-shadow: 0 12px 35px rgba(0, 0, 0, 0.35); }
     .ds-hero h3 { color: #e8eaf6; margin: 0 0 0.5rem 0; font-size: 1.1rem; }
     .ds-hero p { color: #c5cae9; margin: 0; font-size: 0.9rem; }
     .ds-flow { display: flex; align-items: center; flex-wrap: wrap; gap: 0.3rem; margin: 1rem 0; font-size: 0.85rem; }
     .ds-flow span { color: #90caf9; }
     .ds-flow .arrow { color: #64b5f6; }
-    .ds-card { background: #1e1e2e; border: 1px solid #333; border-radius: 10px; padding: 1rem; margin-bottom: 0.8rem; }
-    .ds-card-title { color: #81d4fa; font-weight: 600; font-size: 0.95rem; margin-bottom: 0.3rem; }
+    .ds-card { background: var(--ds-card); border: 1px solid var(--ds-border); border-radius: 12px; padding: 1rem; margin-bottom: 0.8rem; backdrop-filter: blur(7px); box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
+    .ds-card-title { color: #9dc0ff; font-weight: 600; font-size: 0.95rem; margin-bottom: 0.3rem; }
     .ds-card-value { color: #fff; font-size: 1.1rem; }
     .ds-card-empty { color: #78909c; }
+    .ds-panel-title { margin: 0.2rem 0 0.6rem 0; padding: 0.9rem 1rem; border-radius: 12px; border: 1px solid var(--ds-border); background: linear-gradient(135deg, rgba(26, 39, 76, 0.9) 0%, rgba(41, 52, 99, 0.9) 100%); color: #d6e1ff; font-weight: 700; letter-spacing: 0.2px; }
+    .ds-panel-sub { color: var(--ds-text-soft); font-size: 0.88rem; margin-top: 0.2rem; font-weight: 400; }
+    .ds-chip { display: inline-block; border: 1px solid rgba(138, 166, 255, 0.45); color: #c7d7ff; border-radius: 999px; padding: 0.24rem 0.7rem; margin: 0.15rem 0.3rem 0.15rem 0; font-size: 0.76rem; background: rgba(65, 84, 150, 0.28); }
+    [data-testid="stMetric"] {
+      background: linear-gradient(160deg, rgba(27, 37, 72, 0.78) 0%, rgba(19, 27, 56, 0.78) 100%);
+      border: 1px solid rgba(126, 158, 255, 0.35);
+      border-radius: 12px;
+      padding: 0.45rem 0.7rem;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.22);
+    }
+    [data-testid="stMetricLabel"] p { color: #a9c3ff !important; font-weight: 600; }
+    [data-testid="stMetricValue"] { color: #f4f7ff !important; }
+    .stButton > button {
+      border: 1px solid rgba(122, 161, 255, 0.45) !important;
+      color: #eaf0ff !important;
+      background: linear-gradient(135deg, rgba(55, 86, 189, 0.85) 0%, rgba(91, 68, 198, 0.85) 100%) !important;
+      border-radius: 11px !important;
+      font-weight: 600 !important;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.25) !important;
+    }
+    .stButton > button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.08);
+      border-color: rgba(170, 192, 255, 0.8) !important;
+    }
+    [data-baseweb="tab-list"] {
+      gap: 0.35rem;
+      background: rgba(23, 32, 64, 0.68);
+      border: 1px solid rgba(109, 139, 237, 0.28);
+      border-radius: 12px;
+      padding: 0.3rem;
+    }
+    [data-baseweb="tab"] {
+      border-radius: 9px !important;
+      font-weight: 600;
+    }
+    [data-baseweb="tab"][aria-selected="true"] {
+      background: linear-gradient(135deg, rgba(65, 94, 201, 0.85), rgba(126, 84, 220, 0.85)) !important;
+      color: #f4f6ff !important;
+    }
+    [data-testid="stTabs"] [role="tabpanel"] {
+      background: rgba(13, 20, 39, 0.72);
+      border: 1px solid rgba(106, 138, 238, 0.24);
+      border-radius: 12px;
+      padding: 1rem 1rem 1.15rem 1rem;
+      margin-top: 0.65rem;
+      overflow: clip;
+      isolation: isolate;
+    }
+    [data-testid="stTabs"] [role="tabpanel"] > div {
+      row-gap: 0.85rem;
+    }
+    [data-testid="stVerticalBlock"] > div {
+      row-gap: 0.65rem;
+    }
+    .stSlider [data-baseweb="slider"] > div > div {
+      background: linear-gradient(90deg, #6f9bff, #9f7cff) !important;
+    }
+    .stSelectbox [data-baseweb="select"] > div,
+    .stTextInput [data-baseweb="input"] {
+      background: rgba(20, 30, 59, 0.78) !important;
+      border: 1px solid rgba(122, 159, 255, 0.36) !important;
+      border-radius: 10px !important;
+    }
+    [data-testid="stExpander"] {
+      border: 1px solid rgba(118, 150, 245, 0.3);
+      border-radius: 12px;
+      background: rgba(19, 28, 54, 0.86);
+    }
+    [data-testid="stDataFrame"] {
+      border: 1px solid rgba(113, 144, 237, 0.3);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .ds-compass-box {
+      border: 1px solid rgba(118, 150, 245, 0.28);
+      border-radius: 11px;
+      background: rgba(17, 25, 48, 0.72);
+      padding: 0.65rem 0.75rem;
+      margin-top: 0.35rem;
+      min-height: 150px;
+    }
+    .ds-compass-title {
+      color: #c9d8ff;
+      font-weight: 700;
+      margin-bottom: 0.45rem;
+      font-size: 0.84rem;
+    }
+    .ds-compass-list {
+      margin: 0;
+      padding-left: 1rem;
+      color: #a8bdf6;
+      font-size: 0.79rem;
+      line-height: 1.34;
+    }
+    .ds-compass-list li {
+      margin: 0.2rem 0;
+    }
+    .ds-compass-muted {
+      color: #8ea2d8;
+      font-size: 0.79rem;
+      margin-top: 0.15rem;
+    }
+    </style>
+    """,
+        unsafe_allow_html=True,
+    )
+
+
+def _inject_readability_css(enabled: bool) -> None:
+    """Mode accessibilité: contraste et lisibilité renforcés."""
+    if not enabled:
+        return
+    st.markdown(
+        """
+    <style>
+    html, body, [data-testid="stAppViewContainer"] {
+      font-size: 17px !important;
+    }
+    p, li, span, label, [data-testid="stMarkdownContainer"] {
+      line-height: 1.55 !important;
+    }
+    [data-testid="stMetric"] {
+      border: 2px solid rgba(173, 199, 255, 0.75) !important;
+    }
+    [data-baseweb="tab"] {
+      font-size: 1rem !important;
+      padding-top: 0.55rem !important;
+      padding-bottom: 0.55rem !important;
+    }
+    [data-testid="stDataFrame"] {
+      border: 2px solid rgba(151, 184, 255, 0.55) !important;
+    }
+    </style>
+    """,
+        unsafe_allow_html=True,
+    )
+
+
+def _inject_demo_css(enabled: bool) -> None:
+    """Mode démo: interface allégée et focus narration."""
+    if not enabled:
+        return
+    st.markdown(
+        """
+    <style>
+    .stExpander { margin-bottom: 0.6rem !important; }
+    [data-testid="stMetric"] { min-height: 105px; }
+    [data-testid="stCaptionContainer"] p { opacity: 0.92; }
     </style>
     """,
         unsafe_allow_html=True,
@@ -59,21 +235,135 @@ def _inject_css() -> None:
 
 def _scan_stage(path: Path, patterns: list[str]) -> dict:
     if not path.exists():
-        return {"exists": False, "count": 0, "latest": None, "size": 0}
+        return {
+            "exists": False,
+            "count": 0,
+            "latest": None,
+            "size": 0,
+            "latest_mtime": None,
+            "changed_24h_count": 0,
+            "changed_24h_size": 0,
+        }
     files: list[Path] = []
     for pattern in patterns:
         files.extend(path.rglob(pattern))
-    files = [p for p in files if p.is_file()]
+    files = [p.resolve() for p in files if p.is_file()]
+    # Evite les doubles comptes quand un fichier matche plusieurs patterns.
+    files = list(dict.fromkeys(files))
     if not files:
-        return {"exists": True, "count": 0, "latest": None, "size": 0}
-    latest = max(files, key=lambda p: p.stat().st_mtime)
-    total_size = sum(p.stat().st_size for p in files)
+        return {
+            "exists": True,
+            "count": 0,
+            "latest": None,
+            "size": 0,
+            "latest_mtime": None,
+            "changed_24h_count": 0,
+            "changed_24h_size": 0,
+        }
+    file_stats = [(p, p.stat().st_size, p.stat().st_mtime) for p in files]
+    latest, _latest_size, latest_mtime = max(file_stats, key=lambda x: x[2])
+    total_size = sum(size for _p, size, _mt in file_stats)
+    cutoff = time.time() - 24 * 3600
+    changed_24h = [(p, size) for p, size, mt in file_stats if mt >= cutoff]
+    changed_24h_size = sum(size for _p, size in changed_24h)
     return {
         "exists": True,
         "count": len(files),
         "latest": latest,
         "size": total_size,
+        "latest_mtime": latest_mtime,
+        "changed_24h_count": len(changed_24h),
+        "changed_24h_size": changed_24h_size,
     }
+
+
+def _stage_time_range(stage_path: Path, stage_key: str) -> tuple[str, str]:
+    """Retourne la période couverte (min, max) selon le format de partition."""
+    if not stage_path.exists():
+        return ("—", "—")
+    dates: list[str] = []
+    if stage_key == "raw":
+        for d in stage_path.iterdir():
+            if d.is_dir() and d.name.startswith("sources_"):
+                dates.append(d.name.replace("sources_", ""))
+    elif stage_key in {"silver", "gold"}:
+        for d in stage_path.iterdir():
+            if not d.is_dir():
+                continue
+            if d.name.startswith("date="):
+                dates.append(d.name.replace("date=", ""))
+            elif stage_key == "silver" and d.name.startswith("v_"):
+                dates.append(d.name.replace("v_", ""))
+    elif stage_key == "goldai":
+        meta_path = stage_path / "metadata.json"
+        if meta_path.exists():
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                dates = [str(x) for x in (meta.get("dates_included") or [])]
+            except Exception:
+                dates = []
+        if not dates:
+            for d in stage_path.iterdir():
+                if d.is_dir() and d.name.startswith("date="):
+                    dates.append(d.name.replace("date=", ""))
+    elif stage_key == "ia":
+        files = [f for f in stage_path.rglob("*.parquet") if f.is_file()]
+        if files:
+            ts = sorted([f.stat().st_mtime for f in files])
+            return (
+                pd.to_datetime(ts[0], unit="s").strftime("%Y-%m-%d"),
+                pd.to_datetime(ts[-1], unit="s").strftime("%Y-%m-%d"),
+            )
+    dates = sorted([d for d in dates if re.match(r"^\d{4}-\d{2}-\d{2}$", d)])
+    if not dates:
+        return ("—", "—")
+    return (dates[0], dates[-1])
+
+
+@st.cache_data(show_spinner=False, ttl=60)
+def _read_parquet_cached(path_str: str, columns: tuple[str, ...] | None = None) -> pd.DataFrame:
+    path = Path(path_str)
+    if columns:
+        selected = list(columns)
+        if pq is not None:
+            try:
+                available = set(pq.ParquetFile(path).schema.names)
+                selected = [c for c in columns if c in available]
+            except Exception:
+                selected = list(columns)
+        if selected:
+            return pd.read_parquet(path, columns=selected)
+    return pd.read_parquet(path)
+
+
+@st.cache_data(show_spinner=False, ttl=60)
+def _parquet_row_count_cached(path_str: str) -> int:
+    path = Path(path_str)
+    if not path.exists():
+        return 0
+    if pq is not None:
+        try:
+            return int(pq.ParquetFile(path).metadata.num_rows)
+        except Exception:
+            pass
+    try:
+        return int(len(pd.read_parquet(path, columns=[])))
+    except Exception:
+        return int(len(pd.read_parquet(path)))
+
+
+@st.cache_data(show_spinner=False, ttl=60)
+def _csv_row_count_cached(path_str: str) -> int:
+    path = Path(path_str)
+    if not path.exists():
+        return 0
+    try:
+        with path.open("r", encoding="utf-8", errors="replace", newline="") as handle:
+            reader = csv.reader(handle)
+            next(reader, None)
+            return sum(1 for _ in reader)
+    except Exception:
+        return 0
 
 
 def _chrono_data(root: Path) -> pd.DataFrame:
@@ -107,6 +397,16 @@ def _chrono_data(root: Path) -> pd.DataFrame:
 
 def _ia_metrics_from_parquet(root: Path) -> dict | None:
     """Calcule les métriques IA depuis les Parquet GOLD/GoldAI (pour pilotage du modèle)."""
+    def _canon_sentiment(value: object) -> str:
+        s = str(value or "").strip().lower()
+        if s in {"positif", "positive", "pos", "4", "5"}:
+            return "positif"
+        if s in {"négatif", "negatif", "negative", "neg", "1", "2"}:
+            return "négatif"
+        if s in {"neutre", "neutral", "neu", "3"}:
+            return "neutre"
+        return "inconnu"
+
     goldai_merged = root / "data" / "goldai" / "merged_all_dates.parquet"
     gold_dir = root / "data" / "gold"
     df = None
@@ -136,9 +436,24 @@ def _ia_metrics_from_parquet(root: Path) -> dict | None:
     total = len(df)
     out = {"total_articles": total, "source": source_label}
     if "sentiment" in df.columns:
-        sent = df["sentiment"].value_counts()
-        out["sentiment_distribution"] = sent.to_dict()
-        out["sentiment_pct"] = (sent / total * 100).round(1).to_dict()
+        raw_sent = df["sentiment"].fillna("inconnu").astype(str).str.strip()
+        canon_sent = raw_sent.map(_canon_sentiment)
+
+        sent_norm = canon_sent.value_counts()
+        sent_raw = raw_sent.value_counts()
+        out["sentiment_distribution"] = sent_norm.to_dict()
+        out["sentiment_pct"] = (sent_norm / total * 100).round(1).to_dict()
+        out["sentiment_distribution_raw"] = sent_raw.head(12).to_dict()
+        out["sentiment_alias_rows"] = int((raw_sent.str.lower() != canon_sent.str.lower()).sum())
+
+        mapping_df = (
+            pd.DataFrame({"label_brut": raw_sent, "label_canonique": canon_sent})
+            .groupby(["label_brut", "label_canonique"])
+            .size()
+            .reset_index(name="count")
+            .sort_values("count", ascending=False)
+        )
+        out["sentiment_mapping_table"] = mapping_df.head(20).to_dict(orient="records")
     if "topic_1" in df.columns:
         top = df["topic_1"].value_counts().head(15)
         out["topic_distribution"] = top.to_dict()
@@ -149,6 +464,33 @@ def _ia_metrics_from_parquet(root: Path) -> dict | None:
         out["topic_confidence_mean"] = float(df["topic_1_confidence"].mean())
     if "source" in df.columns:
         out["top_sources"] = df["source"].value_counts().head(10).to_dict()
+    if "id" in df.columns:
+        stable_id = (
+            df["id"]
+            .astype("string")
+            .str.strip()
+            .fillna("")
+            .replace({"<NA>": "", "nan": "", "None": ""})
+        )
+        out["id_missing"] = int((stable_id == "").sum())
+        out["id_duplicates"] = int(stable_id[stable_id != ""].duplicated().sum())
+    ia_dir = root / "data" / "goldai" / "ia"
+    merged_annot = ia_dir / "merged_all_dates_annotated.parquet"
+    train_p, val_p, test_p = ia_dir / "train.parquet", ia_dir / "val.parquet", ia_dir / "test.parquet"
+    out["mistral_dataset_reco"] = (
+        "Utiliser `data/goldai/ia/merged_all_dates_annotated.parquet` pour l'inférence Mistral "
+        "(insights clients), et `train/val/test` uniquement pour l'entraînement/évaluation."
+        if merged_annot.exists()
+        else "Créer d'abord la copie IA annotée (`create_ia_copy.py`) avant l'usage Mistral."
+    )
+    if train_p.exists() and val_p.exists() and test_p.exists():
+        out["ia_splits"] = {
+            "train": int(len(pd.read_parquet(train_p))),
+            "val": int(len(pd.read_parquet(val_p))),
+            "test": int(len(pd.read_parquet(test_p))),
+        }
+    else:
+        out["ia_splits"] = {}
     return out
 
 
@@ -273,11 +615,13 @@ def _mongo_status(root: Path) -> dict:
             size = f.get("length", 0)
             total_size += size
             meta = f.get("metadata", {})
+            upload_dt = f.get("uploadDate")
             files.append({
                 "filename": f.get("filename", "?"),
                 "logical_name": meta.get("logical_name", "—"),
                 "partition_date": meta.get("partition_date", "—"),
                 "stored_at": meta.get("stored_at", "—"),
+                "upload_date": upload_dt.isoformat() if upload_dt else "—",
                 "size_bytes": size,
                 "sha256": meta.get("sha256", "")[:12] + "…" if meta.get("sha256") else "—",
             })
@@ -330,6 +674,24 @@ def _ia_history(root: Path) -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values("date")
 
 
+def _latest_db_state_reports(root: Path) -> tuple[dict | None, dict | None]:
+    """Retourne (dernier, précédent) rapports db_state JSON."""
+    rep = root / "reports"
+    files = sorted(rep.glob("db_state_*.json"))
+    if not files:
+        return None, None
+
+    def _load(p: Path) -> dict | None:
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+
+    latest = _load(files[-1])
+    previous = _load(files[-2]) if len(files) >= 2 else None
+    return latest, previous
+
+
 def _load_benchmark_results(root: Path) -> dict | None:
     """Charge les résultats du dernier benchmark depuis AI_BENCHMARK_RESULTS.json."""
     p = root / "docs" / "e2" / "AI_BENCHMARK_RESULTS.json"
@@ -337,9 +699,166 @@ def _load_benchmark_results(root: Path) -> dict | None:
         return None
     try:
         import json
-        return json.loads(p.read_text(encoding="utf-8"))
+        raw = json.loads(p.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            return None
+        normalized: dict = {}
+        for key, value in raw.items():
+            canon = "xlm_roberta_twitter" if key == "flaubert_multilingual" else key
+            normalized[canon] = value
+        return normalized
     except Exception:
         return None
+
+
+def _sentiment_benchmark_diagnosis(root: Path) -> pd.DataFrame:
+    """Build a concise diagnosis table from AI_BENCHMARK_RESULTS.json."""
+    model_meta = {
+        "sentiment_fr": {
+            "display": "Sentiment_FR (backbone fine-tuné par toi)",
+            "backbone": "ac0hik/Sentiment_Analysis_French",
+            "family": "FR spécialisé",
+            "type": "Base",
+        },
+        "finetuned_local": {
+            "display": "Sentiment_FR local fine-tuné (projet)",
+            "backbone": "models/sentiment_fr-sentiment-finetuned",
+            "family": "FR spécialisé",
+            "type": "Fine-tuné local",
+        },
+        "bert_multilingual": {
+            "display": "BERT multilingue",
+            "backbone": "nlptown/bert-base-multilingual-uncased-sentiment",
+            "family": "BERT",
+            "type": "Base",
+        },
+        "xlm_roberta_twitter": {
+            "display": "XLM-RoBERTa Twitter (multilingue)",
+            "backbone": "cardiffnlp/twitter-xlm-roberta-base-sentiment-multilingual",
+            "family": "XLM-RoBERTa",
+            "type": "Base",
+        },
+    }
+    payload = _load_benchmark_results(root)
+    if not payload:
+        return pd.DataFrame()
+    rows = []
+    for model, m in payload.items():
+        if not isinstance(m, dict) or "error" in m:
+            continue
+        per = m.get("per_class", {}) or {}
+        f1_neg = float((per.get("neg") or {}).get("f1", 0.0))
+        f1_neu = float((per.get("neu") or {}).get("f1", 0.0))
+        f1_pos = float((per.get("pos") or {}).get("f1", 0.0))
+        rows.append(
+            {
+                "model_key": model,
+                "model": model_meta.get(model, {}).get("display", model),
+                "backbone": model_meta.get(model, {}).get("backbone", str(m.get("model_name", ""))),
+                "family": model_meta.get(model, {}).get("family", "n/a"),
+                "type": model_meta.get(model, {}).get("type", "n/a"),
+                "accuracy": float(m.get("accuracy", 0.0)),
+                "f1_macro": float(m.get("f1_macro", 0.0)),
+                "latency_ms": float(m.get("avg_latency_ms", 0.0)),
+                "f1_neg": f1_neg,
+                "f1_neu": f1_neu,
+                "f1_pos": f1_pos,
+                "f1_gap_max": max(f1_neg, f1_neu, f1_pos) - min(f1_neg, f1_neu, f1_pos),
+            }
+        )
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows).sort_values(["f1_macro", "accuracy"], ascending=False)
+    ordered_cols = [
+        "model",
+        "family",
+        "type",
+        "backbone",
+        "accuracy",
+        "f1_macro",
+        "latency_ms",
+        "f1_neg",
+        "f1_neu",
+        "f1_pos",
+        "f1_gap_max",
+        "model_key",
+    ]
+    df = df[[c for c in ordered_cols if c in df.columns]]
+    return df
+
+
+def _active_inference_benchmark_key(active_model: str | None, bench_results: dict | None) -> str | None:
+    """Resolve benchmark key corresponding to currently active inference model."""
+    if not bench_results:
+        return None
+    if active_model:
+        if active_model == "camembert_pretrained":
+            return None
+        # Fine-tuned local model path is benchmarked under this canonical key.
+        if "finetuned_local" in bench_results:
+            return "finetuned_local"
+    if "sentiment_fr" in bench_results:
+        return "sentiment_fr"
+    return next(iter(bench_results.keys()), None)
+
+
+def _go_no_go_snapshot(
+    active_model: str | None,
+    bench_results: dict | None,
+    trained_models: list[dict],
+) -> dict:
+    """Compute explicit production gate from training (validation) and inference (benchmark)."""
+    trained_ranked = sorted(
+        trained_models,
+        key=lambda m: (m.get("eval_f1_macro") or m.get("eval_f1") or 0, m.get("eval_accuracy") or 0),
+        reverse=True,
+    )
+    best_trained = trained_ranked[0] if trained_ranked else None
+
+    inf_key = _active_inference_benchmark_key(active_model, bench_results)
+    inf = (bench_results or {}).get(inf_key, {}) if inf_key else {}
+    per = inf.get("per_class", {}) if isinstance(inf, dict) else {}
+
+    train_f1_macro = (best_trained or {}).get("eval_f1_macro")
+    if train_f1_macro is None and best_trained:
+        train_f1_macro = best_trained.get("eval_f1")
+    train_acc = (best_trained or {}).get("eval_accuracy")
+    train_f1_pos = (best_trained or {}).get("eval_f1_pos")
+
+    inf_f1_macro = inf.get("f1_macro") if isinstance(inf, dict) else None
+    inf_acc = inf.get("accuracy") if isinstance(inf, dict) else None
+    inf_f1_pos = (per.get("pos") or {}).get("f1") if isinstance(per, dict) else None
+    inf_latency = inf.get("avg_latency_ms") if isinstance(inf, dict) else None
+
+    checks = [
+        ("Train F1 macro >= 0.75", train_f1_macro is not None and float(train_f1_macro) >= 0.75),
+        ("Train accuracy >= 0.75", train_acc is not None and float(train_acc) >= 0.75),
+        ("Inference F1 macro >= 0.70", inf_f1_macro is not None and float(inf_f1_macro) >= 0.70),
+        ("Inference F1 positif >= 0.65", inf_f1_pos is not None and float(inf_f1_pos) >= 0.65),
+        ("Inference latence <= 260 ms", inf_latency is not None and float(inf_latency) <= 260.0),
+    ]
+    passed = sum(1 for _, ok in checks if ok)
+
+    if passed == len(checks):
+        status = "GO"
+    elif passed >= 3:
+        status = "GO avec vigilance"
+    else:
+        status = "NO-GO"
+
+    return {
+        "status": status,
+        "checks": checks,
+        "train_model_name": (best_trained or {}).get("name"),
+        "train_accuracy": train_acc,
+        "train_f1_macro": train_f1_macro,
+        "train_f1_pos": train_f1_pos,
+        "inference_model_key": inf_key,
+        "inference_accuracy": inf_acc,
+        "inference_f1_macro": inf_f1_macro,
+        "inference_f1_pos": inf_f1_pos,
+        "inference_latency_ms": inf_latency,
+    }
 
 
 def _scan_trained_models(root: Path) -> list[dict]:
@@ -494,20 +1013,19 @@ def _run_command(label: str, command: list[str], extra_env: dict | None = None) 
         }
 
 
-def _render_last_report() -> None:
+def _render_last_report(panel_key: str) -> None:
     """Affiche le dernier rapport d'exécution (persiste après rerun)."""
     report = st.session_state.get("last_command_report")
     if not report:
         return
     with st.expander("📋 Rapport d'exécution (cliquez pour afficher)", expanded=True):
-        # Pas de key explicite ici pour éviter les DuplicateWidgetID lorsque
-        # le rapport est rendu dans plusieurs onglets.
         st.text_area(
             "Sortie",
             value=report.get("out", "OK"),
             height=350,
             disabled=True,
             label_visibility="collapsed",
+            key=f"last_report_output_{panel_key}",
         )
         if report.get("err"):
             st.error(report.get("err", "Erreur inconnue"))
@@ -516,6 +1034,9 @@ def _render_last_report() -> None:
 def main() -> None:
     settings = get_settings()
     st.set_page_config(page_title="DataSens Cockpit", layout="wide")
+    ux_mode = "Standard"
+    show_compass = True
+    data_scope = "Historique complet"
 
     api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
     try:
@@ -540,6 +1061,50 @@ def main() -> None:
         else:
             render_user_and_logout()
 
+        st.divider()
+        ux_mode = st.selectbox(
+            "Ergonomie cockpit",
+            ["Standard", "Lecture facile", "Mode démo"],
+            index=0,
+            key="ux_mode_select",
+            help="Lecture facile: contraste renforcé. Mode démo: parcours simplifié en 5 écrans.",
+        )
+        show_compass = st.checkbox(
+            "Afficher la boussole cockpit",
+            value=True,
+            key="ux_show_compass",
+            help="Repérage rapide des panneaux selon votre besoin.",
+        )
+        data_scope = st.selectbox(
+            "Périmètre visualisation données",
+            ["Historique complet", "Date sélectionnée"],
+            index=0,
+            key="ux_data_scope",
+            help="Historique complet: charge toutes les partitions disponibles dans les panels de visualisation.",
+        )
+        compass_body = (
+            """
+            <ul class="ds-compass-list">
+              <li>🏠 Vue d'ensemble: état global du système</li>
+              <li>🔁 Pipeline & Fusion: Gold/GoldAI, doublons, ajouts</li>
+              <li>⚙️ Pilotage: actions run (collecte, fusion, API)</li>
+              <li>🎯 Modèles & Sélection: benchmark, fine-tuning, GO/NO-GO</li>
+              <li>📊 Monitoring: MLOps live, Prometheus/Grafana/Kuma</li>
+            </ul>
+            """
+            if show_compass
+            else '<div class="ds-compass-muted">Boussole masquée. Activez le switch pour afficher le guide.</div>'
+        )
+        st.markdown(
+            f"""
+            <div class="ds-compass-box">
+              <div class="ds-compass-title">🧭 Boussole cockpit</div>
+              {compass_body}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
     # Securite : aucun panel accessible sans connexion
     if not is_logged_in():
         st.warning("Connectez-vous dans la barre laterale pour acceder au cockpit.")
@@ -547,6 +1112,9 @@ def main() -> None:
 
     st.title("DataSens Cockpit")
     _inject_css()
+    _inject_readability_css(ux_mode == "Lecture facile")
+    _inject_demo_css(ux_mode == "Mode démo")
+    history_mode = data_scope == "Historique complet"
 
     raw_dir = PROJECT_ROOT / "data" / "raw"
     silver_dir = PROJECT_ROOT / "data" / "silver"
@@ -554,44 +1122,54 @@ def main() -> None:
     goldai_dir = PROJECT_ROOT / "data" / "goldai"
     ia_dir = goldai_dir / "ia"
 
-    # Flux réel : sources (dont ZZDB) → RAW → SILVER (+ topics) → GOLD (+ sentiment) → MongoDB → GoldAI + copie IA
-    # Topics arrivent en SILVER ; sentiment (positif/négatif/neutre) arrive en GOLD. Pas d'« annotation » en plus.
-    stages = [
-        (
-            "RAW (sources brutes)",
-            raw_dir,
-            ["*.json", "*.csv"],
-            "Articles bruts extraits des sources RSS, agrégateurs et jeux de données.",
-        ),
-        (
-            "SILVER (nettoyage, fusion)",
-            silver_dir,
-            ["*.parquet"],
-            "Nettoyage, fusion, agrégation. Les topics (topic_1, topic_2) sont ajoutés ici.",
-        ),
-        (
-            "GOLD (parquet quotidien)",
-            gold_dir,
-            ["*.parquet"],
-            "Source de vérité. Le sentiment IA (positif/négatif/neutre) est ajouté ici. Envoyé vers MongoDB pour stockage long terme.",
-        ),
-        (
-            "GoldAI (fusion long terme)",
-            goldai_dir,
-            ["merged_all_dates.parquet", "*.parquet"],
-            "Fusion de tous les GOLD, stockage long terme MongoDB. Contient déjà sentiment + topics.",
-        ),
-        (
-            "Copie IA (entraînement)",
-            ia_dir,
-            ["merged_all_dates_annotated.parquet", "*.parquet"],
-            "Même données (sentiment + topics déjà dans la source de vérité). Copie dédiée au split train/val/test pour l'entraînement des modèles.",
-        ),
-    ]
-
-    tab_overview, tab_pipeline, tab_flux, tab_pilotage, tab_ia, tab_modeles, tab_monitoring = st.tabs(
-        ["Vue d'ensemble", "Pipeline & Fusion", "Flux & Visualisation", "Pilotage", "IA", "Modeles & Selection", "Monitoring"]
+    tab_demo, tab_overview, tab_pipeline, tab_flux, tab_pilotage, tab_ia, tab_modeles, tab_monitoring = st.tabs(
+        ["🎬 Démo guidée", "🏠 Vue d'ensemble", "🔁 Pipeline & Fusion", "🧬 Flux & Visualisation", "⚙️ Pilotage", "🤖 IA", "🎯 Modèles & Sélection", "📊 Monitoring"]
     )
+
+    with tab_demo:
+        st.subheader("Parcours démo (6 panneaux)")
+        st.caption("Vue opérable du flux data/IA: ingestion, fusion, scoring et observabilité.")
+
+        st.markdown(
+            """
+            1. **Vue d'ensemble**: état système, volumétrie, disponibilité API, signaux de santé.
+            2. **Pipeline & Fusion**: delta journalier GOLD -> GoldAI, overlap, déduplication, stock net.
+            3. **Flux & Visualisation**: lineage SOURCE -> RAW -> SILVER -> GOLD avec points de contrôle.
+            4. **Pilotage**: commandes run, supervision buffer/long terme, actions opérationnelles.
+            5. **Modèles & Sélection**: benchmark, trade-off qualité/latence, lecture GO/NO-GO.
+            6. **Monitoring**: statut live des briques MLOps et cohérence de la collecte.
+            """
+        )
+
+        st.info(
+            "Astuce usage: activez `Mode démo` dans la barre latérale pour une lecture plus fluide pendant la présentation."
+        )
+
+        with st.expander("Prise en main (6 panneaux)", expanded=True):
+            st.markdown(
+                """
+                **Intro**  
+                « Ce cockpit donne une lecture exécutable du pipeline: de l'ingestion au monitoring de prod. »
+
+                **Écran 1 - Vue d'ensemble**  
+                « On valide le socle: volumes, présence des artefacts, accessibilité API et cohérence globale. »
+
+                **Écran 2 - Pipeline & Fusion**  
+                « On lit le différentiel du jour: lignes candidates, recouvrement historique, puis résultat dédupliqué. »
+
+                **Écran 3 - Flux & Visualisation**  
+                « On explicite la transformation inter-couches et les contrôles qualité associés. »
+
+                **Écran 4 - Pilotage**  
+                « On exécute les actions clés (pipeline, fusion, copie IA) avec retour opérationnel immédiat. »
+
+                **Écran 5 - Modèles & Sélection**  
+                « On compare les modèles sur des métriques actionnables (F1, accuracy, latence) pour décider l'usage. »
+
+                **Écran 6 - Monitoring**  
+                « On clôture par la télémétrie live (API, Prometheus, Grafana, Uptime Kuma) pour valider l'exploitabilité. »
+                """
+            )
 
     with tab_overview:
         st.markdown(
@@ -607,22 +1185,67 @@ def main() -> None:
             unsafe_allow_html=True,
         )
 
-        col1, col2, col3 = st.columns(3)
-        for idx, (name, path, patterns, _desc) in enumerate(stages):
-            target = col1 if idx % 3 == 0 else col2 if idx % 3 == 1 else col3
-            with target:
-                data = _scan_stage(path, patterns)
-                if data["exists"]:
-                    f = "fichier" if data["count"] == 1 else "fichiers"
-                    val = f"{data['count']} {f} · {_fmt_size(data['size'])}"
-                    cls = ""
-                else:
-                    val = "—"
-                    cls = " ds-card-empty"
-                st.markdown(
-                    f'<div class="ds-card"><div class="ds-card-title">{name}</div><div class="ds-card-value{cls}">{val}</div></div>',
-                    unsafe_allow_html=True,
-                )
+        # Vue métier: lignes comparables par couche (pas de mélange fichiers/poids).
+        raw_total = 0
+        db_candidate = os.getenv("DB_PATH")
+        if db_candidate and Path(db_candidate).exists():
+            db_path = Path(db_candidate)
+        else:
+            default_db = Path.home() / "datasens_project" / "datasens.db"
+            db_path = default_db if default_db.exists() else PROJECT_ROOT / "datasens.db"
+        if db_path.exists():
+            try:
+                import sqlite3
+                conn = sqlite3.connect(str(db_path))
+                cur = conn.cursor()
+                raw_total = int(cur.execute("SELECT COUNT(*) FROM raw_data").fetchone()[0])
+                conn.close()
+            except Exception:
+                raw_total = 0
+
+        silver_rows, silver_label = 0, "—"
+        if silver_dir.exists():
+            silver_dirs = sorted(
+                [d for d in silver_dir.iterdir() if d.is_dir()],
+                key=lambda d: d.name.replace("date=", "").replace("v_", ""),
+                reverse=True,
+            )
+            if silver_dirs:
+                sdir = silver_dirs[0]
+                silver_label = sdir.name.replace("date=", "").replace("v_", "")
+                cands = [sdir / "silver_articles.csv", sdir / "silver_articles.parquet"] + list(sdir.rglob("*.csv")) + list(sdir.rglob("*.parquet"))
+                sfile = next((p for p in cands if p.exists()), None)
+                if sfile is not None:
+                    silver_rows = _parquet_row_count_cached(str(sfile)) if sfile.suffix.lower() == ".parquet" else _csv_row_count_cached(str(sfile))
+
+        gold_rows, gold_label = 0, "—"
+        if gold_dir.exists():
+            gold_dates = sorted(
+                [d.name.replace("date=", "") for d in gold_dir.iterdir() if d.is_dir() and d.name.startswith("date=")],
+                reverse=True,
+            )
+            if gold_dates:
+                gold_label = gold_dates[0]
+                gpart = gold_dir / f"date={gold_label}"
+                gfile = gpart / "articles.parquet"
+                if gfile.exists():
+                    gold_rows = _parquet_row_count_cached(str(gfile))
+
+        goldai_rows = _parquet_row_count_cached(str(goldai_dir / "merged_all_dates.parquet")) if (goldai_dir / "merged_all_dates.parquet").exists() else 0
+        ia_train = _parquet_row_count_cached(str(ia_dir / "train.parquet")) if (ia_dir / "train.parquet").exists() else 0
+        ia_val = _parquet_row_count_cached(str(ia_dir / "val.parquet")) if (ia_dir / "val.parquet").exists() else 0
+        ia_test = _parquet_row_count_cached(str(ia_dir / "test.parquet")) if (ia_dir / "test.parquet").exists() else 0
+        ia_total = ia_train + ia_val + ia_test
+
+        k1, k2, k3 = st.columns(3)
+        k1.metric("RAW SQLite (buffer)", f"{raw_total:,}")
+        k2.metric("SILVER dernière partition", f"{silver_rows:,}", delta=silver_label)
+        k3.metric("GOLD du jour (partition)", f"{gold_rows:,}", delta=gold_label)
+        k4, k5, k6 = st.columns(3)
+        k4.metric("GoldAI fusion long terme", f"{goldai_rows:,}")
+        k5.metric("IA split total", f"{ia_total:,}", delta=f"train {ia_train:,} · val {ia_val:,} · test {ia_test:,}")
+        k6.metric("Écart GoldAI - GOLD jour", f"{goldai_rows - gold_rows:+,}")
+        st.caption("Périmètre homogène: lignes par couche. On ne mélange pas ici avec des compteurs de fichiers/MB.")
         st.divider()
         st.caption("API & Dependencies")
         api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
@@ -702,7 +1325,13 @@ def main() -> None:
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             dates_in_goldai = meta.get("dates_included", [])
         if dates_in_goldai:
-            st.caption(f"Dates dans GoldAI : {', '.join(sorted(dates_in_goldai))}")
+            dates_sorted = sorted(dates_in_goldai)
+            st.caption(
+                f"GoldAI contient {len(dates_sorted)} dates "
+                f"(de {dates_sorted[0]} à {dates_sorted[-1]})."
+            )
+            with st.expander("Voir la liste complète des dates GoldAI", expanded=False):
+                st.caption(", ".join(dates_sorted))
 
         gold_dates = (
             sorted(
@@ -716,7 +1345,19 @@ def main() -> None:
             if gold_dir.exists()
             else []
         )
-        selected_date = st.selectbox("Date GOLD", gold_dates or ["—"], index=0)
+        if gold_dates:
+            selected_date = st.select_slider(
+                "Date GOLD",
+                options=gold_dates,
+                value=gold_dates[0],
+                help="Sélection directe sans menu déroulant.",
+            )
+        else:
+            selected_date = "—"
+            st.caption("Date GOLD: aucune partition disponible.")
+        already_merged_selected = (
+            selected_date != "—" and selected_date in set(dates_in_goldai)
+        )
 
         df_gold = df_goldai = None
         gold_file = (
@@ -724,12 +1365,61 @@ def main() -> None:
             if selected_date != "—"
             else None
         )
+        cols_min = tuple(["id", "fingerprint", "url", "title", "source", "collected_at", "sentiment"])
+        cols_goldai = tuple(["id", "fingerprint", "url", "title", "source", "collected_at", "sentiment", "raw_data_id"])
         if gold_file and gold_file.exists():
-            df_gold = pd.read_parquet(gold_file)
+            df_gold = _read_parquet_cached(str(gold_file), cols_min)
         if merged_path.exists():
-            df_goldai = pd.read_parquet(merged_path)
-        n_gold = len(df_gold) if df_gold is not None else 0
-        n_goldai = len(df_goldai) if df_goldai is not None else 0
+            df_goldai = _read_parquet_cached(str(merged_path), cols_goldai)
+        n_gold = _parquet_row_count_cached(str(gold_file)) if (gold_file and gold_file.exists()) else 0
+        n_goldai = _parquet_row_count_cached(str(merged_path)) if merged_path.exists() else 0
+
+        # Bloc de vérité métier: un seul périmètre (partition GOLD sélectionnée -> fusion GoldAI -> fichiers IA)
+        st.markdown("#### Périmètre métier du jour (partition unique)")
+        st.caption(
+            "Lecture unique: `GOLD(date sélectionnée)` -> fusion dans `GoldAI` -> génération des fichiers IA. "
+            "Ne pas mélanger ici avec les compteurs globaux `raw_data`."
+        )
+        ia_train = goldai_dir / "ia" / "train.parquet"
+        ia_val = goldai_dir / "ia" / "val.parquet"
+        ia_test = goldai_dir / "ia" / "test.parquet"
+        ia_annot = goldai_dir / "ia" / "merged_all_dates_annotated.parquet"
+        n_ia_train = _parquet_row_count_cached(str(ia_train)) if ia_train.exists() else 0
+        n_ia_val = _parquet_row_count_cached(str(ia_val)) if ia_val.exists() else 0
+        n_ia_test = _parquet_row_count_cached(str(ia_test)) if ia_test.exists() else 0
+        n_ia_annot = _parquet_row_count_cached(str(ia_annot)) if ia_annot.exists() else 0
+
+        clarity_rows = [
+            {"Étape": "1) GOLD SQLite du jour", "Objet": f"data/gold/date={selected_date}/articles.parquet", "Lignes": n_gold},
+            {"Étape": "2) GoldAI fusion long terme", "Objet": "data/goldai/merged_all_dates.parquet", "Lignes": n_goldai},
+            {"Étape": "3) IA annoté (enfant GoldAI)", "Objet": "data/goldai/ia/merged_all_dates_annotated.parquet", "Lignes": n_ia_annot},
+            {"Étape": "4) IA split train", "Objet": "data/goldai/ia/train.parquet", "Lignes": n_ia_train},
+            {"Étape": "5) IA split val", "Objet": "data/goldai/ia/val.parquet", "Lignes": n_ia_val},
+            {"Étape": "6) IA split test", "Objet": "data/goldai/ia/test.parquet", "Lignes": n_ia_test},
+        ]
+        st.dataframe(pd.DataFrame(clarity_rows), use_container_width=True, hide_index=True)
+        st.code(
+            "\n".join(
+                [
+                    f"Partition GOLD du jour: {n_gold:,} lignes",
+                    f"GoldAI courant: {n_goldai:,} lignes (stock long terme, dédupliqué)",
+                    f"IA split total: {n_ia_train + n_ia_val + n_ia_test:,} = {n_ia_train:,} + {n_ia_val:,} + {n_ia_test:,}",
+                ]
+            ),
+            language="text",
+        )
+
+        def _stable_keys_local(df: pd.DataFrame) -> pd.Series:
+            if "id" in df.columns:
+                s = df["id"]
+            elif "fingerprint" in df.columns:
+                s = df["fingerprint"]
+            elif "url" in df.columns:
+                s = df["url"]
+            else:
+                s = pd.Series([None] * len(df), index=df.index, dtype="object")
+            s = s.astype("string").str.strip()
+            return s.fillna("").replace({"<NA>": "", "nan": "", "None": ""})
 
         if st.button("Fusionner GoldAI", type="primary", use_container_width=True):
             with st.spinner("Fusion en cours…"):
@@ -757,61 +1447,145 @@ def main() -> None:
                 st.session_state["fusion_error"] = (proc.stderr or proc.stdout or "")[-500:]
             st.rerun()
 
-        w1, w2, w3, w4 = st.columns(4)
+        n_new, df_new = 0, None
+        keys_gold = keys_goldai = pd.Series(dtype="string")
+        ids = set()
+        keys_gold_set = set()
+        n_overlap = 0
+        n_gold_missing_keys = 0
+        n_goldai_missing_keys = 0
+        n_gold_keys = 0
+        n_goldai_keys = 0
+        if (
+            df_gold is not None
+            and df_goldai is not None
+        ):
+            keys_gold = _stable_keys_local(df_gold)
+            keys_goldai = _stable_keys_local(df_goldai)
+            ids = set(keys_goldai[keys_goldai != ""])
+            keys_gold_set = set(keys_gold[keys_gold != ""])
+            n_gold_missing_keys = int((keys_gold == "").sum())
+            n_goldai_missing_keys = int((keys_goldai == "").sum())
+            n_gold_keys = len(keys_gold_set)
+            n_goldai_keys = len(ids)
+            n_overlap = len(keys_gold_set.intersection(ids))
+            df_new = df_gold[(keys_gold != "") & (~keys_gold.isin(ids))]
+            n_new = len(df_new)
+
+        w1, w2, w3 = st.columns(3)
         with w1:
             st.markdown("#### 1. GOLD quotidien")
             if df_gold is not None:
                 st.metric("Lignes", f"{n_gold:,}")
-                st.dataframe(df_gold.head(80), use_container_width=True, height=260)
+                st.caption("Lot source du jour à fusionner.")
             else:
                 st.info("—")
         with w2:
             st.markdown("#### 2. GoldAI")
             if df_goldai is not None:
                 st.metric("Lignes", f"{n_goldai:,}")
-                st.dataframe(df_goldai.head(80), use_container_width=True, height=260)
+                st.caption("Stock long terme déjà fusionné.")
+                if "raw_data_id" in df_goldai.columns:
+                    n_null_raw_data_id = int(df_goldai["raw_data_id"].isna().sum())
+                    if n_null_raw_data_id > 0:
+                        st.caption(
+                            f"Note: {n_null_raw_data_id:,} valeurs `raw_data_id` vides = normal "
+                            "pour des lignes historiques / schémas hérités."
+                        )
             else:
                 st.info("—")
         with w3:
-            st.markdown("#### 3. Lignes ajoutées")
-            n_new, df_new = 0, None
-            if (
-                df_gold is not None
-                and df_goldai is not None
-                and "id" in df_gold.columns
-                and "id" in df_goldai.columns
-            ):
-                ids = set(df_goldai["id"])
-                df_new = df_gold[~df_gold["id"].isin(ids)]
-                n_new = len(df_new)
-            st.metric("+ lignes", f"{n_new:,}")
-            if n_new == 0 and df_gold is not None and df_goldai is not None:
-                st.caption("Date déjà fusionnée")
-            if df_new is not None or df_gold is not None:
-                st.dataframe(
-                    (df_new if df_new is not None else df_gold).head(80),
-                    use_container_width=True,
-                    height=260,
-                )
-            else:
-                st.info("—")
-        with w4:
-            st.markdown("#### 4. Résultat")
+            st.markdown("#### 3. Nouveaux IDs à fusionner")
+            st.metric("IDs nouveaux", f"{n_new:,}")
             if df_gold is not None and df_goldai is not None:
-                merged = pd.concat([df_goldai, df_gold], ignore_index=True)
-                n_concat = len(merged)
-                if "id" in merged.columns:
-                    merged = merged.drop_duplicates(subset=["id"], keep="last")
-                n_res = len(merged)
-                n_dedup = n_concat - n_res
-                st.caption(f"Concat : {n_goldai:,}+{n_gold:,}={n_concat:,}")
-                st.markdown(f"→ **{n_res:,}** ({n_dedup:,} doublons)")
-                st.dataframe(merged.tail(80), use_container_width=True, height=260)
-            elif df_goldai is not None:
-                st.metric("Lignes", f"{n_goldai:,}")
-                st.dataframe(df_goldai.head(80), use_container_width=True, height=260)
-            else:
-                st.info("—")
+                st.caption(f"Doublons détectés (IDs déjà en GoldAI): {n_overlap:,}")
+            if n_new == 0 and df_gold is not None and df_goldai is not None:
+                if already_merged_selected:
+                    st.caption("Date déjà fusionnée: +0 est normal.")
+                else:
+                    st.caption("Aucun ID nouveau détecté: lot 100% doublons.")
+        st.markdown("#### 4. Résultat (1 + 2 + 3)")
+        if df_gold is not None and df_goldai is not None:
+            n_concat = n_goldai + n_gold
+            n_res_keys = len(ids.union(keys_gold_set))
+            n_dedup_keys = n_gold_keys - n_new
+            n_added = n_new
+
+            if already_merged_selected:
+                st.caption("Date déjà intégrée dans GoldAI (simulation informative).")
+            st.markdown("**Preuve du calcul (séparée par unité)**")
+            st.code(
+                "\n".join(
+                    [
+                        f"Rows bruts: {n_goldai:,} + {n_gold:,} = {n_concat:,}",
+                        f"IDs stables: {n_goldai_keys:,} + {n_new:,} = {n_res_keys:,}",
+                        f"Contrôle doublons IDs: {n_gold_keys:,} - {n_new:,} = {n_dedup_keys:,}",
+                    ]
+                ),
+                language="text",
+            )
+
+            r1, r2, r3 = st.columns(3)
+            r1.metric("Concat brut (1+2)", f"{n_concat:,}")
+            r2.metric("Résultat après dédup (IDs)", f"{n_res_keys:,}")
+            r3.metric("Lignes ajoutées nettes", f"{n_added:,}", delta=f"+{n_added:,}")
+            st.caption(
+                f"Clés vides ignorées dans la preuve IDs: GOLD={n_gold_missing_keys:,}, GoldAI={n_goldai_missing_keys:,}."
+            )
+
+            proof_df = pd.DataFrame(
+                [
+                    {"Preuve": "IDs GoldAI existants (avant)", "Valeur": n_goldai_keys},
+                    {"Preuve": "IDs GOLD du jour", "Valeur": n_gold_keys},
+                    {"Preuve": "Recouvrement (doublons IDs)", "Valeur": n_overlap},
+                    {"Preuve": "Nouveaux IDs", "Valeur": n_new},
+                    {"Preuve": "Total IDs attendus après fusion", "Valeur": n_res_keys},
+                ]
+            )
+            st.dataframe(proof_df, use_container_width=True, hide_index=True)
+
+            tab_new, tab_gold_prev, tab_goldai_prev = st.tabs(
+                ["Nouvelles lignes (+)", "Aperçu GOLD", "Aperçu GoldAI"]
+            )
+            with tab_new:
+                if df_new is not None and not df_new.empty:
+                    cols_focus = [c for c in ["id", "title", "source", "collected_at"] if c in df_new.columns]
+                    preview_new = df_new[cols_focus].copy().head(120) if cols_focus else df_new.copy().head(120)
+                    if "id" in preview_new.columns:
+                        preview_new["id"] = (
+                            preview_new["id"]
+                            .astype("string")
+                            .fillna("ID_HARMONISE_MANQUANT")
+                            .replace({"<NA>": "ID_HARMONISE_MANQUANT", "": "ID_HARMONISE_MANQUANT"})
+                        )
+                    st.success(f"{n_new:,} ligne(s) nouvelle(s) détectée(s).")
+                    st.dataframe(preview_new, use_container_width=True, height=300)
+                elif df_new is not None:
+                    st.info("Aucune nouvelle ligne à afficher.")
+                else:
+                    st.info("—")
+            with tab_gold_prev:
+                cols_focus = [c for c in ["id", "title", "source", "collected_at"] if c in df_gold.columns]
+                gold_view = df_gold[cols_focus].copy().head(220) if cols_focus else df_gold.copy().head(220)
+                if not gold_view.empty:
+                    key_series = _stable_keys_local(gold_view)
+                    gold_view.insert(
+                        0,
+                        "Statut preuve",
+                        key_series.apply(
+                            lambda v: "NOUVEAU" if v != "" and v not in ids else "DEJA_PRESENT" if v != "" else "SANS_CLE"
+                        ),
+                    )
+                    gold_view = gold_view.sort_values(by="Statut preuve", ascending=True)
+                st.dataframe(gold_view.head(120), use_container_width=True, height=320)
+            with tab_goldai_prev:
+                cols_focus_goldai = [c for c in ["id", "title", "source", "collected_at", "sentiment"] if c in df_goldai.columns]
+                preview_goldai = df_goldai[cols_focus_goldai].copy().head(120) if cols_focus_goldai else df_goldai.copy().head(120)
+                st.dataframe(preview_goldai, use_container_width=True, height=320)
+        elif df_goldai is not None:
+            st.metric("Lignes", f"{n_goldai:,}")
+        else:
+            st.info("—")
 
         st.divider()
         st.markdown("### Datasets par étape")
@@ -968,13 +1742,16 @@ def main() -> None:
                 ia_existing,
             )
 
-        for name, path in [
-            ("train", ia_dir / "train.parquet"),
-            ("val", ia_dir / "val.parquet"),
-            ("test", ia_dir / "test.parquet"),
-        ]:
+        for idx, (name, path) in enumerate(
+            [
+                ("train", ia_dir / "train.parquet"),
+                ("val", ia_dir / "val.parquet"),
+                ("test", ia_dir / "test.parquet"),
+            ]
+        ):
             if path.exists():
-                with st.expander(f"5b. {name}", expanded=False):
+                substep = chr(ord("a") + idx)
+                with st.expander(f"5{substep}. {name}", expanded=False):
                     df = _load_df_full(path)
                     if df is not None:
                         st.dataframe(df.head(30), use_container_width=True, height=280)
@@ -1130,6 +1907,30 @@ def main() -> None:
                     pass
             return None, ""
 
+        def _load_stage_many(paths: list[Path]) -> tuple[pd.DataFrame | None, int]:
+            frames: list[pd.DataFrame] = []
+            loaded = 0
+            for p in paths:
+                if not p.exists():
+                    continue
+                try:
+                    if p.suffix == ".parquet":
+                        df_i = pd.read_parquet(p)
+                    elif p.suffix == ".csv":
+                        df_i = pd.read_csv(p, encoding="utf-8", on_bad_lines="skip")
+                    else:
+                        continue
+                    frames.append(df_i)
+                    loaded += 1
+                except Exception:
+                    continue
+            if not frames:
+                return None, 0
+            try:
+                return pd.concat(frames, ignore_index=True, sort=False), loaded
+            except Exception:
+                return frames[0], loaded
+
         # ── ETAPE 1 : RAW ────────────────────────────────────────────────────────
         st.markdown("""
         <div class="flux-stage-header">
@@ -1150,20 +1951,64 @@ def main() -> None:
         with cr1:
             sel_raw_date = st.selectbox("Date RAW", date_options_raw or ["(aucune date disponible)"], key="sel_raw_date")
         with cr2:
-            load_raw = st.button("Charger RAW", type="primary", use_container_width=True, key="btn_raw")
+            load_raw = st.button(
+                "Charger RAW" if not history_mode else "Charger RAW (historique)",
+                type="primary",
+                use_container_width=True,
+                key="btn_raw",
+            )
 
         if load_raw and date_dirs:
-            raw_dir_sel = next((d for d in date_dirs if d.name == sel_raw_date), None)
-            paths_raw = [raw_dir_sel / "raw_articles.csv", raw_dir_sel / "raw_articles.json"] if raw_dir_sel else []
-            df_raw_loaded, fn_raw = _load_stage(paths_raw)
+            if history_mode:
+                paths_raw: list[Path] = []
+                loaded_dates: list[str] = []
+                for d in date_dirs:
+                    cand = [d / "raw_articles.csv", d / "raw_articles.json"]
+                    picked = next((p for p in cand if p.exists()), None)
+                    if picked is not None:
+                        paths_raw.append(picked)
+                        loaded_dates.append(d.name)
+                df_raw_loaded, n_files = _load_stage_many(paths_raw)
+                meta_raw = {
+                    "mode": "history",
+                    "files": n_files,
+                    "range": (
+                        min(loaded_dates).replace("sources_", ""),
+                        max(loaded_dates).replace("sources_", ""),
+                    )
+                    if loaded_dates
+                    else ("—", "—"),
+                }
+                fn_raw = f"{n_files} fichier(s)"
+            else:
+                raw_dir_sel = next((d for d in date_dirs if d.name == sel_raw_date), None)
+                paths_raw = [raw_dir_sel / "raw_articles.csv", raw_dir_sel / "raw_articles.json"] if raw_dir_sel else []
+                df_raw_loaded, fn_raw = _load_stage(paths_raw)
+                meta_raw = {"mode": "single"}
             if df_raw_loaded is not None:
-                st.session_state["flux_raw"] = (df_raw_loaded, fn_raw, sel_raw_date)
+                st.session_state["flux_raw"] = (df_raw_loaded, fn_raw, sel_raw_date, meta_raw)
             else:
                 st.warning("Fichier RAW introuvable pour cette date.")
 
         if "flux_raw" in st.session_state:
-            df_r, fn_r, date_r = st.session_state["flux_raw"]
-            st.markdown(f'<div class="success-banner">  {len(df_r):,} articles charges depuis {fn_r} (date: {date_r})</div>', unsafe_allow_html=True)
+            fr_val = st.session_state["flux_raw"]
+            if isinstance(fr_val, tuple) and len(fr_val) >= 4:
+                df_r, fn_r, date_r, meta_r = fr_val
+            else:
+                df_r, fn_r, date_r = fr_val
+                meta_r = {"mode": "single"}
+            if isinstance(meta_r, dict) and meta_r.get("mode") == "history":
+                dmin, dmax = meta_r.get("range", ("—", "—"))
+                st.markdown(
+                    f'<div class="success-banner">  {len(df_r):,} articles charges depuis RAW historique '
+                    f'({meta_r.get("files", 0)} fichier(s), période {dmin} → {dmax})</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f'<div class="success-banner">  {len(df_r):,} articles charges depuis {fn_r} (date: {date_r})</div>',
+                    unsafe_allow_html=True,
+                )
             rc1, rc2, rc3, rc4 = st.columns(4)
             rc1.metric("Lignes", f"{len(df_r):,}")
             rc2.metric("Colonnes", len(df_r.columns))
@@ -1205,27 +2050,73 @@ def main() -> None:
         with cs1:
             sel_silver = st.selectbox("Date SILVER", silver_options or ["(aucune)"], key="sel_silver")
         with cs2:
-            load_silver = st.button("Charger SILVER", type="primary", use_container_width=True, key="btn_silver")
+            load_silver = st.button(
+                "Charger SILVER" if not history_mode else "Charger SILVER (historique)",
+                type="primary",
+                use_container_width=True,
+                key="btn_silver",
+            )
 
         if load_silver and silver_dirs:
-            sd = next((d for d in silver_dirs if d.name == sel_silver), None)
-            if sd:
-                # Nouveau format : CSV partitionné  |  Ancien format : Parquet v_YYYY-MM-DD
-                candidates = (
-                    [sd / "silver_articles.csv"]
-                    + [sd / "silver_articles.parquet"]
-                    + list(sd.rglob("*.parquet"))
-                    + list(sd.rglob("*.csv"))
-                )
-                df_s, fn_s = _load_stage([p for p in candidates if p.exists()][:1])
+            if history_mode:
+                paths_silver: list[Path] = []
+                silver_period: list[str] = []
+                for sd in silver_dirs:
+                    candidates = (
+                        [sd / "silver_articles.csv"]
+                        + [sd / "silver_articles.parquet"]
+                        + list(sd.rglob("*.parquet"))
+                        + list(sd.rglob("*.csv"))
+                    )
+                    picked = next((p for p in candidates if p.exists()), None)
+                    if picked is not None:
+                        paths_silver.append(picked)
+                        silver_period.append(sd.name.replace("date=", "").replace("v_", ""))
+                df_s, n_files = _load_stage_many(paths_silver)
                 if df_s is not None:
-                    st.session_state["flux_silver"] = (df_s, fn_s, sel_silver)
+                    st.session_state["flux_silver"] = (
+                        df_s,
+                        f"{n_files} fichier(s)",
+                        "historique",
+                        {"mode": "history", "files": n_files, "range": (min(silver_period), max(silver_period)) if silver_period else ("—", "—")},
+                    )
                 else:
                     st.warning("Aucun fichier SILVER trouve.")
+            else:
+                sd = next((d for d in silver_dirs if d.name == sel_silver), None)
+                if sd:
+                    # Nouveau format : CSV partitionné  |  Ancien format : Parquet v_YYYY-MM-DD
+                    candidates = (
+                        [sd / "silver_articles.csv"]
+                        + [sd / "silver_articles.parquet"]
+                        + list(sd.rglob("*.parquet"))
+                        + list(sd.rglob("*.csv"))
+                    )
+                    df_s, fn_s = _load_stage([p for p in candidates if p.exists()][:1])
+                    if df_s is not None:
+                        st.session_state["flux_silver"] = (df_s, fn_s, sel_silver, {"mode": "single"})
+                    else:
+                        st.warning("Aucun fichier SILVER trouve.")
 
         if "flux_silver" in st.session_state:
-            df_s, fn_s, ver_s = st.session_state["flux_silver"]
-            st.markdown(f'<div class="success-banner">  {len(df_s):,} articles charges depuis SILVER ({ver_s})</div>', unsafe_allow_html=True)
+            fs_val = st.session_state["flux_silver"]
+            if isinstance(fs_val, tuple) and len(fs_val) >= 4:
+                df_s, fn_s, ver_s, meta_s = fs_val
+            else:
+                df_s, fn_s, ver_s = fs_val
+                meta_s = {"mode": "single"}
+            if isinstance(meta_s, dict) and meta_s.get("mode") == "history":
+                dmin, dmax = meta_s.get("range", ("—", "—"))
+                st.markdown(
+                    f'<div class="success-banner">  {len(df_s):,} articles charges depuis SILVER historique '
+                    f'({meta_s.get("files", 0)} fichier(s), période {dmin} → {dmax})</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f'<div class="success-banner">  {len(df_s):,} articles charges depuis SILVER ({ver_s})</div>',
+                    unsafe_allow_html=True,
+                )
 
             sc1, sc2, sc3, sc4 = st.columns(4)
             sc1.metric("Lignes", f"{len(df_s):,}")
@@ -1285,23 +2176,65 @@ def main() -> None:
         with cg1:
             sel_gold_date = st.selectbox("Date GOLD", gold_dates_v or ["(aucune)"], key="sel_gold_date")
         with cg2:
-            load_gold = st.button("Charger GOLD", type="primary", use_container_width=True, key="btn_gold")
+            load_gold = st.button(
+                "Charger GOLD" if not history_mode else "Charger GOLD (historique)",
+                type="primary",
+                use_container_width=True,
+                key="btn_gold",
+            )
 
         if load_gold and gold_dates_v:
-            gold_part = gold_dir_v / f"date={sel_gold_date}"
-            # Parquet en priorité, CSV en fallback (les deux sont maintenant générés)
-            df_g, fn_g = _load_stage([
-                gold_part / "articles.parquet",
-                gold_part / "articles.csv",
-            ])
-            if df_g is not None:
-                st.session_state["flux_gold"] = (df_g, fn_g, sel_gold_date)
+            if history_mode:
+                paths_gold: list[Path] = []
+                for dt in gold_dates_v:
+                    gold_part = gold_dir_v / f"date={dt}"
+                    picked = next(
+                        (p for p in [gold_part / "articles.parquet", gold_part / "articles.csv"] if p.exists()),
+                        None,
+                    )
+                    if picked is not None:
+                        paths_gold.append(picked)
+                df_g, n_files = _load_stage_many(paths_gold)
+                if df_g is not None:
+                    st.session_state["flux_gold"] = (
+                        df_g,
+                        f"{n_files} fichier(s)",
+                        "historique",
+                        {"mode": "history", "files": n_files, "range": (min(gold_dates_v), max(gold_dates_v))},
+                    )
+                else:
+                    st.warning("Fichier GOLD introuvable.")
             else:
-                st.warning("Fichier GOLD introuvable.")
+                gold_part = gold_dir_v / f"date={sel_gold_date}"
+                # Parquet en priorité, CSV en fallback (les deux sont maintenant générés)
+                df_g, fn_g = _load_stage([
+                    gold_part / "articles.parquet",
+                    gold_part / "articles.csv",
+                ])
+                if df_g is not None:
+                    st.session_state["flux_gold"] = (df_g, fn_g, sel_gold_date, {"mode": "single"})
+                else:
+                    st.warning("Fichier GOLD introuvable.")
 
         if "flux_gold" in st.session_state:
-            df_g, fn_g, date_g = st.session_state["flux_gold"]
-            st.markdown(f'<div class="success-banner">  {len(df_g):,} articles charges depuis GOLD (date={date_g})</div>', unsafe_allow_html=True)
+            fg_val = st.session_state["flux_gold"]
+            if isinstance(fg_val, tuple) and len(fg_val) >= 4:
+                df_g, fn_g, date_g, meta_g = fg_val
+            else:
+                df_g, fn_g, date_g = fg_val
+                meta_g = {"mode": "single"}
+            if isinstance(meta_g, dict) and meta_g.get("mode") == "history":
+                dmin, dmax = meta_g.get("range", ("—", "—"))
+                st.markdown(
+                    f'<div class="success-banner">  {len(df_g):,} articles charges depuis GOLD historique '
+                    f'({meta_g.get("files", 0)} partition(s), période {dmin} → {dmax})</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f'<div class="success-banner">  {len(df_g):,} articles charges depuis GOLD (date={date_g})</div>',
+                    unsafe_allow_html=True,
+                )
             gc1, gc2, gc3, gc4 = st.columns(4)
             gc1.metric("Lignes", f"{len(df_g):,}")
             gc2.metric("Colonnes", len(df_g.columns))
@@ -1347,6 +2280,14 @@ def main() -> None:
         if "flux_goldai" in st.session_state:
             df_ga, fn_ga = st.session_state["flux_goldai"]
             st.markdown(f'<div class="success-banner">  {len(df_ga):,} articles charges depuis GoldAI (fusion complete)</div>', unsafe_allow_html=True)
+            if "published_at" in df_ga.columns:
+                try:
+                    dmin = pd.to_datetime(df_ga["published_at"], errors="coerce").min()
+                    dmax = pd.to_datetime(df_ga["published_at"], errors="coerce").max()
+                    if pd.notna(dmin) and pd.notna(dmax):
+                        st.caption(f"Période couverte (preuve): {dmin.date()} → {dmax.date()}")
+                except Exception:
+                    pass
             ga1, ga2, ga3, ga4 = st.columns(4)
             ga1.metric("Total articles", f"{len(df_ga):,}")
             ga2.metric("Colonnes", len(df_ga.columns))
@@ -1537,6 +2478,14 @@ def main() -> None:
                 st.dataframe(pd.DataFrame(article_d), use_container_width=True)
 
     with tab_pilotage:
+        view_mode = st.radio(
+            "Mode cockpit",
+            ["Focus", "Expert"],
+            horizontal=True,
+            help="Focus: vue claire et guidée. Expert: détails techniques complets.",
+            key="cockpit_view_mode",
+        )
+        show_advanced = view_mode == "Expert"
 
         def _resolve_db_path() -> str:
             db = os.getenv("DB_PATH")
@@ -1579,6 +2528,259 @@ def main() -> None:
         m2.metric("SILVER", f"{n_silver:,}")
         m3.metric("GOLD", f"{n_gold:,}")
 
+        # Cockpit de lineage/transformation (pilotage opérationnel)
+        try:
+            lineage = LineageService(db_path=db_path, project_root=PROJECT_ROOT).get_daily_lineage()
+        except Exception:
+            lineage = {}
+
+        if lineage:
+            st.markdown(
+                """
+                <div class="ds-panel-title">
+                  Cockpit lineage quotidien
+                  <div class="ds-panel-sub">Traçabilité complète: collecte, transformation, enrichissement, stockage.</div>
+                </div>
+                <span class="ds-chip">SOURCE → RAW</span>
+                <span class="ds-chip">RAW → SILVER</span>
+                <span class="ds-chip">SILVER → GOLD</span>
+                <span class="ds-chip">GOLD → GoldAI</span>
+                """,
+                unsafe_allow_html=True,
+            )
+            s = lineage.get("summary", {})
+            f = lineage.get("formulas", {})
+            l = lineage.get("layers", {})
+
+            c1, c2, c3, c4, c5 = st.columns(5)
+            c1.metric("Avant ingestion", f"{int(s.get('before_total', 0)):,}")
+            c2.metric("Collectés aujourd'hui", f"{int(s.get('collected_today', 0)):,}")
+            c3.metric("Doublons", f"{int(s.get('duplicates_today', 0)):,}")
+            c4.metric("Ajoutés (réels)", f"{int(s.get('added_today', 0)):,}")
+            c5.metric("Après merge", f"{int(s.get('after_total', 0)):,}")
+
+            st.caption(
+                f"Formule collecte → insert: `{f.get('collection_to_insert', 'n/a')}` | "
+                f"Formule stock: `{f.get('before_to_after', 'n/a')}`"
+            )
+
+            d1, d2, d3 = st.columns(3)
+            d1.metric("SQLite RAW (buffer)", f"{int(l.get('raw_sqlite', 0)):,}")
+            d2.metric("GoldAI (Parquet long terme)", f"{int(l.get('goldai_parquet') or 0):,}")
+            mongo_files = l.get("mongo_gridfs_files")
+            d3.metric("MongoDB GridFS (fichiers)", "n/a" if mongo_files is None else f"{int(mongo_files):,}")
+
+            with st.expander("Nouvelles lignes du jour (exactes)", expanded=False):
+                rows = lineage.get("new_rows_today", [])
+                if rows:
+                    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                else:
+                    st.caption("Aucune nouvelle ligne aujourd'hui.")
+
+            with st.expander("Flux réel (article) : RAW → SILVER → GOLD → GoldAI", expanded=False):
+                samples = lineage.get("transformed_samples_today", [])
+                if not samples:
+                    st.caption("Aucun échantillon de transformation disponible aujourd'hui.")
+                else:
+                    idx_label = [
+                        f"#{r.get('id')} · {str(r.get('source', ''))} · {str(r.get('title', ''))[:60]}"
+                        for r in samples
+                    ]
+                    pick = st.selectbox("Choisir un article ajouté aujourd'hui", idx_label, index=0)
+                    chosen = samples[idx_label.index(pick)]
+
+                    title = str(chosen.get("title", "") or "")
+                    content = str(chosen.get("content", "") or "")
+                    topic_1 = str(chosen.get("topic_1", "") or "")
+                    topic_2 = str(chosen.get("topic_2", "") or "")
+                    sent = str(chosen.get("sentiment", "") or "")
+                    score = chosen.get("sentiment_score")
+                    url = str(chosen.get("url", "") or "")
+
+                    b1, b2, b3, b4 = st.columns(4)
+                    with b1:
+                        st.markdown("**RAW (buffer SQLite)**")
+                        st.caption("Donnée brute ingérée")
+                        st.write(f"ID: `{chosen.get('id')}`")
+                        st.write(f"Source: `{chosen.get('source')}`")
+                        st.write(f"Titre: {title[:120]}")
+                        st.caption((content[:220] + "…") if len(content) > 220 else content)
+                    with b2:
+                        st.markdown("**SILVER**")
+                        st.caption("Nettoyage + topics")
+                        st.write(f"Topic 1: `{topic_1 or 'n/a'}`")
+                        st.write(f"Topic 2: `{topic_2 or 'n/a'}`")
+                        st.write("Transformations: normalisation texte, harmonisation schéma")
+                    with b3:
+                        st.markdown("**GOLD**")
+                        st.caption("Ajout sentiment IA")
+                        if sent:
+                            st.markdown(_badge(sent), unsafe_allow_html=True)
+                        st.write(f"Score sentiment: `{float(score):+.3f}`" if score is not None else "Score sentiment: `n/a`")
+                        st.write("Transformations: enrichissement IA, scoring")
+                    with b4:
+                        st.markdown("**GoldAI (long terme)**")
+                        st.caption("Fusion historique et conservation")
+                        st.write(f"Article fusionné par `id={chosen.get('id')}`")
+                        st.write("Règle: keep='last' sur `collected_at`")
+                        if url.startswith("http"):
+                            st.markdown(f"[URL source]({url})")
+
+            with st.expander("Collecte vs ajoutés par source", expanded=False):
+                src_rows = lineage.get("by_source", [])
+                if src_rows:
+                    st.dataframe(pd.DataFrame(src_rows), use_container_width=True, hide_index=True)
+                else:
+                    st.caption("Aucune donnée source.")
+
+            with st.expander("Qualité ingestion : doublons / rejets / enrichissement", expanded=False):
+                t1, t2, t3 = st.tabs(
+                    ["Doublons/Non-ajoutés", "Rejets validation", "Enrichissement du jour"]
+                )
+
+                with t1:
+                    dups = lineage.get("duplicates_rows_today_table", [])
+                    if dups:
+                        st.dataframe(pd.DataFrame(dups), use_container_width=True, hide_index=True)
+                    else:
+                        st.caption("Aucun non-ajouté détecté aujourd'hui.")
+
+                with t2:
+                    rej = lineage.get("rejected_rows_today_table", [])
+                    if rej:
+                        st.dataframe(pd.DataFrame(rej), use_container_width=True, hide_index=True)
+                        st.info(
+                            "Le pipeline ne persiste pas chaque ligne rejetée individuellement. "
+                            "La colonne `non_added_today` agrège doublons + rejets."
+                        )
+                    else:
+                        st.caption("Aucune info rejet disponible.")
+
+                with t3:
+                    enr = lineage.get("enriched_rows_today_table", [])
+                    if enr:
+                        st.dataframe(pd.DataFrame(enr), use_container_width=True, hide_index=True)
+                    else:
+                        st.caption("Aucune ligne ajoutée aujourd'hui, donc pas d'enrichissement du jour.")
+
+            with st.expander("Évolution quotidienne (40 jours)", expanded=False):
+                hist = lineage.get("history_daily", [])
+                if hist:
+                    df_hist = pd.DataFrame(hist).sort_values("day")
+                    st.dataframe(df_hist, use_container_width=True, hide_index=True)
+                    st.line_chart(
+                        df_hist.set_index("day")[["collected_rows", "added_rows", "duplicates_rows"]],
+                        use_container_width=True,
+                    )
+                else:
+                    st.caption("Historique indisponible.")
+
+            with st.expander("Diagnostic modèles sentiment (benchmark)", expanded=False):
+                df_diag = _sentiment_benchmark_diagnosis(PROJECT_ROOT)
+                if df_diag.empty:
+                    st.caption("Aucun benchmark disponible dans docs/e2/AI_BENCHMARK_RESULTS.json")
+                else:
+                    st.dataframe(df_diag, use_container_width=True, hide_index=True)
+                    best = df_diag.iloc[0]
+                    worst = df_diag.iloc[-1]
+                    st.info(
+                        f"Meilleur modèle actuel: `{best['model']}` "
+                        f"(F1 macro={best['f1_macro']:.3f}, acc={best['accuracy']:.3f}). "
+                        f"Modèle le plus faible: `{worst['model']}` "
+                        f"(F1 macro={worst['f1_macro']:.3f})."
+                    )
+                    st.caption(
+                        "Indice stabilité classes: `f1_gap_max` (plus bas = performances plus homogènes entre neg/neu/pos)."
+                    )
+                    st.caption(
+                        "Note nomenclature: `xlm_roberta_twitter` est la clé canonique "
+                        "(ancien alias: `flaubert_multilingual`)."
+                    )
+
+        # Cockpit pilotage: buffer SQLite vs long terme GoldAI / MongoDB
+        if show_advanced:
+            latest_state, prev_state = _latest_db_state_reports(PROJECT_ROOT)
+            if latest_state:
+                st.markdown(
+                    """
+                    <div class="ds-panel-title">
+                      Supervision buffer vs long terme
+                      <div class="ds-panel-sub">SQLite journalier, Parquet long terme, MongoDB GridFS et disponibilité IA.</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                raw_total = int(latest_state.get("raw_data", {}).get("total_rows", 0) or 0)
+                goldai_meta = latest_state.get("goldai_metadata") or {}
+                goldai_total = int(goldai_meta.get("total_rows", 0) or 0)
+                delta_prev = latest_state.get("run_progress", {}).get(
+                    "raw_data_delta_since_previous_report"
+                )
+                coh = latest_state.get("coherence_checks", {})
+
+                p1, p2, p3, p4 = st.columns(4)
+                p1.metric("Buffer SQLite (raw_data)", f"{raw_total:,}", delta=None)
+                p2.metric(
+                    "Long terme GoldAI",
+                    f"{goldai_total:,}",
+                    delta=f"{goldai_total - raw_total:+,} vs buffer",
+                )
+                p3.metric(
+                    "Croissance depuis dernier snapshot",
+                    f"{(delta_prev if isinstance(delta_prev, int) else 0):+,}",
+                )
+                p4.metric(
+                    "Statut cohérence",
+                    str(coh.get("status", "n/a")),
+                    delta=None,
+                )
+                coh_status = str(coh.get("status", "n/a")).upper()
+                coh_reasons = coh.get("reasons") or []
+                if coh_status == "WARNING":
+                    reason_txt = " | ".join(str(r) for r in coh_reasons) if coh_reasons else "Motif non renseigné"
+                    st.warning(
+                        "Incohérence détectée: "
+                        f"{reason_txt}. "
+                        "Interprétation: GoldAI contient un historique supérieur au buffer SQLite."
+                    )
+                    st.caption(
+                        "Action de réalignement recommandée: "
+                        "`python scripts/merge_parquet_goldai.py --force-full`"
+                    )
+                elif coh_status == "OK":
+                    st.success("Cohérence buffer/long terme: OK.")
+
+                with st.expander("Détail évolution collecte (par source)", expanded=False):
+                    deltas = latest_state.get("run_progress", {}).get(
+                        "source_deltas_since_previous_report", []
+                    )
+                    if deltas:
+                        df_d = pd.DataFrame(deltas)
+                        st.dataframe(df_d, use_container_width=True, hide_index=True)
+                    else:
+                        st.caption("Aucun delta source disponible (ou premier rapport).")
+
+                with st.expander("Actions recommandées", expanded=False):
+                    recos = latest_state.get("recommendations", [])
+                    if recos:
+                        for r in recos:
+                            st.markdown(f"- {r}")
+                    else:
+                        st.caption("Aucune recommandation.")
+
+                # Vue rapide MongoDB si déjà vérifié, sinon information claire
+                mongo_cached = st.session_state.get("mongo_status_cache")
+                if mongo_cached and mongo_cached.get("connected"):
+                    st.success(
+                        f"MongoDB long terme connecté: {len(mongo_cached.get('files', []))} fichiers, "
+                        f"{_fmt_size(mongo_cached.get('total_size', 0))}."
+                    )
+                else:
+                    st.info(
+                        "Long terme MongoDB: cliquez sur 'Vérifier MongoDB' plus bas pour compléter "
+                        "le cockpit de pilotage."
+                    )
+
         st.divider()
         b1, b2, b3 = st.columns(3)
         with b1:
@@ -1597,7 +2799,7 @@ def main() -> None:
                 _run_command("copie IA", cmd)
 
         # Rapport d'exécution (affiché juste après les boutons principaux)
-        _render_last_report()
+        _render_last_report("pilotage")
 
         b4, b5, _ = st.columns(3)
         with b4:
@@ -1663,6 +2865,7 @@ def main() -> None:
             _backbone_map = {
                 "bert_multilingual": "bert_multilingual",
                 "sentiment_fr": "sentiment_fr",
+                "xlm_roberta_twitter": "flaubert",
                 "flaubert_multilingual": "flaubert",
             }
             if _pretrained_only:
@@ -1714,6 +2917,24 @@ def main() -> None:
             key="ft_topics_filter",
             help="Entraîne sur les articles avec topic_1 ou topic_2 = finance/politique. Meilleure restitution veille.",
         )
+        ft_pos_ratio = st.slider(
+            "Recalibrage classe positif (train)",
+            min_value=0.0,
+            max_value=0.40,
+            value=0.25,
+            step=0.01,
+            help="0 = off. Augmente la part de la classe positif dans le train via sur-échantillonnage contrôlé.",
+            key="ft_target_pos_ratio",
+        )
+        ft_pos_mult = st.slider(
+            "Limite sur-échantillonnage positif (x)",
+            min_value=1.0,
+            max_value=6.0,
+            value=3.0,
+            step=0.5,
+            help="Garde-fou pour éviter de dupliquer excessivement la classe positif.",
+            key="ft_pos_oversample_multiplier",
+        )
 
         b6, b7, _ = st.columns(3)
         with b6:
@@ -1735,10 +2956,13 @@ def main() -> None:
                     cmd += ["--max-val-samples", str(ft_max_val)]
                 if ft_topics:
                     cmd += ["--topics", "finance,politique"]
+                if ft_pos_ratio > 0:
+                    cmd += ["--target-pos-ratio", str(ft_pos_ratio)]
+                    cmd += ["--pos-oversample-max-multiplier", str(ft_pos_mult)]
                 _run_command("finetune", cmd)
         with b7:
             if st.button(
-                "Evaluer modele fine-tune",
+                "Évaluer modèle fine-tuné",
                 use_container_width=True,
                 help="Calcule accuracy/F1 sur val.parquet (modèle fine-tuné)",
             ):
@@ -2003,6 +3227,73 @@ def main() -> None:
                 "Activez un modèle fine-tuné ci-dessous pour améliorer la précision sur vos données."
             )
 
+        # Vision claire pour l'utilisateur: entraînement (validation) vs inférence (production)
+        bench_results_modeles = _load_benchmark_results(PROJECT_ROOT)
+        trained_models_modeles = _scan_trained_models(PROJECT_ROOT)
+        gate = _go_no_go_snapshot(active_model, bench_results_modeles, trained_models_modeles)
+
+        st.divider()
+        st.subheader("Lecture métier : entraînement vs inférence")
+        st.caption(
+            "Entraînement = qualité d'apprentissage interne (train/validation). "
+            "Inférence = qualité réelle en production (benchmark/test + latence)."
+        )
+        explain_rows = [
+            {
+                "Étape": "Entraînement (offline)",
+                "Objectif": "Apprendre le modèle",
+                "Mesures clés": "eval_accuracy, eval_f1_macro, eval_f1_pos, eval_loss",
+                "Source": "trainer_state.json / runs fine-tuning",
+            },
+            {
+                "Étape": "Inférence (online)",
+                "Objectif": "Prédire vite et bien pour l'utilisateur",
+                "Mesures clés": "accuracy, f1_macro, f1_pos, latency_ms",
+                "Source": "AI_BENCHMARK_RESULTS.json + API /ai/predict",
+            },
+        ]
+        st.dataframe(pd.DataFrame(explain_rows), use_container_width=True, hide_index=True)
+
+        c_train, c_inf, c_gate = st.columns(3)
+        with c_train:
+            st.markdown("**Entraînement (validation)**")
+            st.metric("Modèle entraîné de référence", gate.get("train_model_name") or "n/a")
+            tr_acc = gate.get("train_accuracy")
+            tr_f1 = gate.get("train_f1_macro")
+            tr_pos = gate.get("train_f1_pos")
+            st.caption(
+                f"Acc={float(tr_acc):.3f} | F1_macro={float(tr_f1):.3f} | F1_pos={float(tr_pos):.3f}"
+                if tr_acc is not None and tr_f1 is not None and tr_pos is not None
+                else "Métriques entraînement incomplètes."
+            )
+        with c_inf:
+            st.markdown("**Inférence (production/test)**")
+            st.metric("Modèle évalué en inférence", gate.get("inference_model_key") or "n/a")
+            inf_acc = gate.get("inference_accuracy")
+            inf_f1 = gate.get("inference_f1_macro")
+            inf_pos = gate.get("inference_f1_pos")
+            inf_lat = gate.get("inference_latency_ms")
+            st.caption(
+                f"Acc={float(inf_acc):.3f} | F1_macro={float(inf_f1):.3f} | "
+                f"F1_pos={float(inf_pos):.3f} | Lat={float(inf_lat):.1f} ms"
+                if inf_acc is not None and inf_f1 is not None and inf_pos is not None and inf_lat is not None
+                else "Métriques inférence incomplètes."
+            )
+        with c_gate:
+            st.markdown("**Décision Go/No-Go prod**")
+            gate_status = str(gate.get("status", "NO-GO"))
+            if gate_status == "GO":
+                st.success("GO")
+            elif gate_status == "GO avec vigilance":
+                st.warning("GO avec vigilance")
+            else:
+                st.error("NO-GO")
+
+        with st.expander("Règles de décision (explicites)", expanded=False):
+            checks = gate.get("checks", [])
+            for label, ok in checks:
+                st.markdown(f"- {'✅' if ok else '❌'} {label}")
+
         # ── Section 0 : Évolution des datasets ─────────────────────────────────────
         st.divider()
         st.subheader("0. Évolution du volume de données")
@@ -2058,6 +3349,7 @@ def main() -> None:
         _backbone_from_bench_key = {
             "bert_multilingual": "bert_multilingual",
             "sentiment_fr": "sentiment_fr",
+            "xlm_roberta_twitter": "flaubert",
             "flaubert_multilingual": "flaubert",
         }
         _best_pretrained_backbone = "sentiment_fr"
@@ -2117,7 +3409,9 @@ def main() -> None:
                             _run_command(
                                 "finetune",
                                 [sys.executable, "scripts/finetune_sentiment.py",
-                                 "--model", _best_pretrained_backbone, "--epochs", "3"],
+                                 "--model", _best_pretrained_backbone, "--epochs", "3",
+                                 "--target-pos-ratio", "0.25",
+                                 "--pos-oversample-max-multiplier", "3.0"],
                             )
                             st.info("Fine-tuning lancé. Suivez la progression dans **Pilotage**.")
         else:
@@ -2139,7 +3433,7 @@ def main() -> None:
                          help="Compare sur toutes les données — résultats définitifs"):
                 _run_command("benchmark", [sys.executable, "scripts/ai_benchmark.py"])
 
-        _render_last_report()
+        _render_last_report("monitoring")
 
         # ── Section 2 : Modèles fine-tunés ─────────────────────────────────────────
         st.divider()
@@ -2304,6 +3598,104 @@ def main() -> None:
         api_v1 = f"{api_base}{settings.api_v1_prefix}"
         prometheus_url = f"http://localhost:{settings.prometheus_port}"
         grafana_url = f"http://localhost:{settings.grafana_port}"
+        uptime_kuma_url = os.getenv("UPTIME_KUMA_URL", "http://localhost:3001")
+
+        st.subheader("Traçabilité historique datasets")
+        monitor_stages = [
+            ("RAW", PROJECT_ROOT / "data" / "raw", ["*.json", "*.csv"], "raw"),
+            ("SILVER", PROJECT_ROOT / "data" / "silver", ["*.parquet", "*.csv"], "silver"),
+            ("GOLD", PROJECT_ROOT / "data" / "gold", ["*.parquet", "*.csv"], "gold"),
+            ("GoldAI", PROJECT_ROOT / "data" / "goldai", ["merged_all_dates.parquet", "*.parquet"], "goldai"),
+            ("Copie IA", PROJECT_ROOT / "data" / "goldai" / "ia", ["*.parquet"], "ia"),
+        ]
+        trace_rows: list[dict] = []
+        for label, path, patterns, key in monitor_stages:
+            s = _scan_stage(path, patterns)
+            dmin, dmax = _stage_time_range(path, key)
+            latest_dt = (
+                pd.to_datetime(float(s["latest_mtime"]), unit="s").strftime("%Y-%m-%d %H:%M")
+                if s.get("latest_mtime")
+                else "—"
+            )
+            trace_rows.append(
+                {
+                    "Étape": label,
+                    "Fichiers": int(s.get("count", 0)),
+                    "Taille totale": _fmt_size(int(s.get("size", 0))),
+                    "Période couverte": f"{dmin} -> {dmax}",
+                    "Dernière MAJ": latest_dt,
+                    "Delta 24h (fichiers)": int(s.get("changed_24h_count", 0)),
+                    "Delta 24h (taille)": _fmt_size(int(s.get("changed_24h_size", 0))),
+                }
+            )
+        st.dataframe(pd.DataFrame(trace_rows), use_container_width=True, hide_index=True)
+        st.caption("Preuve de couverture temporelle + variation 24h sur l'ensemble des couches.")
+
+        st.subheader("État MLOps live")
+        st.caption("Vérification en direct des briques observabilité (API, Prometheus, Grafana, Uptime Kuma).")
+
+        def _check_url(url: str, timeout: int = 3) -> tuple[str, str]:
+            try:
+                r = requests.get(url, timeout=timeout)
+                if 200 <= r.status_code < 400:
+                    return ("UP", f"HTTP {r.status_code}")
+                return ("DOWN", f"HTTP {r.status_code}")
+            except Exception as exc:
+                return ("DOWN", str(exc)[:120])
+
+        status_rows = []
+        api_health_status, api_health_msg = _check_url(f"{api_base}/health")
+        status_rows.append(
+            {"Service": "API E2 /health", "URL": f"{api_base}/health", "Statut": api_health_status, "Détail": api_health_msg}
+        )
+        api_metrics_status, api_metrics_msg = _check_url(f"{api_base}/metrics")
+        status_rows.append(
+            {"Service": "API E2 /metrics", "URL": f"{api_base}/metrics", "Statut": api_metrics_status, "Détail": api_metrics_msg}
+        )
+        prom_status, prom_msg = _check_url(f"{prometheus_url}/-/ready")
+        status_rows.append(
+            {"Service": "Prometheus", "URL": f"{prometheus_url}/-/ready", "Statut": prom_status, "Détail": prom_msg}
+        )
+        graf_status, graf_msg = _check_url(f"{grafana_url}/api/health")
+        status_rows.append(
+            {"Service": "Grafana", "URL": f"{grafana_url}/api/health", "Statut": graf_status, "Détail": graf_msg}
+        )
+        kuma_status, kuma_msg = _check_url(uptime_kuma_url)
+        status_rows.append(
+            {"Service": "Uptime Kuma", "URL": uptime_kuma_url, "Statut": kuma_status, "Détail": kuma_msg}
+        )
+
+        st.dataframe(pd.DataFrame(status_rows), use_container_width=True, hide_index=True)
+        up_count = sum(1 for row in status_rows if row["Statut"] == "UP")
+        if up_count == len(status_rows):
+            st.success(f"MLOps branché: {up_count}/{len(status_rows)} services UP.")
+        else:
+            st.warning(f"MLOps partiel: {up_count}/{len(status_rows)} services UP.")
+
+        with st.expander("Contrôle scrape Prometheus (targets)", expanded=False):
+            try:
+                r = requests.get(f"{prometheus_url}/api/v1/targets", timeout=4)
+                if r.status_code == 200:
+                    payload = r.json().get("data", {}).get("activeTargets", [])
+                    rows = []
+                    for t in payload:
+                        labels = t.get("labels", {}) or {}
+                        rows.append(
+                            {
+                                "job": labels.get("job", "n/a"),
+                                "instance": labels.get("instance", "n/a"),
+                                "health": t.get("health", "unknown"),
+                                "last_error": (t.get("lastError") or "")[:120],
+                            }
+                        )
+                    if rows:
+                        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                    else:
+                        st.caption("Aucune target active remontée par Prometheus.")
+                else:
+                    st.warning(f"Prometheus targets indisponible: HTTP {r.status_code}")
+            except Exception as exc:
+                st.warning(f"Prometheus targets indisponible: {str(exc)[:150]}")
 
         st.subheader("Métriques IA")
         st.caption("Déséquilibres, confiance, volume – pour piloter le modèle.")
@@ -2325,10 +3717,46 @@ def main() -> None:
             with c3:
                 if "sentiment_distribution" in ia:
                     sent = ia["sentiment_distribution"]
-                    st.caption("Distribution sentiment")
+                    st.caption("Distribution sentiment (normalisée)")
                     for label, count in list(sent.items())[:5]:
                         pct = ia.get("sentiment_pct", {}).get(label, 0)
                         st.caption(f"  • {label}: {count} ({pct}%)")
+                    alias_rows = int(ia.get("sentiment_alias_rows", 0) or 0)
+                    if alias_rows > 0:
+                        st.warning(
+                            f"{alias_rows:,} lignes avec labels hétérogènes (ex: neutral/positive) "
+                            "ont été reclassées en labels canoniques FR."
+                        )
+
+            with st.expander("Annotation / reclassement des sentiments", expanded=False):
+                map_rows = ia.get("sentiment_mapping_table", [])
+                if map_rows:
+                    st.dataframe(pd.DataFrame(map_rows), use_container_width=True, hide_index=True)
+                raw_dist = ia.get("sentiment_distribution_raw", {})
+                if raw_dist:
+                    st.caption("Labels bruts observés (avant normalisation) :")
+                    for lbl, n in list(raw_dist.items())[:10]:
+                        st.caption(f"  • {lbl}: {n}")
+                st.caption(
+                    "Lecture: cette table montre comment les labels bruts sont reclassés "
+                    "vers les 3 classes canoniques (négatif / neutre / positif)."
+                )
+
+            with st.expander("Qualité dataset IA pour Mistral", expanded=False):
+                st.caption(ia.get("mistral_dataset_reco", ""))
+                splits = ia.get("ia_splits", {})
+                if splits:
+                    st.dataframe(
+                        pd.DataFrame(
+                            [{"split": k, "lignes": v} for k, v in splits.items()]
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                st.caption(
+                    f"IDs manquants: {int(ia.get('id_missing', 0)):,} · "
+                    f"IDs dupliqués: {int(ia.get('id_duplicates', 0)):,}."
+                )
 
             with st.expander("Distribution des topics (pour rééquilibrer le modèle)"):
                 if "topic_distribution" in ia:
@@ -2395,10 +3823,70 @@ def main() -> None:
                     df_mongo = df_mongo.rename(columns={
                         "filename": "Fichier", "logical_name": "Nom logique",
                         "partition_date": "Date partition", "stored_at": "Stocké le",
+                        "upload_date": "Upload Mongo",
                         "size_bytes": "Taille", "sha256": "SHA256",
                     })
                     df_mongo["Taille"] = df_mongo["Taille"].apply(_fmt_size)
-                    st.dataframe(df_mongo, use_container_width=True, hide_index=True)
+                    if "Upload Mongo" in df_mongo.columns:
+                        ts = pd.to_datetime(df_mongo["Upload Mongo"], errors="coerce")
+                        df_mongo = df_mongo.assign(_upload_ts=ts)
+                        logical = df_mongo["Nom logique"].astype("string")
+                        is_model_artifact = logical.str.startswith("model_")
+                        df_dataset = df_mongo[~is_model_artifact].copy()
+                        is_gold_daily = logical.str.startswith("gold_articles_")
+                        has_legacy_gold = bool((logical == "gold_articles").any())
+                        gold_daily_count = int(is_gold_daily.sum())
+                        gold_daily_dates = pd.to_datetime(
+                            df_mongo.loc[is_gold_daily, "Date partition"],
+                            errors="coerce",
+                        ).dropna()
+                        latest_backup = df_mongo["_upload_ts"].max()
+                        c_m1, c_m2, c_m3 = st.columns(3)
+                        c_m1.metric("Snapshots GOLD quotidiens", f"{gold_daily_count:,}")
+                        if not gold_daily_dates.empty:
+                            c_m2.metric(
+                                "Période GOLD couverte",
+                                f"{gold_daily_dates.min().date()} → {gold_daily_dates.max().date()}",
+                            )
+                        else:
+                            c_m2.metric("Période GOLD couverte", "—")
+                        c_m3.metric(
+                            "Dernier backup Mongo",
+                            latest_backup.strftime("%Y-%m-%d %H:%M") if pd.notna(latest_backup) else "—",
+                        )
+                        if has_legacy_gold:
+                            st.caption("Note: entrée legacy `gold_articles` détectée (ancien format, remplacé par `gold_articles_YYYY-MM-DD`).")
+                        df_latest = (
+                            df_dataset.sort_values("_upload_ts", ascending=False)
+                            .drop_duplicates(subset=["Nom logique"], keep="first")
+                            .drop(columns=["_upload_ts"])
+                        )
+                        st.caption("Vue compacte datasets: dernier état par nom logique (GOLD/GoldAI/IA).")
+                        st.dataframe(df_latest, use_container_width=True, hide_index=True)
+                        with st.expander("Historique complet datasets", expanded=False):
+                            st.dataframe(
+                                df_dataset.drop(columns=["_upload_ts"]),
+                                use_container_width=True,
+                                hide_index=True,
+                            )
+                        with st.expander("Artefacts modèles (détail)", expanded=False):
+                            df_models = df_mongo[is_model_artifact].copy()
+                            if df_models.empty:
+                                st.caption("Aucun artefact modèle stocké.")
+                            else:
+                                st.dataframe(
+                                    df_models.drop(columns=["_upload_ts"]),
+                                    use_container_width=True,
+                                    hide_index=True,
+                                )
+                        with st.expander("Historique complet GridFS (brut)", expanded=False):
+                            st.dataframe(
+                                df_mongo.drop(columns=["_upload_ts"]),
+                                use_container_width=True,
+                                hide_index=True,
+                            )
+                    else:
+                        st.dataframe(df_mongo, use_container_width=True, hide_index=True)
                 else:
                     st.info("Aucun fichier dans GridFS. Lancez un backup.")
             else:

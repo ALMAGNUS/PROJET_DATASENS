@@ -16,7 +16,17 @@ sys.path.insert(0, str(project_root / "src"))
 
 try:
     from pyspark.sql import DataFrame
-    from pyspark.sql.functions import coalesce, col, lit, row_number, to_timestamp
+    from pyspark.sql.functions import (
+        coalesce,
+        col,
+        countDistinct,
+        length,
+        lit,
+        row_number,
+        to_timestamp,
+        trim,
+        when,
+    )
     from pyspark.sql.window import Window
 
     from src.config import get_settings
@@ -65,6 +75,36 @@ class GoldAIMetadataManager:
 
 class GoldAIDeduplicator:
     """Déduplication par id (SRP: déduplication uniquement)"""
+
+    @staticmethod
+    def _non_empty_str(column_name: str, columns: list[str]):
+        if column_name not in columns:
+            return lit(None).cast("string")
+        c = trim(col(column_name).cast("string"))
+        return when(length(c) > 0, c).otherwise(lit(None).cast("string"))
+
+    def harmonize_id(self, df: DataFrame) -> DataFrame:
+        """
+        Harmonise l'identifiant métier:
+        - priorité à id
+        - fallback fingerprint, puis url, puis title
+        """
+        cols = df.columns
+        id_candidate = self._non_empty_str("id", cols)
+        fp_candidate = self._non_empty_str("fingerprint", cols)
+        url_candidate = self._non_empty_str("url", cols)
+        title_candidate = self._non_empty_str("title", cols)
+        stable_id = coalesce(id_candidate, fp_candidate, url_candidate, title_candidate)
+
+        if "id" in cols:
+            out = df.withColumn("id", coalesce(id_candidate, stable_id))
+        else:
+            out = df.withColumn("id", stable_id)
+
+        null_after = out.filter(col("id").isNull()).count()
+        if null_after > 0:
+            print(f"ATTENTION: {null_after:,} lignes sans identifiant stable restent présentes.")
+        return out
 
     @staticmethod
     def deduplicate(df: DataFrame, by: str = "id") -> DataFrame:
@@ -218,6 +258,13 @@ class GoldAIMerger:
         self.deduplicator = GoldAIDeduplicator()
         self.saver = GoldAISaver(self.goldai_base)
 
+    @staticmethod
+    def _distinct_id_count(df: DataFrame | None) -> int:
+        if df is None or "id" not in df.columns:
+            return 0
+        non_null = df.filter(col("id").isNotNull())
+        return int(non_null.select(countDistinct("id").alias("n")).collect()[0]["n"])
+
     def run_merge(self, force_full: bool = False) -> dict:
         """Exécute la fusion incrémentale complète"""
         print("\n" + "=" * 70)
@@ -232,8 +279,8 @@ class GoldAIMerger:
 
         gold_dates = self.gold_reader.get_available_dates()
         print(f"\nDates GOLD disponibles: {len(gold_dates)}")
-        for d in gold_dates:
-            print(f"  - {d:%Y-%m-%d}")
+        if gold_dates:
+            print(f"Periode GOLD: {gold_dates[0]:%Y-%m-%d} -> {gold_dates[-1]:%Y-%m-%d}")
 
         new_dates = (
             gold_dates if force_full else self.metadata_mgr.get_new_dates(gold_dates, metadata)
@@ -241,8 +288,13 @@ class GoldAIMerger:
         print(
             f"\n{'Mode FORCE FULL' if force_full else 'Nouvelles dates a fusionner'}: {len(new_dates)}"
         )
-        for d in new_dates:
-            print(f"  - {d:%Y-%m-%d}")
+        if new_dates:
+            if len(new_dates) <= 10:
+                print("Dates cibles: " + ", ".join(f"{d:%Y-%m-%d}" for d in new_dates))
+            else:
+                first = ", ".join(f"{d:%Y-%m-%d}" for d in new_dates[:5])
+                last = ", ".join(f"{d:%Y-%m-%d}" for d in new_dates[-5:])
+                print(f"Dates cibles (aperçu): {first} ... {last}")
 
         if not new_dates and not force_full:
             print("\nAucune nouvelle date a fusionner. GoldAI a jour.")
@@ -250,18 +302,55 @@ class GoldAIMerger:
 
         # Chargement données
         dfs_to_merge = []
+        existing_df = None
+        existing_rows = 0
+        existing_unique_ids = 0
         if not force_full:
             existing_df = self.loader.load_existing(self.goldai_base)
             if existing_df:
-                print(f"Ajout GoldAI existant: {existing_df.count():,} lignes")
+                existing_rows = existing_df.count()
+                existing_unique_ids = self._distinct_id_count(existing_df)
+                print(f"Ajout GoldAI existant: {existing_rows:,} lignes")
                 dfs_to_merge.append(existing_df)
 
-        dfs_to_merge.extend(self.loader.load_gold_dates(new_dates))
+        new_dfs = self.loader.load_gold_dates(new_dates)
+        dfs_to_merge.extend(new_dfs)
+
+        # Diagnostics explicites: combien de nouveaux IDs réels apportent les dates du jour
+        if new_dfs:
+            new_union = self.merger.union_all(new_dfs)
+            new_rows = new_union.count()
+            new_unique_ids = self._distinct_id_count(new_union)
+            print(f"IDs distincts dans les nouvelles dates: {new_unique_ids:,}")
+
+            if existing_df and "id" in existing_df.columns and "id" in new_union.columns:
+                existing_ids = existing_df.select("id").dropDuplicates()
+                new_ids = new_union.select("id").dropDuplicates()
+                overlap = new_ids.join(existing_ids, on="id", how="inner").count()
+                new_unique_vs_existing = max(new_unique_ids - overlap, 0)
+                print(f"IDs déjà présents dans GoldAI existant: {overlap:,}")
+                print(f"Nouveaux IDs potentiels (vs GoldAI existant): {new_unique_vs_existing:,}")
+            else:
+                print("Nouveaux IDs potentiels (vs GoldAI existant): n/a")
+            print(f"Lignes brutes nouvelles dates: {new_rows:,}")
 
         # Fusion + déduplication
         merged_df = self.merger.union_all(dfs_to_merge)
+        merged_df = self.deduplicator.harmonize_id(merged_df)
         merged_df = self.deduplicator.deduplicate(merged_df, by="id")
         total_rows = merged_df.count()
+        total_unique_ids = self._distinct_id_count(merged_df)
+        print(f"IDs distincts après fusion: {total_unique_ids:,}")
+        if existing_rows > 0:
+            growth_rows = total_rows - existing_rows
+            growth_ids = total_unique_ids - existing_unique_ids
+            print(f"Croissance GoldAI (lignes): {growth_rows:+,}")
+            print(f"Croissance GoldAI (IDs distincts): {growth_ids:+,}")
+            if growth_ids <= 0:
+                print(
+                    "AVERTISSEMENT: aucune croissance d'IDs GoldAI. "
+                    "Si la DB augmente, envisager un --force-full pour recalage."
+                )
 
         # Sauvegarde
         latest_date = (
