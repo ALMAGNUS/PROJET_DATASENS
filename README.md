@@ -71,7 +71,7 @@ Creates SQLite database with:
 python main.py
 ```
 
-**Inclus dans le même run** (toutes les sources `active: true` de `sources_config.json`) : RSS, API, **scraping** (`trustpilot_reviews`, `ifop_barometers`, `monavis_citoyen`, etc.). Le scraping MonAvis s’appuie sur **Botasaurus** ; les fichiers générés vont sous `output/` (ignoré par git).
+**Inclus dans le même run** (toutes les sources `active: true` de `sources_config.json`) : RSS, API, **scraping** (`trustpilot_reviews`, `ifop_barometers` en HTTP si vous l’activez — **désactivé par défaut**, cadence annuelle, `monavis_citoyen` avec **Botasaurus**). Les artefacts Botasaurus vont sous `output/` (ignoré par git). Les sources `active: false` sont listées en fin d’extraction.
 
 **Output:**
 - Articles extracted to database
@@ -154,7 +154,7 @@ python scripts/regenerate_exports.py
 | 8 | openweather_api | API | 187 | ✓ Dynamique |
 | 9 | gdelt_events | BigData | 79 | ✓ Fondation |
 | 10 | datagouv_datasets | Dataset | 50 | ✓ Dynamique |
-| 11 | ifop_barometers | Scraping | 18 | ✓ Dynamique |
+| 11 | ifop_barometers | Scraping | 18 | ✓ Optionnel (annuel, `active: false` par défaut) |
 | 12 | insee_indicators | API | 5 | ✓ Dynamique |
 | 13 | agora_consultations | API | n/a | ✓ Dynamique |
 | 14 | GDELT_Last15_English | BigData | 2 | ✓ Dynamique |

@@ -164,6 +164,12 @@ class E1Pipeline:
 
         logger.info("Extraction complete: {} articles", self.stats["extracted"])
         console_write(f"\nOK Total extracted: {self.stats['extracted']}")
+        inactive = [s.source_name for s in sources if not s.active]
+        if inactive:
+            shown = ", ".join(inactive[:12])
+            if len(inactive) > 12:
+                shown += f", … (+{len(inactive) - 12})"
+            console_write(f"\n   [Info] Sources inactives (non extraites) : {shown}")
         return articles
 
     def clean(self, articles: list) -> list:

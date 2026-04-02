@@ -42,6 +42,28 @@ def _latest_partition(base: Path, pattern: re.Pattern) -> Path | None:
     return max(candidates, key=lambda x: x[0])[1]
 
 
+def _all_partitions(base: Path, pattern: re.Pattern) -> list[tuple[date, Path]]:
+    if not base.exists():
+        return []
+    out: list[tuple[date, Path]] = []
+    for d in base.iterdir():
+        if not d.is_dir():
+            continue
+        m = pattern.match(d.name)
+        if not m:
+            continue
+        try:
+            dt = datetime.strptime(m.group(1), "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        parquet = d / "articles.parquet"
+        if not parquet.exists():
+            parquet = d / "goldai.parquet"
+        if parquet.exists():
+            out.append((dt, parquet))
+    return sorted(out, key=lambda x: x[0])
+
+
 def main() -> int:
     settings = get_settings()
     if not settings.mongo_store_parquet:
@@ -93,11 +115,19 @@ def main() -> int:
     try:
         print("\n--- Parquets GOLD & GoldAI ---")
 
-        # Dernier GOLD partitionné
-        latest_gold = _latest_partition(gold_base, date_re)
-        if latest_gold:
-            partition_date = latest_gold.parent.name.replace("date=", "")
-            _backup(latest_gold, "gold_articles", {"partition_date": partition_date})
+        # GOLD partitionné: historique complet (une entrée par date)
+        all_gold = _all_partitions(gold_base, date_re)
+        if all_gold:
+            for dt, parquet in all_gold:
+                partition_date = dt.isoformat()
+                _backup(
+                    parquet,
+                    f"gold_articles_{partition_date}",
+                    {
+                        "partition_date": partition_date,
+                        "dataset_family": "gold_daily",
+                    },
+                )
         else:
             print("  -- ABSENT  Aucun GOLD partitionné trouvé")
 

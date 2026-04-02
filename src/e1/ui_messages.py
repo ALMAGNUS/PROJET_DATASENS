@@ -74,8 +74,16 @@ class UiMessages:
         return "[SESSION] RESUME DE LA COLLECTE"
 
     @staticmethod
+    def session_report_note() -> str:
+        """Aligne l'interprétation des chiffres avec la base (raw_data depuis début session)."""
+        return (
+            "   (Les totaux = articles distincts en base avec collected_at ≥ début de cette exécution ;"
+            "\n    alignés sur le chargement DB, pas sur le volume extrait avant dédup.)"
+        )
+
+    @staticmethod
     def sources_detail_title() -> str:
-        return "[SOURCES] DETAIL PAR SOURCE (avec mode de collecte)"
+        return "[SOURCES] Détail par source"
 
     @staticmethod
     def topics_distribution_title() -> str:

@@ -258,13 +258,15 @@ class TestAuditTrail:
         )
         count_after = cursor.fetchone()[0]
 
-        # Vérifier le dernier log
+        # Vérifier un log de lecture RAW (et non le dernier log global, qui peut être "login")
         cursor.execute(
             """
             SELECT action_type, resource_type, ip_address, details
             FROM user_action_log
             WHERE profil_id = ?
-            ORDER BY action_date DESC
+              AND action_type = 'read'
+              AND resource_type = 'raw_data'
+            ORDER BY rowid DESC
             LIMIT 1
         """,
             (test_user["profil_id"],),

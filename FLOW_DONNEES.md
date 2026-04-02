@@ -28,12 +28,12 @@ Chaque ligne utilise `collection_mode_description()` (`src/e1/core.py`) : libell
 
 Le **rapport session** reprend la même information dans la colonne **Canal**.
 
-> **Analyse du rapport de session (exemple)** : extraction **1358** articles, **66** nouveaux en base (reste dédupliqué). **IFOP** : `OK 0` (réseau / site) ; **INSEE** : `OK 0` (URL racine API → 404) ; **MonAvis** : `OK 14` (Botasaurus). **merge_parquet_goldai** : « 0 nouvelles dates » = partition **2026-03-21** déjà fusionnée ou identique — comportement attendu si relance le même jour.
+> **Analyse du rapport de session** : les totaux « Articles collectés / taggés » utilisent des **comptages DISTINCT sur `raw_data_id`** (sinon les JOINs topics/sentiment gonflaient les chiffres). **IFOP** (`ifop_barometers`) : **désactivé par défaut** (`active: false`, cadence annuelle) — activer dans `sources_config.json` pour une collecte ponctuelle.
 
 ### **Sources Actives** (`sources_config.json`)
 - ✅ **RSS** : `rss_french_news`, `google_news_rss`, `yahoo_finance`
 - ✅ **API** (`acquisition_type: api`) : `reddit_france`, `agora_consultations`, `openweather_api` → **API (JSON)** ; `insee_indicators` → **Scraping HTML** (URL à affiner côté INSEE)
-- ✅ **Scraping HTML** (`acquisition_type: scraping`) : `trustpilot_reviews`, `ifop_barometers`, `monavis_citoyen`
+- ✅ **Scraping HTML** (`acquisition_type: scraping`) : `trustpilot_reviews`, `monavis_citoyen` ; **`ifop_barometers`** (optionnel, 1×/an — `active: false` par défaut)
 - ✅ **Big data** : `gdelt_events`, `GDELT_Last15_English`, `GDELT_Master_List`
 - ✅ **Dataset** : `datagouv_datasets`, `kaggle_french_opinions`
 - ✅ **CSV** : `zzdb_csv` → `zzdb/zzdb_dataset.csv`

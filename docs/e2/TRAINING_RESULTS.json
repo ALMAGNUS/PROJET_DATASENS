@@ -1,0 +1,26 @@
+{
+  "run_date": "2026-04-01",
+  "mode": "quick",
+  "model": "sentiment_fr",
+  "train_samples": 1342,
+  "val_samples": 300,
+  "epochs": 1,
+  "train_loss_final": 0.9571,
+  "eval_loss": 0.7976512312889099,
+  "eval_accuracy": 0.63,
+  "eval_f1_weighted": 0.6473451853859824,
+  "eval_f1_macro": 0.5898883039350431,
+  "train_runtime_seconds": 0.0,
+  "train_samples_per_second": 0.0,
+  "train_steps_per_second": 0.0,
+  "target_pos_ratio": 0.25,
+  "pos_oversample_max_multiplier": 3.0,
+  "positive_rebalance": {
+    "applied": true,
+    "before_ratio": 0.16166666666666665,
+    "after_ratio": 0.2503725782414307,
+    "added_positive_rows": 142,
+    "before_total": 1200,
+    "after_total": 1342
+  }
+}

@@ -37,7 +37,7 @@ def test_ui_messages_zzdb_lines():
 
 
 def test_ui_messages_titles():
-    assert UiMessages.extraction_title()[1] == "[EXTRACTION] All sources"
+    assert UiMessages.extraction_title()[1] == "[EXTRACTION] Sources actives"
     assert UiMessages.cleaning_title()[1] == "[CLEANING] Articles validation"
     assert UiMessages.loading_title()[1] == "[LOADING] Database ingestion + Tagging + Sentiment"
     assert UiMessages.stats_title()[1] == "[STATS] Pipeline results"

@@ -1,6 +1,6 @@
 {
   "theme": "veille_ia_datasens",
-  "generated_at": "2026-03-21 12:41",
+  "generated_at": "2026-03-21 15:34",
   "sources": [
     {
       "name": "OpenAI Blog",
@@ -179,9 +179,9 @@
       ],
       "items": [
         {
-          "title": "Systematic benchmarking demonstrates large language models have not reached the diagnostic accuracy of traditional rare-disease decision support tools | European Journal of Human Genetics - Nature",
-          "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE5kZ20xQ2xVdGVwY1VNcXQxYnlYbjVWSVl4NXJDTk5rcnJyYXRLdFJObWs5Nll6ay1UU3VSNzBScFQ0LUVlSlZEZk5rZkkydzM3Q0xUMlFDbWRuVnF4eF9B?oc=5",
-          "published": "Tue, 24 Feb 2026 08:00:00 GMT"
+          "title": "Benchmarking large language models for personalized, biomarker-based health intervention recommendations - Nature",
+          "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE42dVQzVjAzWHc0aGxKMUVXRW03WVctZm56TkJBRUZrQ04tVG1KX0xfelRMYUpUdFpvNzEyZVIwbFRFLWNKVDdwVFIwcllXckQzaGp0bmNkS1VDN3dXc0Qw?oc=5",
+          "published": "Mon, 27 Oct 2025 07:00:00 GMT"
         },
         {
           "title": "FACTS Benchmark Suite: a new way to systematically evaluate LLMs factuality - Google DeepMind",
@@ -189,14 +189,14 @@
           "published": "Tue, 09 Dec 2025 08:00:00 GMT"
         },
         {
-          "title": "Can AI read papers like a scientist? A new benchmark shows where LLMs fail - Tech Xplore",
-          "link": "https://news.google.com/rss/articles/CBMigAFBVV95cUxOWkMwbEhqUldiaHlGWWNYeUpMbmhSSF9xV19nQ05ZNHBXMXJrMHpSVm1veTB3OTliMjRxU00tODZOS2ZiU2hWN3hwZzNKQ2VoMUVWa3V3b3A0aTJwSkZlanAyZHVhWndUcXhZckZVSlB4S1dpTm13T3BGUzFvMk5oXw?oc=5",
-          "published": "Tue, 10 Mar 2026 07:00:00 GMT"
-        },
-        {
           "title": "Benchmark-to-benchmark comparisons made easier - IBM Research",
           "link": "https://news.google.com/rss/articles/CBMib0FVX3lxTE1IX1BVaEZoNnFOS1AtZmVfaUhMeXY5Z0dGa1VMVWNzbTRFamxodEFyOGNINnNNRm93cktrbDkydDhLejJRQlVTREhIVmU1NEhiRGZpMG5rMlhfVWpZRF93eW5QUWJHTDlWSEZTRG5rQQ?oc=5",
           "published": "Tue, 16 Dec 2025 08:00:00 GMT"
+        },
+        {
+          "title": "Can AI read papers like a scientist? A new benchmark shows where LLMs fail - Tech Xplore",
+          "link": "https://news.google.com/rss/articles/CBMigAFBVV95cUxOWkMwbEhqUldiaHlGWWNYeUpMbmhSSF9xV19nQ05ZNHBXMXJrMHpSVm1veTB3OTliMjRxU00tODZOS2ZiU2hWN3hwZzNKQ2VoMUVWa3V3b3A0aTJwSkZlanAyZHVhWndUcXhZckZVSlB4S1dpTm13T3BGUzFvMk5oXw?oc=5",
+          "published": "Tue, 10 Mar 2026 07:00:00 GMT"
         },
         {
           "title": "German Gov-Backed AI Benchmark Tracks Large Language Models in 200 Languages - Slator",
@@ -214,9 +214,9 @@
           "published": "Wed, 24 Sep 2025 07:00:00 GMT"
         },
         {
-          "title": "Benchmarking large language models for personalized, biomarker-based health intervention recommendations - Nature",
-          "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE42dVQzVjAzWHc0aGxKMUVXRW03WVctZm56TkJBRUZrQ04tVG1KX0xfelRMYUpUdFpvNzEyZVIwbFRFLWNKVDdwVFIwcllXckQzaGp0bmNkS1VDN3dXc0Qw?oc=5",
-          "published": "Mon, 27 Oct 2025 07:00:00 GMT"
+          "title": "A benchmark of expert-level academic questions to assess AI capabilities - Nature",
+          "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE93bU50WWJqVzdWR0RFOEpmYVZ4MXVLaEFGLUtzVGxkZDQzTloyRndvU1F2NzkzQXpxU2Vwbjg4ck9Pb2NPaXgwcElhV0g4X3lfcDlEamh6LVh0eUlmWVZr?oc=5",
+          "published": "Wed, 28 Jan 2026 08:00:00 GMT"
         },
         {
           "title": "Italian Benchmark Evaluates Large Language Models, Includes AI Translation - Slator",
@@ -319,24 +319,19 @@
       ],
       "items": [
         {
+          "title": "Evaluating generative AI models with Amazon Nova LLM-as-a-Judge on Amazon SageMaker AI - Amazon Web Services (AWS)",
+          "link": "https://news.google.com/rss/articles/CBMizgFBVV95cUxNbTdSSnpkeHdHU1AwdWdDbkRzZFdPb2ZFX3d4Ul85bmZ5eFpGQ3BXdG1XbmlVUy1jU0pfZDJ6WGduTFlpWHhHVFlRaWEzTU9kaWFDNlppOUYxOGZTdUdGdVk5aHhBei1JREZ0OUFTS2ZLS1NOMHJjSTh0cEF1Njk3MzlJRzk1X0VxS1Qtek1SSjYyNGpScWhJR01wR0tXMmNMQTNmMVZYcGlnSFdtSDdja0pSb0MzY1BDaURYV1FEU1lBanR1NW5ISkMtTUhGdw?oc=5",
+          "published": "Fri, 30 Jan 2026 08:00:00 GMT"
+        },
+        {
           "title": "Positive sentiments in early academic literature on DeepSeek: a cross-disciplinary mini review - Frontiers",
           "link": "https://news.google.com/rss/articles/CBMiogFBVV95cUxQNW9UdHFhYXBOSDdUd2RSS3p4NVQ0N2RjOU56TjNqaGlaNENUbjFkQkZSMHc3d0ZMQ0szS0J3NFZzY1pabmJVOTNWa2dDNnJxd2dqUFBvZVlEQmZUZW1LZ01rS3NvaEVubGY1N1gzNlp2WHRER1NHbXBqNGpfQlRQNTZmWmttOW9RYnk1UnVkdUFRMTZxd2V0XzhxZFNRMThCT1E?oc=5",
           "published": "Wed, 10 Dec 2025 16:22:25 GMT"
         },
         {
-          "title": "A scalable framework for evaluating multiple language models through cross-domain generation and hallucination detection - Nature",
-          "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE5hYnQ5ZGZXUW9PVUxqdklmNVB6dWpfc3M2bFVtb1dnRmY1SXBVa3F6dFBDMFBzZmRYd0ZXeHdaa2tOSFdobS14M3IyMXlzWDFlb1lYc3ZtVG1lLUdnOUw4?oc=5",
-          "published": "Sat, 16 Aug 2025 07:00:00 GMT"
-        },
-        {
           "title": "Bias in AI: Examples and 6 Ways to Fix it in 2026 - AIMultiple",
-          "link": "https://news.google.com/rss/articles/CBMiUkFVX3lxTE5wWHhQS0lnMnBuc1B3M3lwMVlCbEZBNlRSMDRhcVZ2VTgwV19RM0NGcTZjRm9uY1Ntb2tjMW9qYmJmSzZBdTJOOTVLcG1sVVQ0U1E?oc=5",
+          "link": "https://news.google.com/rss/articles/CBMiREFVX3lxTFBBQ3N2UFFqZms5c0NxdXl5VUo1cDhuUkZuSWllcnZuMHRmcXcxNkxmU0JieTBVbVZhbWphVUJXajR4QjZD?oc=5",
           "published": "Thu, 22 Jan 2026 08:00:00 GMT"
-        },
-        {
-          "title": "Empathy, bias, and data responsibility: evaluating AI chatbots for gender-based violence support - Frontiers",
-          "link": "https://news.google.com/rss/articles/CBMimgFBVV95cUxPT1JNOUozVnh5XzlaVlo1OHUwc2czU29HY2F5eHBjb3lKY3FBTUNfX0p4aW5TRDNib1d0WGVYdXNrWVF3RnNKVVc4QnJ3VTVXdzRpNEtyWjFuN2IwYmxBRFROUDF4endyVkNsX0UwUWMxN19CcXd5OHNMcy1QZ2FLd1ZobllISkNzZHJqS0doazhmWUNVN2NqZW1R?oc=5",
-          "published": "Mon, 07 Jul 2025 18:11:00 GMT"
         },
         {
           "title": "Multi stage sentiment analysis for product reviews on Twitter using optimized machine learning algorithm - Nature",
@@ -344,24 +339,29 @@
           "published": "Thu, 13 Nov 2025 08:00:00 GMT"
         },
         {
+          "title": "Evaluation of large language models within GenAI in qualitative research - Nature",
+          "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE1YSnhFT1IycG0zRTl5VEktWGI3dU1Bb2x0b1pFdU85UDhFMVc5dUg2c1pXcVB2Y3VfdmZrRWNxbnMwWHdWWDdCMjRENkFHTmJmUnJYZ2N3d1c1bEVYS0FR?oc=5",
+          "published": "Tue, 07 Oct 2025 07:00:00 GMT"
+        },
+        {
+          "title": "Evaluating the performance of general purpose large language models in identifying human facial emotions - Nature",
+          "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE0wT1JBakctQ3ozNTJGSXlqNTFScldYVFQtZ2F2eFBOOXJ4NFBTa0sxRV9vVl9pU2ExcS1uNDhaMEJteVQyTFJzT01Hb1dNSnlXU0JKdHNkdV9GSXRxMkhJ?oc=5",
+          "published": "Thu, 16 Oct 2025 07:00:00 GMT"
+        },
+        {
+          "title": "Sentiment Analysis-Based Model for Monitoring User Engagement With Mental Health Chatbots - Wiley Online Library",
+          "link": "https://news.google.com/rss/articles/CBMia0FVX3lxTE44Z1lQWF9Eal9ITWVNOWJFSEhYRmRMWXF4MzJsWnE2dHZYMmxTYUpaZ19NRm1pampDS3I5b1dWeVhUX0o1SXUtUVQwa3NxUFRtaVVhRkpzUEVOMjU2ZXFuMkZ4SHgtM25sZFZr?oc=5",
+          "published": "Wed, 18 Jun 2025 07:00:00 GMT"
+        },
+        {
           "title": "How to avoid replicating bias and human error in LLMs - Orange.com",
           "link": "https://news.google.com/rss/articles/CBMikgFBVV95cUxOVVBOUzRSNjdKcEMyS0NXNWJtR2xtWUZlcTNFdVptcmNLSGxLRm56dVpBckZ4bGNKZGR4MFdLc0JWUXplWFFHSGdEREp6aGpxZ29oVUFIWEQtaTRzLTNtRTlqazFCYjJ1MEwwNzEzYmtGNlpCck5hY2kxdmpFS09UazBYekNqY2FlUE9MSUw0dnRxUQ?oc=5",
           "published": "Tue, 24 Sep 2024 07:00:00 GMT"
         },
         {
-          "title": "Popular AI Models Show Partisan Bias When Asked to Talk Politics - Stanford Graduate School of Business",
-          "link": "https://news.google.com/rss/articles/CBMioAFBVV95cUxNSG1zUVU3U1U0MzdzNHpvdmQxdWxyMTNZcnJUdng4VUkyLTFHVGhCaUtNdEVtMWQ0SWdNMDFES2dMdzZVTENobU5ZblY5eFpwT1EyeDcycWRpTmlFREJKanVFMTRBMTFaekt5V1htNHptYUVzNW1sdzRSY09JLTlIdEtaRm5hOXNFQS1ZbFVmNVFkT3BENFc0cmd6Y01DZS1F?oc=5",
-          "published": "Tue, 20 May 2025 07:00:00 GMT"
-        },
-        {
-          "title": "USAi tool lets agencies test for AI biases, GSA official says - FedScoop",
-          "link": "https://news.google.com/rss/articles/CBMiuwFBVV95cUxNR21BcGFVRTNWd0JENUgtZEFLaVZjeV9hakxwWjlTaDdqM3hMUWxDM01nZ0Y5STVEb1RCdEt0ZkdoNGF1VktXRTlEUmdadUd0MWpTVEJBbEFHR0pvY2E2RHpFM3JPQ2RCcTJlZllWNlhYUjJxc1hVa3ZzMFZ2OE42QTFWSHF5LWp5V0tMR1VXMWR6dFFtRVctWDZ4RG5GNjB4YXlKVTNrVHBHNWJCOXRRYmFZS1drbUF6eWxJ?oc=5",
-          "published": "Thu, 18 Sep 2025 07:00:00 GMT"
-        },
-        {
-          "title": "Exploring the occupational biases and stereotypes of Chinese large language models - Nature",
-          "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE1EakF6SGhGQU5rQXE2emRzYVlZaXJ6dGFIVXRtNmducnYxTzU2eDRxS3lCOGQzYkEtZjVKYzNveWlia282QUpjSDc2UVo3TWY5M2tPRTlBalVUdWlUM0dV?oc=5",
-          "published": "Thu, 29 May 2025 07:00:00 GMT"
+          "title": "Empathy, bias, and data responsibility: evaluating AI chatbots for gender-based violence support - Frontiers",
+          "link": "https://news.google.com/rss/articles/CBMimgFBVV95cUxPT1JNOUozVnh5XzlaVlo1OHUwc2czU29HY2F5eHBjb3lKY3FBTUNfX0p4aW5TRDNib1d0WGVYdXNrWVF3RnNKVVc4QnJ3VTVXdzRpNEtyWjFuN2IwYmxBRFROUDF4endyVkNsX0UwUWMxN19CcXd5OHNMcy1QZ2FLd1ZobllISkNzZHJqS0doazhmWUNVN2NqZW1R?oc=5",
+          "published": "Mon, 07 Jul 2025 18:11:00 GMT"
         }
       ]
     },
