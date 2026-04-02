@@ -163,12 +163,20 @@ async def ml_sentiment_goldai(
         from src.ml.inference.sentiment import (
             run_sentiment_inference,
             write_inference_to_model_output,
+            write_predictions_parquet,
         )
         results = run_sentiment_inference(limit=limit, use_merged=True)
         persisted = 0
+        predictions_path = None
         if persist and results:
             persisted = write_inference_to_model_output(results)
-        return {"count": len(results), "persisted": persisted, "results": results}
+            predictions_path = str(write_predictions_parquet(results))
+        return {
+            "count": len(results),
+            "persisted": persisted,
+            "predictions_parquet": predictions_path,
+            "results": results,
+        }
     except FileNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -199,22 +207,99 @@ def _build_data_context(theme: str) -> str:
     context_lines: list[str] = []
     try:
         project_root = Path(__file__).resolve().parents[4]
-        goldai_path = project_root / "data" / "goldai" / "merged_all_dates.parquet"
-        if not goldai_path.exists():
-            # Fallback: dernier GOLD disponible
-            gold_dir = project_root / "data" / "gold"
-            if gold_dir.exists():
-                for d in sorted(gold_dir.iterdir(), reverse=True):
-                    if d.is_dir() and d.name.startswith("date="):
-                        p = d / "articles.parquet"
-                        if p.exists():
-                            goldai_path = p
-                            break
+        goldai_root = project_root / "data" / "goldai"
+        app_input_path = goldai_root / "app" / "gold_app_input.parquet"
+        pred_candidates = (
+            sorted(
+                (goldai_root / "predictions").glob("date=*/run=*/predictions.parquet"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            if (goldai_root / "predictions").exists()
+            else []
+        )
+        latest_pred_path = pred_candidates[0] if pred_candidates else None
 
-        if not goldai_path.exists():
-            return "Aucune donnée disponible dans le dataset."
+        data_label = "GoldAI merged (legacy sentiment)"
+        if app_input_path.exists() and latest_pred_path is not None:
+            app_df = pd.read_parquet(app_input_path)
+            pred_df = pd.read_parquet(latest_pred_path)
+            if "id" in app_df.columns and "id" in pred_df.columns:
+                app_df = app_df.copy()
+                pred_df = pred_df.copy()
+                app_df["id"] = (
+                    app_df["id"].astype("string").str.strip().fillna("").replace({"<NA>": "", "nan": "", "None": ""})
+                )
+                pred_df["id"] = (
+                    pred_df["id"].astype("string").str.strip().fillna("").replace({"<NA>": "", "nan": "", "None": ""})
+                )
+                pred_cols = [c for c in ["id", "predicted_sentiment", "predicted_sentiment_score"] if c in pred_df.columns]
+                pred_df = pred_df[pred_cols].drop_duplicates(subset=["id"], keep="last")
+                df = app_df.merge(pred_df, on="id", how="left")
+                pred_coverage = (
+                    float(df["predicted_sentiment"].notna().mean())
+                    if "predicted_sentiment" in df.columns and len(df) > 0
+                    else 0.0
+                )
+                if pred_coverage < 0.3:
+                    # Fallback hybride: compléter avec le sentiment legacy GoldAI quand la couverture prédiction est faible.
+                    legacy_path = goldai_root / "merged_all_dates.parquet"
+                    if legacy_path.exists():
+                        legacy_df = pd.read_parquet(legacy_path, columns=["id", "sentiment", "sentiment_score"])
+                        if "id" in legacy_df.columns:
+                            legacy_df = legacy_df.copy()
+                            legacy_df["id"] = (
+                                legacy_df["id"]
+                                .astype("string")
+                                .str.strip()
+                                .fillna("")
+                                .replace({"<NA>": "", "nan": "", "None": ""})
+                            )
+                            legacy_df = legacy_df.drop_duplicates(subset=["id"], keep="last")
+                            df = df.merge(
+                                legacy_df.rename(
+                                    columns={
+                                        "sentiment": "sentiment_legacy",
+                                        "sentiment_score": "sentiment_score_legacy",
+                                    }
+                                ),
+                                on="id",
+                                how="left",
+                            )
+                    if "predicted_sentiment" in df.columns:
+                        df["sentiment"] = df["predicted_sentiment"].fillna(df.get("sentiment_legacy"))
+                    if "predicted_sentiment_score" in df.columns:
+                        df["sentiment_score"] = df["predicted_sentiment_score"].fillna(df.get("sentiment_score_legacy"))
+                    data_label = (
+                        f"Gold app input + latest predictions (coverage={pred_coverage:.1%}) "
+                        "avec fallback legacy sentiment"
+                    )
+                else:
+                    if "predicted_sentiment" in df.columns:
+                        df["sentiment"] = df["predicted_sentiment"]
+                    if "predicted_sentiment_score" in df.columns:
+                        df["sentiment_score"] = df["predicted_sentiment_score"]
+                    data_label = f"Gold app input + latest model predictions (coverage={pred_coverage:.1%})"
+            else:
+                df = app_df
+                data_label = "Gold app input (without joined predictions)"
+        else:
+            goldai_path = goldai_root / "merged_all_dates.parquet"
+            if not goldai_path.exists():
+                # Fallback: dernier GOLD disponible
+                gold_dir = project_root / "data" / "gold"
+                if gold_dir.exists():
+                    for d in sorted(gold_dir.iterdir(), reverse=True):
+                        if d.is_dir() and d.name.startswith("date="):
+                            p = d / "articles.parquet"
+                            if p.exists():
+                                goldai_path = p
+                                break
 
-        df = pd.read_parquet(goldai_path)
+            if not goldai_path.exists():
+                return "Aucune donnée disponible dans le dataset."
+
+            df = pd.read_parquet(goldai_path)
 
         # Filtrer par thème si possible
         THEME_KEYWORDS = {
@@ -233,6 +318,7 @@ def _build_data_context(theme: str) -> str:
 
         total = len(df_theme)
         context_lines.append(f"Dataset analysé : {total:,} articles (thème : {theme})")
+        context_lines.append(f"Source contexte : {data_label}")
 
         # Sentiment distribution
         if "sentiment" in df_theme.columns:
@@ -263,9 +349,6 @@ def _build_data_context(theme: str) -> str:
             if titles:
                 context_lines.append("Articles récents :")
                 for t in titles:
-                    sentiment_tag = ""
-                    if "sentiment" in df_theme.columns:
-                        row_sent = recent[recent.get("title", pd.Series()) == t]["sentiment"] if "title" in recent.columns else pd.Series()
                     context_lines.append(f"  - {t}")
 
         # Tendance récente vs ancienne (si dates disponibles)
@@ -388,7 +471,7 @@ def _resolve_sentiment_model(choice: str) -> str:
     if choice == "camembert":
         return settings.camembert_model_path
     # flaubert = XLM-RoBERTa multilingue (robuste)
-    return settings.flaubert_model_path
+    return settings.xlm_roberta_model_path
 
 
 @router.post("/predict", response_model=AIPredictResponse)

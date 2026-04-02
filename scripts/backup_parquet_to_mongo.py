@@ -14,6 +14,14 @@ project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "src"))
 
+# Encodage console Windows
+if sys.platform == "win32":
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError):
+        pass
+
 from src.config import get_settings
 from src.storage.mongo_gridfs import MongoGridFSStore
 
@@ -136,9 +144,47 @@ def main() -> int:
 
         # Copie IA annotée + splits train/val/test
         ia_dir = goldai_base / "ia"
-        _backup(ia_dir / "merged_all_dates_annotated.parquet", "goldai_ia_annotated")
+        _backup(
+            ia_dir / "merged_all_dates_annotated.parquet",
+            "goldai_ia_annotated",
+            {"dataset_family": "ia_training"},
+        )
+        _backup(
+            ia_dir / "gold_ia_labelled.parquet",
+            "goldai_ia_labelled",
+            {"dataset_family": "ia_training"},
+        )
         for split in ["train", "val", "test"]:
-            _backup(ia_dir / f"{split}.parquet", f"goldai_ia_{split}")
+            _backup(
+                ia_dir / f"{split}.parquet",
+                f"goldai_ia_{split}",
+                {"dataset_family": "ia_training", "split": split},
+            )
+        _backup(
+            goldai_base / "app" / "gold_app_input.parquet",
+            "goldai_app_input",
+            {"dataset_family": "ia_inference_input"},
+        )
+
+        # Sorties inférence (par run) pour audit long terme
+        pred_base = goldai_base / "predictions"
+        if pred_base.exists():
+            pred_files = sorted(
+                pred_base.glob("date=*/run=*/predictions.parquet"),
+                key=lambda p: p.stat().st_mtime,
+            )
+            for p in pred_files:
+                d = p.parent.parent.name.replace("date=", "")
+                run = p.parent.name.replace("run=", "")
+                _backup(
+                    p,
+                    f"goldai_app_predictions_{d}_{run}",
+                    {
+                        "dataset_family": "ia_inference_output",
+                        "partition_date": d,
+                        "inference_run_id": run,
+                    },
+                )
 
         print("\n--- Modèle IA entraîné ---")
 

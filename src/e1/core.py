@@ -394,6 +394,29 @@ class APIExtractor(BaseExtractor):
                     except Exception as e:
                         logger.warning("Reddit {} extraction error: {}", sr, str(e)[:40])
             elif "weather" in src_low or "meteo" in src_low:
+                def _weather_desc(code: object) -> str:
+                    try:
+                        wc = int(code)
+                    except (TypeError, ValueError):
+                        return "conditions inconnues"
+                    if wc == 0:
+                        return "ensoleille"
+                    if wc in (1, 2):
+                        return "partiellement nuageux"
+                    if wc == 3:
+                        return "couvert"
+                    if wc in (45, 48):
+                        return "brouillard"
+                    if wc in (51, 53, 55, 56, 57):
+                        return "bruine"
+                    if wc in (61, 63, 65, 66, 67, 80, 81, 82):
+                        return "pluie"
+                    if wc in (71, 73, 75, 77, 85, 86):
+                        return "neige"
+                    if wc in (95, 96, 99):
+                        return "orage"
+                    return "conditions variables"
+
                 for city in ["Paris", "Lyon", "Marseille", "Toulouse", "Nice"]:
                     try:
                         g_r = requests.get(
@@ -407,9 +430,17 @@ class APIExtractor(BaseExtractor):
                                 timeout=8,
                             ).json()
                             c = w.get("current", {})
+                            temp = c.get("temperature_2m", "N/A")
+                            weather_code = c.get("weather_code", "N/A")
+                            weather_label = _weather_desc(weather_code)
                             a = Article(
-                                title=f"Météo {city}: {c.get('temperature_2m', 'N/A')}C",
-                                content=f"Condition: {c.get('weather_code', 'N/A')}, {g.get('name', city)}",
+                                title=f"Bulletin meteo {city}: {temp}C - {weather_label}",
+                                content=(
+                                    f"Meteo du jour a {g.get('name', city)}. "
+                                    f"Temperature {temp} degres, conditions {weather_label}. "
+                                    f"Weather code {weather_code}. "
+                                    "Suivi climat, precipitation, vent et alertes orage."
+                                ),
                                 url=f"https://www.weather.com/weather/today/l/{g['latitude']},{g['longitude']}",
                                 source_name=self.name,
                             )
@@ -1270,6 +1301,7 @@ class DatabaseLoader:
     def __init__(self, db_path: str):
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path)
+        self.conn.execute("PRAGMA foreign_keys = ON")
         self.cursor = self.conn.cursor()
 
     def get_source_id(self, name: str) -> int | None:
