@@ -2328,7 +2328,7 @@ def main() -> None:
                 _run_command("goldai", [sys.executable, "scripts/merge_parquet_goldai.py"])
         with b3:
             copie_ia_topics = st.checkbox(
-                "Copie IA (experimental): filtrer finance+politique (peut biaiser l'entrainement)",
+                "Copie IA (experimental): filtrer finance+politique+météo (peut biaiser l'entrainement)",
                 value=False,
                 key="copie_ia_topics",
             )
@@ -2340,7 +2340,7 @@ def main() -> None:
             if st.button("Copie IA", type="primary", use_container_width=True):
                 cmd = [sys.executable, "scripts/create_ia_copy.py"]
                 if copie_ia_topics:
-                    cmd += ["--topics", "finance,politique"]
+                    cmd += ["--topics", "finance,politique,meteo"]
                 _run_command("copie IA", cmd)
 
         # Rapport d'exécution (affiché juste après les boutons principaux)
@@ -2457,10 +2457,10 @@ def main() -> None:
                 st.caption(f"Max train: {ft_max_train} · Max val: {ft_max_val}")
 
         ft_topics = st.checkbox(
-            "Filtrer finance + politique uniquement",
+            "Filtrer finance + politique + météo uniquement",
             value=False,
             key="ft_topics_filter",
-            help="Entraîne sur les articles avec topic_1 ou topic_2 = finance/politique. Meilleure restitution veille.",
+            help="Entraîne sur les articles avec topic_1 ou topic_2 = finance/politique/meteo. Meilleure restitution veille.",
         )
         ft_pos_ratio = st.slider(
             "Recalibrage classe positif (train)",
@@ -2500,7 +2500,7 @@ def main() -> None:
                 if ft_max_val:
                     cmd += ["--max-val-samples", str(ft_max_val)]
                 if ft_topics:
-                    cmd += ["--topics", "finance,politique"]
+                    cmd += ["--topics", "finance,politique,meteo"]
                 if ft_pos_ratio > 0:
                     cmd += ["--target-pos-ratio", str(ft_pos_ratio)]
                     cmd += ["--pos-oversample-max-multiplier", str(ft_pos_mult)]
