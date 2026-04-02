@@ -12,26 +12,18 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
+# Encodage console Windows
+if sys.platform == "win32":
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError):
+        pass
+
 import pandas as pd
 
 from src.config import get_settings
-
-
-def normalize_sentiment_label(value: object) -> str:
-    """Normalise les variantes de label vers négatif/neutre/positif."""
-    s = str(value or "").strip().lower()
-
-    negative = {"negatif", "négatif", "negative", "n�gatif"}
-    positive = {"positif", "positive"}
-    neutral = {"neutre", "neutral"}
-
-    if s in negative:
-        return "négatif"
-    if s in positive:
-        return "positif"
-    if s in neutral:
-        return "neutre"
-    return "neutre"
+from src.datasets import normalize_sentiment_label
 
 
 def _filter_by_topics(df: pd.DataFrame, topics: list[str]) -> pd.DataFrame:
@@ -47,6 +39,17 @@ def _filter_by_topics(df: pd.DataFrame, topics: list[str]) -> pd.DataFrame:
     return df[mask].reset_index(drop=True)
 
 
+def _display_sentiment_distribution(dist: dict[str, int]) -> str:
+    """Console-friendly distribution to avoid mojibake on Windows shells."""
+    labels = [
+        ("positif", int(dist.get("positif", 0))),
+        ("neutre", int(dist.get("neutre", 0))),
+        ("negatif", int(dist.get("négatif", dist.get("negatif", 0)))),
+    ]
+    labels = [(k, v) for k, v in labels if v > 0]
+    return ", ".join(f"{k}={v:,}" for k, v in labels) if labels else "vide"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Copie IA avec split train/val/test")
     parser.add_argument("--train", type=float, default=0.8, help="Fraction train (défaut 0.8)")
@@ -57,6 +60,12 @@ def main() -> int:
         type=str,
         default="",
         help="Filtrer par topics (ex: finance,politique). Vide = toutes les données. Améliore la restitution veille.",
+    )
+    parser.add_argument(
+        "--no-temporal",
+        action="store_true",
+        default=False,
+        help="Désactive le split temporel (utilise un shuffle aléatoire, déconseillé en production).",
     )
     args = parser.parse_args()
 
@@ -70,52 +79,90 @@ def main() -> int:
     if not goldai_base.is_absolute():
         goldai_base = project_root / goldai_base
     merged_path = goldai_base / "merged_all_dates.parquet"
+    labelled_path = goldai_base / "ia" / "gold_ia_labelled.parquet"
     ia_dir = goldai_base / "ia"
 
-    if not merged_path.exists():
-        print(f"ERREUR: {merged_path} introuvable. Lancez d'abord: python scripts/merge_parquet_goldai.py")
+    if labelled_path.exists():
+        source_path = labelled_path
+    else:
+        source_path = merged_path
+
+    if not source_path.exists():
+        print(
+            "ERREUR: dataset source introuvable. Attendu: "
+            f"{labelled_path} (recommandé) ou {merged_path}. "
+            "Lancez d'abord: python scripts/merge_parquet_goldai.py"
+        )
         return 1
 
-    print("Chargement merged_all_dates.parquet...")
-    df = pd.read_parquet(merged_path)
-    n = len(df)
-    print(f"  {n:,} lignes chargées")
+    print(f"Chargement dataset IA source: {source_path.name} ...")
+    df = pd.read_parquet(source_path)
+    print(f"  {len(df):,} lignes chargees")
 
-    if "sentiment" not in df.columns:
-        print(f"ERREUR: Colonne 'sentiment' absente dans {merged_path}")
+    if "sentiment_label" in df.columns:
+        df["sentiment_label"] = df["sentiment_label"].apply(normalize_sentiment_label)
+        df["sentiment"] = df["sentiment_label"]
+    elif "sentiment" in df.columns:
+        df["sentiment"] = df["sentiment"].apply(normalize_sentiment_label)
+    else:
+        print(f"ERREUR: Colonne 'sentiment' ou 'sentiment_label' absente dans {source_path}")
         return 1
 
-    # Normalisation des labels pour éviter les variantes d'encodage (ex: n�gatif).
-    df["sentiment"] = df["sentiment"].apply(normalize_sentiment_label)
+    # Supprimer les lignes dont le label est vide apres normalisation
+    before_drop = len(df)
+    df = df[df["sentiment"].notna() & (df["sentiment"] != "")].reset_index(drop=True)
+    if len(df) < before_drop:
+        print(f"  {before_drop - len(df):,} lignes ignorees (label inconnu apres normalisation)")
+
     dist = df["sentiment"].value_counts().to_dict()
-    print(f"  Distribution sentiment normalisée: {dist}")
+    print(f"  Distribution sentiment normalisee: {_display_sentiment_distribution(dist)}")
 
-    # Filtre par topics (finance, politique) pour veille ciblée
+    # Filtre par topics (finance, politique) pour veille ciblee
     if args.topics:
+        print(
+            "ATTENTION BIAIS: filtrer les topics pour construire le dataset d'entrainement "
+            "reduit la generalisation. Recommandation: entrainer sur toutes les donnees, "
+            "puis filtrer politique/finance au moment des insights."
+        )
         topics_list = [t.strip() for t in args.topics.split(",") if t.strip()]
         if topics_list:
             n_before = len(df)
             df = _filter_by_topics(df, topics_list)
             n_after = len(df)
-            print(f"  Filtre topics [{', '.join(topics_list)}]: {n_before:,} → {n_after:,} lignes")
+            print(f"  Filtre topics [{', '.join(topics_list)}]: {n_before:,} -> {n_after:,} lignes")
             if n_after < 100:
-                print(f"  ATTENTION: Peu d'exemples ({n_after}). Vérifiez que topic_1/topic_2 existent dans merged_all_dates.parquet.")
+                print(f"  ATTENTION: Peu d'exemples ({n_after}). Verifiez que topic_1/topic_2 existent.")
 
     ia_dir.mkdir(parents=True, exist_ok=True)
 
-    # Copie annotée (même contenu, prêt pour ML)
+    # Copie annotee (meme contenu, pret pour ML)
     annotated_path = ia_dir / "merged_all_dates_annotated.parquet"
     df.to_parquet(annotated_path, index=False)
     print(f"  OK: {annotated_path}")
 
-    # Split train/val/test
-    df_shuffled = df.sample(frac=1, random_state=42).reset_index(drop=True)
+    # n est calcule ICI, apres tous les filtres (fix bug: n avant filtre = mauvais splits)
+    n = len(df)
+
+    # Split temporel par défaut — trie par date pour éviter la fuite de données futures vers le train.
+    # --no-temporal : shuffle aléatoire (utile pour debug / tests de surapprentissage).
+    date_col = next(
+        (c for c in ("published_at", "publication_date", "date", "created_at") if c in df.columns),
+        None,
+    )
+    if not args.no_temporal and date_col is not None:
+        df_sorted = df.sort_values(date_col, kind="stable").reset_index(drop=True)
+        split_mode = f"temporel (colonne '{date_col}')"
+    else:
+        df_sorted = df.sample(frac=1, random_state=42).reset_index(drop=True)
+        split_mode = "aléatoire (pas de colonne date trouvée)" if date_col is None else "aléatoire (--no-temporal)"
+    print(f"  Split mode: {split_mode}")
+
     n_train = int(n * args.train)
     n_val = int(n * args.val)
 
-    train_df = df_shuffled.iloc[:n_train]
-    val_df = df_shuffled.iloc[n_train : n_train + n_val]
-    test_df = df_shuffled.iloc[n_train + n_val :]
+    train_df = df_sorted.iloc[:n_train]
+    val_df = df_sorted.iloc[n_train : n_train + n_val]
+    test_df = df_sorted.iloc[n_train + n_val :]
 
     train_path = ia_dir / "train.parquet"
     val_path = ia_dir / "val.parquet"

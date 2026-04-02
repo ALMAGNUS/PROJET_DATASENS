@@ -5,7 +5,35 @@ from pathlib import Path
 
 import pandas as pd
 
+from src.config import get_raw_dir, get_silver_dir
+
 from .core import sanitize_text, sanitize_url
+
+
+def _max_silver_id() -> int | None:
+    """
+    Retourne le max raw_data_id déjà exporté dans les partitions SILVER (parquet ou csv),
+    ou None si aucune partition n'existe encore.
+    Permet à aggregate_silver() d'être incrémental.
+    """
+    silver_root = get_silver_dir()
+    if not silver_root.exists():
+        return None
+    max_id: int | None = None
+    for part in silver_root.glob("date=*"):
+        for fpath in list(part.glob("*.parquet")) + list(part.glob("silver_articles.csv")):
+            try:
+                if fpath.suffix == ".parquet":
+                    df = pd.read_parquet(fpath, columns=["id"])
+                else:
+                    df = pd.read_csv(fpath, usecols=["id"], dtype={"id": "Int64"})
+                ids = pd.to_numeric(df["id"], errors="coerce").dropna()
+                if len(ids):
+                    local_max = int(ids.max())
+                    max_id = local_max if max_id is None else max(max_id, local_max)
+            except Exception:
+                pass
+    return max_id
 
 
 class DataAggregator:
@@ -16,9 +44,7 @@ class DataAggregator:
         """Collect GDELT files from local data/raw/ (ZZDB and Kaggle excluded: already in DB via extractors)"""
         data = []
         for p in [
-            Path("data/raw"),
-            Path.home() / "datasens_project" / "data" / "raw",
-            Path.home() / "Desktop" / "DEV IA 2025" / "PROJET_DATASENS" / "data" / "raw",
+            get_raw_dir(),
         ]:
             if not p.exists():
                 continue
@@ -98,17 +124,69 @@ class DataAggregator:
             df = df_db
         return df
 
-    def aggregate_silver(self) -> pd.DataFrame:
-        """SILVER: RAW + topics (sans sentiment) - TOUJOURS 2 topics par article"""
-        df = self.aggregate_raw()
+    def aggregate_silver(self, incremental: bool = True) -> pd.DataFrame:
+        """
+        SILVER: RAW + topics (sans sentiment) - TOUJOURS 2 topics par article.
+
+        incremental=True (défaut) : ne charge que les articles dont raw_data_id
+        est supérieur au max déjà présent dans data/silver/**/*.parquet.
+        Réduit la charge SQLite de O(N total) à O(N nouveaux) à chaque run.
+        """
+        since_id = _max_silver_id() if incremental else None
+
+        if since_id is not None:
+            # Requête incrémentale : seulement les nouveaux articles
+            df_db = pd.read_sql_query(
+                """SELECT r.raw_data_id as id, s.name as source, s.is_synthetic as is_synthetic,
+                          r.title, r.content, r.url, r.fingerprint, r.collected_at, r.quality_score
+                   FROM raw_data r
+                   JOIN source s ON r.source_id = s.source_id
+                   WHERE r.raw_data_id > ?
+                   ORDER BY r.collected_at DESC""",
+                self.conn,
+                params=(since_id,),
+            )
+        else:
+            df_db = pd.read_sql_query(
+                """SELECT r.raw_data_id as id, s.name as source, s.is_synthetic as is_synthetic,
+                          r.title, r.content, r.url, r.fingerprint, r.collected_at, r.quality_score
+                   FROM raw_data r
+                   JOIN source s ON r.source_id = s.source_id
+                   ORDER BY r.collected_at DESC""",
+                self.conn,
+            )
+
+        def classify_source(x: str) -> str:
+            x_lower = str(x).lower()
+            if "zzdb" in x_lower:
+                return "db_non_relational"
+            if "kaggle" in x_lower:
+                return "flat_files"
+            return "real_source"
+
+        df_db["source_type"] = df_db["source"].apply(classify_source)
+        df = df_db
+
+        if df.empty:
+            # Aucun nouvel article : retourner un DataFrame vide avec le bon schéma
+            return df
+
         # S'assurer que source_type est présent
         if "source_type" not in df.columns:
             df["source_type"] = df["source"].apply(
                 lambda x: "academic" if "zzdb" in str(x).lower() else "real"
             )
+
+        id_min = int(df["id"].min())
+        id_max = int(df["id"].max())
         topics = pd.read_sql_query(
-            "SELECT dt.raw_data_id, t.name as topic_name, dt.confidence_score, ROW_NUMBER() OVER (PARTITION BY dt.raw_data_id ORDER BY dt.confidence_score DESC) as rn FROM document_topic dt JOIN topic t ON dt.topic_id = t.topic_id",
+            """SELECT dt.raw_data_id, t.name as topic_name, dt.confidence_score,
+                      ROW_NUMBER() OVER (PARTITION BY dt.raw_data_id ORDER BY dt.confidence_score DESC) as rn
+               FROM document_topic dt
+               JOIN topic t ON dt.topic_id = t.topic_id
+               WHERE dt.raw_data_id BETWEEN ? AND ?""",
             self.conn,
+            params=(id_min, id_max),
         )
         t1 = topics[topics["rn"] == 1][["raw_data_id", "topic_name", "confidence_score"]].rename(
             columns={"topic_name": "topic_1", "confidence_score": "topic_1_score"}
@@ -135,8 +213,8 @@ class DataAggregator:
         return df
 
     def aggregate(self) -> pd.DataFrame:
-        """GOLD: SILVER + sentiment"""
-        df = self.aggregate_silver()
+        """GOLD: SILVER + sentiment (toujours complet pour la partition du jour)"""
+        df = self.aggregate_silver(incremental=False)
         # S'assurer que source_type est présent
         if "source_type" not in df.columns:
             df["source_type"] = df["source"].apply(

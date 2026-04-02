@@ -86,7 +86,8 @@ class Repository(DatabaseLoader):
                 raw_data_id INTEGER NOT NULL REFERENCES raw_data(raw_data_id),
                 topic_id INTEGER NOT NULL REFERENCES topic(topic_id),
                 confidence_score FLOAT DEFAULT 0.5,
-                tagger VARCHAR(100)
+                tagger VARCHAR(100),
+                UNIQUE(raw_data_id, topic_id)
             );
             CREATE INDEX IF NOT EXISTS idx_doc_topic_raw ON document_topic(raw_data_id);
             CREATE INDEX IF NOT EXISTS idx_doc_topic_topic ON document_topic(topic_id);
@@ -104,6 +105,29 @@ class Repository(DatabaseLoader):
             """
 
                 self.cursor.executescript(sql_tables)
+                self.conn.commit()
+
+            # Migration: index UNIQUE sur document_topic(raw_data_id, topic_id) pour bases existantes.
+            # Déduplique d'abord (garde le max doc_topic_id par paire) pour éviter l'échec sur bases existantes.
+            idx_exists = self.cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_doc_topic_unique'"
+            ).fetchone()
+            if not idx_exists:
+                self.cursor.execute(
+                    """DELETE FROM document_topic
+                       WHERE doc_topic_id NOT IN (
+                           SELECT MAX(doc_topic_id)
+                           FROM document_topic
+                           GROUP BY raw_data_id, topic_id
+                       )"""
+                )
+                dupes_removed = self.conn.execute("SELECT changes()").fetchone()[0]
+                if dupes_removed:
+                    logger.info("Migration document_topic: {} doublons supprimés", dupes_removed)
+                self.cursor.execute(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_doc_topic_unique "
+                    "ON document_topic(raw_data_id, topic_id)"
+                )
                 self.conn.commit()
 
             # Migration: ajouter colonne is_synthetic si manquante

@@ -63,6 +63,18 @@ def _count_csv_data_rows(csv_path: Path) -> int | None:
         return None
 
 
+def _parquet_rows(path: Path) -> int | None:
+    if not path.exists():
+        return None
+    try:
+        import pyarrow.parquet as pq
+
+        pf = pq.ParquetFile(path)
+        return int(pf.metadata.num_rows)
+    except Exception:
+        return None
+
+
 def _goldai_raw_linkage(raw_ids: set[int]) -> dict:
     """
     Analyse la comparabilité GoldAI vs raw_data via `raw_data_id`.
@@ -124,6 +136,41 @@ def _by_source_map(by_source: list[dict]) -> dict[str, int]:
     return out
 
 
+def _compute_sentiment_drift(curr: dict, prev: dict | None) -> dict:
+    """
+    Compare la distribution sentiment_keyword entre le rapport courant et le précédent.
+    Alerte si un label dérive de plus de 5 points de pourcentage.
+    """
+    out: dict = {"status": "OK", "alerts": [], "current_pct": {}, "previous_pct": {}}
+    curr_dist: dict[str, int] = curr.get("enrichment", {}).get("sentiment_keyword_distribution", {})
+    total_curr = sum(curr_dist.values()) or 1
+    curr_pct = {k: round(v / total_curr * 100, 2) for k, v in curr_dist.items()}
+    out["current_pct"] = curr_pct
+
+    if not prev:
+        out["note"] = "Pas de rapport précédent — première mesure de référence."
+        return out
+
+    prev_dist: dict[str, int] = prev.get("enrichment", {}).get("sentiment_keyword_distribution", {})
+    total_prev = sum(prev_dist.values()) or 1
+    prev_pct = {k: round(v / total_prev * 100, 2) for k, v in prev_dist.items()}
+    out["previous_pct"] = prev_pct
+
+    alerts = []
+    all_labels = set(curr_pct) | set(prev_pct)
+    for label in sorted(all_labels):
+        delta = curr_pct.get(label, 0.0) - prev_pct.get(label, 0.0)
+        if abs(delta) >= 5.0:
+            alerts.append(
+                f"'{label}': {prev_pct.get(label, 0):.1f}% → {curr_pct.get(label, 0):.1f}% "
+                f"(delta {delta:+.1f}pp)"
+            )
+    if alerts:
+        out["status"] = "DRIFT_DETECTED"
+        out["alerts"] = alerts
+    return out
+
+
 def collect_state(db_file: Path) -> dict:
     generated = datetime.now(timezone.utc).isoformat()
     if not db_file.exists():
@@ -153,6 +200,7 @@ def collect_state(db_file: Path) -> dict:
             "exports_hint": {},
             "run_progress": {},
             "coherence_checks": {},
+            "ia_artifacts": {},
             "recommendations": [],
         }
 
@@ -274,6 +322,42 @@ def collect_state(db_file: Path) -> dict:
         if rows_csv is not None:
             state["exports_hint"]["exports_gold_csv_data_rows"] = rows_csv
 
+        # IA artifacts (branches entraînement / inférence)
+        goldai_base = PROJECT_ROOT / "data" / "goldai"
+        ia_dir = goldai_base / "ia"
+        app_dir = goldai_base / "app"
+        pred_base = goldai_base / "predictions"
+        pred_files = (
+            sorted(pred_base.glob("date=*/run=*/predictions.parquet"), key=lambda p: p.stat().st_mtime, reverse=True)
+            if pred_base.exists()
+            else []
+        )
+        latest_pred = pred_files[0] if pred_files else None
+        state["ia_artifacts"] = {
+            "goldai_app_input_rows": _parquet_rows(app_dir / "gold_app_input.parquet"),
+            "goldai_ia_labelled_rows": _parquet_rows(ia_dir / "gold_ia_labelled.parquet"),
+            "goldai_ia_annotated_rows": _parquet_rows(ia_dir / "merged_all_dates_annotated.parquet"),
+            "goldai_ia_train_rows": _parquet_rows(ia_dir / "train.parquet"),
+            "goldai_ia_val_rows": _parquet_rows(ia_dir / "val.parquet"),
+            "goldai_ia_test_rows": _parquet_rows(ia_dir / "test.parquet"),
+            "goldai_predictions_runs_count": len(pred_files),
+            "goldai_predictions_latest_rows": _parquet_rows(latest_pred) if latest_pred else None,
+            "goldai_predictions_latest_path": (
+                str(latest_pred.relative_to(PROJECT_ROOT)).replace("\\", "/")
+                if latest_pred is not None
+                else None
+            ),
+            "flow_note": (
+                "Flux classique: sources -> SQLite(raw_data) -> exports GOLD parquet -> GoldAI. "
+                "Les fichiers IA (gold_ia_labelled, splits train/val/test, app_input, predictions) "
+                "sont des artefacts parquet dérivés de GoldAI."
+            ),
+            "mongo_transfer_note": (
+                "Transfert long terme MongoDB via scripts/backup_parquet_to_mongo.py "
+                "(inclut GOLD quotidiens, GoldAI, IA training et IA predictions)."
+            ),
+        }
+
         # Compare with previous report
         base = REPORTS_DIR / f"db_state_{datetime.now(timezone.utc).strftime('%Y-%m-%dT%H%M%SZ')}"
         prev = _latest_previous_report(base)
@@ -373,6 +457,9 @@ def collect_state(db_file: Path) -> dict:
             recos.append("Aucune action corrective immédiate: cohérence globale satisfaisante.")
         state["recommendations"] = recos
 
+        # Drift monitoring — comparaison distribution sentiment entre deux rapports consécutifs
+        state["sentiment_drift"] = _compute_sentiment_drift(state, prev[1] if prev else None)
+
         return state
     finally:
         conn.close()
@@ -431,6 +518,25 @@ def render_markdown(state: dict) -> str:
     for r in state.get("recommendations", []):
         lines.append(f"- {r}")
 
+    drift = state.get("sentiment_drift", {})
+    lines.append("\n## Dérive sentiment (monitoring)\n")
+    drift_status = drift.get("status", "OK")
+    lines.append(f"- Statut : **{drift_status}**")
+    if drift.get("note"):
+        lines.append(f"- Note : {drift['note']}")
+    if drift.get("alerts"):
+        for a in drift["alerts"]:
+            lines.append(f"- ALERTE : {a}")
+    curr_pct = drift.get("current_pct", {})
+    prev_pct = drift.get("previous_pct", {})
+    if curr_pct:
+        lines.append("\n| Label | Rapport précédent | Rapport courant | Delta |")
+        lines.append("|-------|------------------|-----------------|-------|")
+        for lbl in sorted(set(curr_pct) | set(prev_pct)):
+            cp = curr_pct.get(lbl, 0.0)
+            pp = prev_pct.get(lbl, 0.0)
+            lines.append(f"| {lbl} | {pp:.1f}% | {cp:.1f}% | {cp-pp:+.1f}pp |")
+
     lines.append("\n## Par source\n")
     lines.append("| Source | Articles |")
     lines.append("|--------|----------|")
@@ -467,6 +573,45 @@ def render_markdown(state: dict) -> str:
         lines.append(f"_Erreur lecture : {gh['error']}_")
     else:
         lines.append(f"```json\n{json.dumps(gh, ensure_ascii=False, indent=2)[:4000]}\n```")
+
+    ia = state.get("ia_artifacts") or {}
+    if ia:
+        lines.append("\n## Flux IA séparé (entraînement / inférence)\n")
+        lines.append(
+            "- `gold_app_input.parquet` (inférence, sans label) : "
+            + (
+                f"**{ia['goldai_app_input_rows']:,}** lignes"
+                if isinstance(ia.get("goldai_app_input_rows"), int)
+                else "_absent_"
+            )
+        )
+        lines.append(
+            "- `gold_ia_labelled.parquet` (entraînement) : "
+            + (
+                f"**{ia['goldai_ia_labelled_rows']:,}** lignes"
+                if isinstance(ia.get("goldai_ia_labelled_rows"), int)
+                else "_absent_"
+            )
+        )
+        lines.append(
+            "- Splits IA (`train/val/test`) : "
+            + f"{int(ia.get('goldai_ia_train_rows') or 0):,} / "
+            + f"{int(ia.get('goldai_ia_val_rows') or 0):,} / "
+            + f"{int(ia.get('goldai_ia_test_rows') or 0):,}"
+        )
+        lines.append(
+            "- Runs de prédiction disponibles : "
+            + f"**{int(ia.get('goldai_predictions_runs_count') or 0):,}**"
+        )
+        if ia.get("goldai_predictions_latest_path"):
+            lines.append(
+                "- Dernier fichier de prédiction : "
+                f"`{ia['goldai_predictions_latest_path']}`"
+            )
+        if ia.get("flow_note"):
+            lines.append(f"- Note flux : {ia['flow_note']}")
+        if ia.get("mongo_transfer_note"):
+            lines.append(f"- Stockage long terme : {ia['mongo_transfer_note']}")
 
     gl = state.get("goldai_linkage") or {}
     if gl:

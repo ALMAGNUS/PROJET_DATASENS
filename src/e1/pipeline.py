@@ -487,10 +487,11 @@ class E1Pipeline:
                 r_raw = exporter.export_raw(df_raw)
                 console_write(f"   OK RAW CSV: {r_raw['csv']} ({r_raw['rows']} rows)")
 
-                # SILVER
-                df_silver = aggregator.aggregate_silver()
+                # SILVER (incrémental: seulement les nouveaux raw_data_id)
+                df_silver = aggregator.aggregate_silver(incremental=True)
                 r_silver = exporter.export_silver(df_silver)
-                console_write(f"   OK SILVER CSV: {r_silver['csv']} ({r_silver['rows']} rows)")
+                silver_label = "incrémental" if df_silver.empty else f"{r_silver['rows']} nouvelles lignes"
+                console_write(f"   OK SILVER: {r_silver.get('parquet', r_silver['csv'])} ({silver_label})")
 
                 # GOLD
                 df_gold = aggregator.aggregate()
@@ -545,13 +546,13 @@ class E1Pipeline:
                 ).fetchone()[0]
                 update_database_stats(total, enriched)
                 logger.info("Metrics database stats updated")
-            except:
-                pass
+            except Exception as e:
+                logger.warning("Metrics update failed: {}", str(e)[:120])
 
         # Close DB connections
         try:
             self.db.conn.close()
             self.tagger.close()
             self.analyzer.close()
-        except:
-            pass
+        except Exception as e:
+            logger.debug("Resource cleanup warning: {}", str(e)[:120])

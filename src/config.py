@@ -108,10 +108,15 @@ class Settings(BaseSettings):
     inference_max_length: int = Field(
         default=256, description="Max tokens par texte (256 = rapide, conforme spec)"
     )
-    flaubert_model_path: str = Field(
+    xlm_roberta_model_path: str = Field(
         default="cardiffnlp/twitter-xlm-roberta-base-sentiment-multilingual",
         description="Multilingue XLM-RoBERTa (pos/neg/neu)",
     )
+
+    @property
+    def flaubert_model_path(self) -> str:
+        """Deprecated alias kept for backward compatibility — use xlm_roberta_model_path."""
+        return self.xlm_roberta_model_path
     camembert_model_path: str = Field(
         default="cmarkea/distilcamembert-base-sentiment",
         description="CamemBERT sentiment pré-entraîné FR (recommandé CPU)",
@@ -171,11 +176,22 @@ class Settings(BaseSettings):
 _settings: Settings | None = None
 
 
+_DEFAULT_SECRET = "your-secret-key-change-in-production"
+
+
 def get_settings() -> Settings:
     """Get settings singleton instance"""
     global _settings
     if _settings is None:
         _settings = Settings()
+        if (
+            _settings.environment not in ("development", "dev", "test")
+            and _settings.secret_key == _DEFAULT_SECRET
+        ):
+            raise RuntimeError(
+                "SECRET_KEY is still the default placeholder. "
+                "Set a strong SECRET_KEY in your .env before running in production."
+            )
     return _settings
 
 

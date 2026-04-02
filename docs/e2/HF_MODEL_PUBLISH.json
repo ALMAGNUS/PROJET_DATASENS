@@ -1,0 +1,8 @@
+{
+  "repo_id": "ALMAGNUS/datasens-sentiment-fr",
+  "model_name": "sentiment_fr-sentiment-finetuned",
+  "checkpoint_dir": "C:\\Users\\Utilisateur\\Desktop\\PROJET_DATASENS\\models\\sentiment_fr-sentiment-finetuned\\checkpoint-6783",
+  "eval_accuracy": 0.7982747179827472,
+  "eval_f1_macro": 0.7584493739073567,
+  "step": 6783
+}

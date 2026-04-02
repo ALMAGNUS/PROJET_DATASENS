@@ -35,26 +35,30 @@ HF_MODELS = {
     "flaubert": "flaubert/flaubert_base_uncased",       # FlauBERT français
 }
 
-LABEL2ID = {"négatif": 0, "neutre": 1, "positif": 2}
+LABEL2ID = {"negatif": 0, "neutre": 1, "positif": 2}
 ID2LABEL = {v: k for k, v in LABEL2ID.items()}
 
 
 def normalize_sentiment_label(value: object) -> str | None:
-    """Normalise les variantes de label vers négatif/neutre/positif."""
-    s = str(value or "").strip().lower()
-
-    negative = {"negatif", "négatif", "negative", "n�gatif"}
-    positive = {"positif", "positive"}
-    neutral = {"neutre", "neutral"}
-
-    if s in negative:
-        return "négatif"
-    if s in positive:
+    """Normalise les variantes de label vers negatif/neutre/positif.
+    Fold ASCII pour ignorer les corruptions d'encodage Windows/Spark/CSV.
+    Retourne None si le label est inconnu (ligne ignoree a l'entrainement).
+    """
+    import unicodedata
+    s = str(value or "").strip()
+    folded = "".join(
+        c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c)
+    ).lower()
+    if folded in ("negatif", "negative", "neg"):
+        return "negatif"
+    # Catch all encoding-corrupted variants of negatif (nïegatif, nïgatif, etc.)
+    if folded.endswith("gatif") and folded.startswith("n"):
+        return "negatif"
+    if folded in ("positif", "positive", "pos"):
         return "positif"
-    if s in neutral:
+    if folded in ("neutre", "neutral", "neu"):
         return "neutre"
     return None
-
 
 def load_ia_dataset(ia_dir: Path, split: str) -> pd.DataFrame:
     """Charge train, val ou test depuis data/goldai/ia/."""
@@ -243,6 +247,10 @@ def main() -> int:
 
     # Filtre par topics (finance, politique) pour veille ciblée
     if args.topics:
+        print(
+            "ATTENTION BIAIS: fine-tuning avec filtre topics est reserve aux tests de slice metier. "
+            "Pour le modele principal, utilisez toutes les donnees."
+        )
         topics_list = [t.strip() for t in args.topics.split(",") if t.strip()]
         if topics_list:
             n_train_before, n_val_before = len(train_df), len(val_df)

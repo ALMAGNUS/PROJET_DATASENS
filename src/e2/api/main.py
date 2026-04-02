@@ -50,6 +50,13 @@ def create_app() -> FastAPI:
     # CORS middleware (CORS_ORIGINS: '*' en dev, liste d'origines en prod)
     origins_str = settings.cors_origins.strip()
     cors_origins_list = [o.strip() for o in origins_str.split(",") if o.strip()] if origins_str != "*" else ["*"]
+    if cors_origins_list == ["*"] and settings.environment not in ("development", "dev", "test"):
+        import warnings
+        warnings.warn(
+            "CORS_ORIGINS='*' en environnement non-dev. "
+            "Restreindre via CORS_ORIGINS dans .env (ex: http://localhost:8501,https://app.example.com).",
+            stacklevel=2,
+        )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins_list,

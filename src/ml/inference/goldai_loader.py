@@ -11,8 +11,6 @@ import pandas as pd
 
 from src.config import get_goldai_dir, get_settings
 
-_settings = get_settings()
-
 
 def load_goldai(
     limit: int | None = None,
@@ -33,17 +31,18 @@ def load_goldai(
     Raises:
         FileNotFoundError: Si GoldAI n'existe pas
     """
-    base = Path(_settings.goldai_base_path)
+    base = Path(get_settings().goldai_base_path)
     if not base.exists():
         base = get_goldai_dir()
     base = base.resolve()
 
     if use_merged:
-        path = base / "merged_all_dates.parquet"
+        app_input = base / "app" / "gold_app_input.parquet"
+        path = app_input if app_input.exists() else base / "merged_all_dates.parquet"
         if not path.exists():
             raise FileNotFoundError(
-                f"GoldAI merged not found: {path}. "
-                "Run: python scripts/merge_parquet_goldai.py"
+                f"GoldAI input not found: {path}. "
+                "Run: python scripts/merge_parquet_goldai.py and optionally python scripts/build_gold_branches.py"
             )
         df = pd.read_parquet(path)
     else:
@@ -60,7 +59,7 @@ def load_goldai(
     return df
 
 
-def get_goldai_texts(df: pd.DataFrame) -> list[tuple[int, str, str]]:
+def get_goldai_texts(df: pd.DataFrame) -> list[tuple[str, str, str]]:
     """
     Extrait (id, title, content) pour chaque article.
 
@@ -70,7 +69,9 @@ def get_goldai_texts(df: pd.DataFrame) -> list[tuple[int, str, str]]:
     Returns:
         Liste de (id, title, content)
     """
-    id_col = "id" if "id" in df.columns else df.columns[0]
+    id_candidates = [c for c in ("raw_data_id", "id", "fingerprint", "url", "title") if c in df.columns]
+    if not id_candidates:
+        id_candidates = [df.columns[0]]
     title_col = "title" if "title" in df.columns else "headline"
     content_col = "content" if "content" in df.columns else "text"
 
@@ -81,7 +82,14 @@ def get_goldai_texts(df: pd.DataFrame) -> list[tuple[int, str, str]]:
 
     results = []
     for _, row in df.iterrows():
-        aid = int(row.get(id_col, 0)) if pd.notna(row.get(id_col)) else 0
+        aid = ""
+        for col in id_candidates:
+            raw_id = row.get(col)
+            if pd.notna(raw_id):
+                cand = str(raw_id).strip()
+                if cand and cand.lower() not in {"<na>", "none", "nan"}:
+                    aid = cand
+                    break
         title = str(row.get(title_col, "") or "")[:500]
         content = str(row.get(content_col, "") or "")[:2000]
         text = f"{title} {content}".strip()
