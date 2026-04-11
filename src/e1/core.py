@@ -394,7 +394,10 @@ class APIExtractor(BaseExtractor):
                     except Exception as e:
                         logger.warning("Reddit {} extraction error: {}", sr, str(e)[:40])
             elif "weather" in src_low or "meteo" in src_low:
-                def _weather_desc(code: object) -> str:
+                owm_key = (os.getenv("OPENWEATHERMAP_API_KEY") or "").strip()
+                cities = ["Paris", "Lyon", "Marseille", "Toulouse", "Nice"]
+
+                def _open_meteo_weather_label(code: object) -> str:
                     try:
                         wc = int(code)
                     except (TypeError, ValueError):
@@ -417,37 +420,127 @@ class APIExtractor(BaseExtractor):
                         return "orage"
                     return "conditions variables"
 
-                for city in ["Paris", "Lyon", "Marseille", "Toulouse", "Nice"]:
+                def _article_open_meteo(city: str) -> Article | None:
                     try:
                         g_r = requests.get(
-                            f"https://geocoding-api.open-meteo.com/v1/search?name={city}&country=France&language=fr&limit=1",
+                            "https://geocoding-api.open-meteo.com/v1/search",
+                            params={
+                                "name": city,
+                                "country": "France",
+                                "language": "fr",
+                                "limit": 1,
+                            },
                             timeout=8,
-                        ).json()
-                        if g_r.get("results"):
-                            g = g_r["results"][0]
-                            w = requests.get(
-                                f"https://api.open-meteo.com/v1/forecast?latitude={g['latitude']}&longitude={g['longitude']}&current=temperature_2m,weather_code&timezone=auto",
-                                timeout=8,
-                            ).json()
-                            c = w.get("current", {})
-                            temp = c.get("temperature_2m", "N/A")
-                            weather_code = c.get("weather_code", "N/A")
-                            weather_label = _weather_desc(weather_code)
-                            a = Article(
-                                title=f"Bulletin meteo {city}: {temp}C - {weather_label}",
-                                content=(
-                                    f"Meteo du jour a {g.get('name', city)}. "
-                                    f"Temperature {temp} degres, conditions {weather_label}. "
-                                    f"Weather code {weather_code}. "
-                                    "Suivi climat, precipitation, vent et alertes orage."
-                                ),
-                                url=f"https://www.weather.com/weather/today/l/{g['latitude']},{g['longitude']}",
-                                source_name=self.name,
+                        )
+                        g_r.raise_for_status()
+                        geo = g_r.json()
+                        if not geo.get("results"):
+                            return None
+                        g = geo["results"][0]
+                        w_r = requests.get(
+                            "https://api.open-meteo.com/v1/forecast",
+                            params={
+                                "latitude": g["latitude"],
+                                "longitude": g["longitude"],
+                                "current": "temperature_2m,weather_code",
+                                "timezone": "auto",
+                            },
+                            timeout=8,
+                        )
+                        w_r.raise_for_status()
+                        w = w_r.json()
+                        c = w.get("current") or {}
+                        temp = c.get("temperature_2m", "N/A")
+                        weather_code = c.get("weather_code", "N/A")
+                        weather_label = _open_meteo_weather_label(weather_code)
+                        a = Article(
+                            title=f"Bulletin meteo {city}: {temp}C - {weather_label}",
+                            content=(
+                                f"Meteo du jour a {g.get('name', city)}. "
+                                f"Temperature {temp} degres, conditions {weather_label}. "
+                                f"Weather code {weather_code}. "
+                                "Suivi climat, precipitation, vent et alertes orage."
+                            ),
+                            url=f"https://www.weather.com/weather/today/l/{g['latitude']},{g['longitude']}",
+                            source_name=self.name,
+                        )
+                        return a if a.is_valid() else None
+                    except Exception as e:
+                        logger.warning(
+                            "Meteo Open-Meteo ({}) echec: {}", city, str(e)[:120]
+                        )
+                        return None
+
+                def _article_openweathermap(city: str, api_key: str) -> Article | None:
+                    try:
+                        r = requests.get(
+                            "https://api.openweathermap.org/data/2.5/weather",
+                            params={
+                                "q": f"{city},FR",
+                                "appid": api_key,
+                                "units": "metric",
+                                "lang": "fr",
+                            },
+                            timeout=10,
+                        )
+                        if r.status_code != 200:
+                            logger.warning(
+                                "OpenWeatherMap {} HTTP {} — {}",
+                                city,
+                                r.status_code,
+                                (r.text or "")[:100],
                             )
-                            if a.is_valid():
-                                articles.append(a)
-                    except:
-                        pass
+                            return None
+                        data = r.json()
+                        main = data.get("main") or {}
+                        temp = main.get("temp", "N/A")
+                        w0 = (data.get("weather") or [{}])[0]
+                        desc = (w0.get("description") or "conditions inconnues").strip()
+                        name = (data.get("name") or city).strip()
+                        lat = (data.get("coord") or {}).get("lat")
+                        lon = (data.get("coord") or {}).get("lon")
+                        city_id = data.get("id")
+                        if city_id:
+                            ow_url = f"https://openweathermap.org/city/{city_id}"
+                        elif lat is not None and lon is not None:
+                            ow_url = f"https://www.openstreetmap.org/?mlat={lat}&mlon={lon}#map=10/{lat}/{lon}"
+                        else:
+                            ow_url = self.url or "https://openweathermap.org/"
+                        a = Article(
+                            title=f"Bulletin meteo {name}: {temp}C - {desc}",
+                            content=(
+                                f"Meteo du jour a {name} (OpenWeatherMap). "
+                                f"Temperature {temp} degres Celsius, conditions: {desc}. "
+                                f"Pression {main.get('pressure', 'N/A')} hPa, humidite {main.get('humidity', 'N/A')} pourcent."
+                            ),
+                            url=ow_url,
+                            source_name=self.name,
+                        )
+                        return a if a.is_valid() else None
+                    except Exception as e:
+                        logger.warning(
+                            "OpenWeatherMap ({}) echec: {}", city, str(e)[:120]
+                        )
+                        return None
+
+                for city in cities:
+                    a: Article | None = None
+                    if owm_key:
+                        a = _article_openweathermap(city, owm_key)
+                    if a is None:
+                        a = _article_open_meteo(city)
+                    if a is not None:
+                        articles.append(a)
+
+                if not articles and not owm_key:
+                    logger.info(
+                        "Meteo: aucune ville collectee — definir OPENWEATHERMAP_API_KEY "
+                        "dans .env pour prioriser OpenWeatherMap, ou verifier Open-Meteo."
+                    )
+                elif not articles and owm_key:
+                    logger.warning(
+                        "Meteo: cle OpenWeatherMap presente mais 0 bulletin — verifier la cle et les quotas."
+                    )
             else:
                 resp = requests.get(self.url, timeout=5)
                 if resp.status_code == 200 and "json" in resp.headers.get("content-type", ""):

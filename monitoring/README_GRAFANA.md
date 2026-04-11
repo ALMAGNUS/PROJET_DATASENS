@@ -10,8 +10,9 @@
 
 1. Double-cliquez sur **`start_grafana.bat`** (ou en ligne de commande : `start_grafana.bat`).
 2. Attendez 5–10 secondes.
-3. Ouvrez **http://localhost:3000** dans le navigateur.
-4. Premier login : **admin** / **admin** (Grafana proposera de changer le mot de passe).
+3. Ouvrez **http://localhost:3001** dans le navigateur (**le script `.bat` mappe le port 3001**, pas 3000 — voir en-tête du fichier `start_grafana.bat`).
+4. Si vous utilisez plutôt **`docker compose up -d grafana`**, alors l’URL est **http://localhost:3000** (voir `docker-compose.yml`).
+5. Premier login : **admin** / **admin** (Grafana proposera de changer le mot de passe).
 
 **Prérequis :** Docker doit être installé et en cours d’exécution. Si vous n’avez pas Docker, installez Grafana manuellement depuis https://grafana.com/grafana/download (Windows) et lancez Grafana, puis importez le dashboard comme indiqué plus bas.
 
