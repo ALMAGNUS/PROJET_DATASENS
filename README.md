@@ -61,24 +61,33 @@ python scripts/setup_with_sql.py
 ```
 
 Creates SQLite database with:
-- 7 tables (source, raw_data, sync_log, topic, document_topic, model_output)
-- 10 sources configured
-- Proper indexes for performance
+- Tables métier E1 (`source`, `raw_data`, `sync_log`, `topic`, `document_topic`, `model_output`, etc.)
+- Lignes `source` initialisées depuis la configuration du script (alignées avec `sources_config.json`)
+- Index pour les jointures fréquentes
 
-### 3. Run E1 Pipeline
+### 3. Variables d’environnement (optionnel)
+
+Copier `.env.example` vers **`.env`** à la racine du dépôt (non versionné). Exemples utiles pour E1 :
+
+- **`DB_PATH`** — chemin du SQLite (défaut : `~/datasens_project/datasens.db`).
+- **`OPENWEATHERMAP_API_KEY`** — si défini, la source `openweather_api` appelle **OpenWeatherMap** en priorité ; sinon repli **Open-Meteo** (sans clé).
+
+Le pipeline charge `.env` au démarrage (`src/e1/pipeline.py`).
+
+### 4. Run E1 Pipeline
 
 ```bash
 python main.py
 ```
 
-**Inclus dans le même run** (toutes les sources `active: true` de `sources_config.json`) : RSS, API, **scraping** (`trustpilot_reviews`, `ifop_barometers` en HTTP si vous l’activez — **désactivé par défaut**, cadence annuelle, `monavis_citoyen` avec **Botasaurus**). Les artefacts Botasaurus vont sous `output/` (ignoré par git). Les sources `active: false` sont listées en fin d’extraction.
+**Inclus dans le même run** (toutes les sources `active: true` de `sources_config.json`) : RSS, API, datasets, **scraping** (`trustpilot_reviews` en HTTP ; **`monavis_citoyen`** actif par défaut — **Botasaurus** en priorité puis navigateur Botasaurus puis `requests` ; `ifop_barometers` en HTTP uniquement si vous passez `active: true`, cadence plutôt annuelle). Les artefacts Botasaurus vont sous **`output/`** (gitignoré, ex. `_botasaurus_request.json`). Les sources `active: false` sont listées en fin d’extraction.
 
 **Output:**
-- Articles extracted to database
-- sync_log mis à jour par source
-- **Export RAW/SILVER/GOLD inclus** dans le pipeline
+- Articles extraits puis chargés en base (avec déduplication)
+- Table **`sync_log`** : une entrée par source et par run (`rows_synced` = nombre d’articles **retournés par l’extracteur** ce run-là)
+- **Export RAW/SILVER/GOLD** inclus dans le pipeline
 
-### 4. Export ou régénération (optionnel)
+### 5. Export ou régénération (optionnel)
 
 L'export est déjà effectué par `main.py`. Pour régénérer manuellement les exports :
 
@@ -128,7 +137,7 @@ python scripts/regenerate_exports.py
 | **scripts/setup_with_sql.py** | Database initialization | ✅ |
 | **scripts/regenerate_exports.py** | Régénération manuelle RAW → SILVER → GOLD | ✅ |
 | **src/e1/core.py** | Extracteurs et transformers E1 | ✅ |
-| **sources_config.json** | 10 sources configuration | ✅ |
+| **sources_config.json** | Liste des sources (`active`, URL, `acquisition_type`) | ✅ |
 | **requirements.txt** | All dependencies | ✅ |
 
 > **ZZDB MongoDB** : pour activer la source `zzdb_synthetic`, installer `pymongo`
@@ -136,51 +145,104 @@ python scripts/regenerate_exports.py
 
 ---
 
-## 🔗 Data Sources (15 sources actives)
+## 🔗 Data Sources
 
-### Sources Actives (15 sources)
+La **liste à jour** (noms, URL, `acquisition_type`, `active`) est dans **`sources_config.json`**. Au moment de la rédaction du README, **16 sources** sont **`active: true`** (dont **`monavis_citoyen`**).
 
-> **Note**: Les statistiques ci-dessous sont une **photo au 2025-12-20**. La collecte évolue quotidiennement pour les sources dynamiques. Les nombres d'articles augmentent à chaque exécution du pipeline.
+### Sources actives (référence)
 
-| # | Source | Type | Records (20/12/2025) | Status |
-|---|--------|------|---------------------|--------|
-| 1 | kaggle_french_opinions | Dataset | 38,327 | ✓ Fondation |
-| 2 | google_news_rss | RSS | 1,456 | ✓ Dynamique |
-| 3 | zzdb_csv | CSV | 930 | ✓ Fondation |
-| 4 | trustpilot_reviews | Scraping | 658 | ✓ Dynamique |
-| 5 | yahoo_finance | RSS | 624 | ✓ Dynamique |
-| 6 | reddit_france | API | 377 | ✓ Dynamique |
-| 7 | rss_french_news | RSS | 259 | ✓ Dynamique |
-| 8 | openweather_api | API | 187 | ✓ Dynamique |
-| 9 | gdelt_events | BigData | 79 | ✓ Fondation |
-| 10 | datagouv_datasets | Dataset | 50 | ✓ Dynamique |
-| 11 | ifop_barometers | Scraping | 18 | ✓ Optionnel (annuel, `active: false` par défaut) |
-| 12 | insee_indicators | API | 5 | ✓ Dynamique |
-| 13 | agora_consultations | API | n/a | ✓ Dynamique |
-| 14 | GDELT_Last15_English | BigData | 2 | ✓ Dynamique |
-| 15 | GDELT_Master_List | BigData | 0 | ✓ Dynamique |
+| Source | Type (`acquisition_type`) | Rôle |
+|--------|---------------------------|------|
+| rss_french_news | rss | Flux RSS |
+| gdelt_events | bigdata | Fichiers GDELT (fondation, skip si déjà intégré) |
+| reddit_france | api | API JSON Reddit |
+| trustpilot_reviews | scraping | HTML (`requests` + BeautifulSoup) |
+| openweather_api | api | Météo (OpenWeatherMap si clé `.env`, sinon Open-Meteo) |
+| insee_indicators | api | INSEE (API + fallback site) |
+| datagouv_datasets | dataset | Jeux data.gouv |
+| kaggle_french_opinions | dataset | Kaggle (fondation, skip si déjà intégré) |
+| google_news_rss | rss | RSS |
+| yahoo_finance | rss | RSS |
+| **monavis_citoyen** | **scraping** | **monaviscitoyen.fr** — Botasaurus (requête → navigateur) puis `requests` ; parse HTML dans `ScrapingExtractor` (`src/e1/core.py`) |
+| agora_consultations | api | API Agora (JSON) |
+| GDELT_Last15_English | bigdata | Échantillon GDELT |
+| GDELT_Master_List | bigdata | Liste GDELT |
+| zzdb_csv | csv | CSV ZZDB |
 
-**Total articles en base** (au 20/12/2025): **43,022 articles**
+Les **totaux d’articles en base par source** changent chaque jour : voir la section **Traçabilité des extractions** plus bas (`db_state_report`, SQLite, exports).
 
 **Classification**:
-- **Fondation** (statiques, intégrées une fois) : `kaggle_french_opinions`, `gdelt_events`, `zzdb_csv`
-  - Ces sources sont figées après leur première intégration et ne sont plus collectées
-- **Dynamiques** (collecte quotidienne) : Toutes les autres sources actives
-  - Les sources dynamiques collectent de nouveaux articles à chaque exécution du pipeline
-  - Les nombres d'articles augmentent quotidiennement pour ces sources
+- **Fondation** : intégration contrôlée (ex. `kaggle_french_opinions`, `gdelt_events`, `zzdb_csv`) — le pipeline peut **SKIP** si déjà marquée intégrée.
+- **Dynamiques** : re-collecte à chaque run ; beaucoup d’articles extraits peuvent être **dédupliqués** (même empreinte titre+contenu) et ne pas augmenter `raw_data`.
 
-### Sources Inactives (pour référence)
+### Sources inactives (référence)
 
-| Source | Type | Status |
-|--------|------|--------|
-| Kaggle_StopWords_28Lang | Dataset | Inactif |
-| Kaggle_StopWords | Dataset | Inactif |
-| Kaggle_FrenchFinNews | Dataset | Inactif |
-| Kaggle_SentimentLexicons | Dataset | Inactif |
-| Kaggle_InsuranceReviews | Dataset | Inactif |
-| Kaggle_FrenchTweets | Dataset | Inactif |
-| monavis_citoyen | Scraping | Inactif |
-| zzdb_synthetic | MongoDB | Inactif |
+| Source | Type | Remarque |
+|--------|------|----------|
+| Kaggle_StopWords_28Lang, Kaggle_StopWords, Kaggle_FrenchFinNews, Kaggle_SentimentLexicons, Kaggle_InsuranceReviews, Kaggle_FrenchTweets | dataset | `active: false` par défaut |
+| ifop_barometers | scraping | `active: false` par défaut (cadence plutôt annuelle) |
+| zzdb_synthetic | mongodb | Nécessite Mongo / config ZZDB |
+
+---
+
+## 📌 Traçabilité des extractions (par source)
+
+Objectif : suivre **ce qui a été extrait**, **ce qui est stocké depuis l’origine**, et **l’historique par run** — pour **toutes** les sources (scraping MonAvis, API, RSS, etc.).
+
+### 1. Stock total par source (depuis le début)
+
+Dans la base SQLite (**`DB_PATH`**, souvent `~/datasens_project/datasens.db`), table **`raw_data`** jointe à **`source`** : chaque ligne est un article **effectivement enregistré** (après déduplication).
+
+Exemples Windows PowerShell / cmd (remplacer par le **`DB_PATH`** réel de ton `.env` si différent) :
+
+```bash
+sqlite3 "%USERPROFILE%\datasens_project\datasens.db" "SELECT s.name, COUNT(*) FROM raw_data r JOIN source s ON s.source_id = r.source_id GROUP BY s.name ORDER BY COUNT(*) DESC;"
+```
+
+Pour **MonAvis** uniquement :
+
+```bash
+sqlite3 "%USERPROFILE%\datasens_project\datasens.db" "SELECT COUNT(*) FROM raw_data r JOIN source s ON s.source_id = r.source_id WHERE s.name = 'monavis_citoyen';"
+```
+
+Sous Linux ou macOS, utiliser le chemin absolu vers le même fichier (souvent `~/datasens_project/datasens.db`).
+
+### 2. Historique run par run (nombre extrait, pas seulement « nouveaux »)
+
+Table **`sync_log`** : à chaque passage du pipeline sur une source, une ligne avec **`rows_synced`** = nombre d’articles **renvoyés par l’extracteur** pour ce run (avant dédup), **`sync_date`**, **`status`**.
+
+Exemple — derniers enregistrements pour MonAvis :
+
+```bash
+sqlite3 "%USERPROFILE%\datasens_project\datasens.db" "SELECT sl.sync_date, sl.rows_synced, sl.status FROM sync_log sl JOIN source s ON s.source_id = sl.source_id WHERE s.name = 'monavis_citoyen' ORDER BY sl.sync_log_id DESC LIMIT 20;"
+```
+
+### 3. Fichiers « instantané » du jour (toutes sources dans un même fichier)
+
+Après chaque `main.py`, le pipeline écrit sous **`data/raw/sources_YYYY-MM-DD/`** :
+
+- **`raw_articles.json`** et **`raw_articles.csv`** — **toutes** les sources mélangées ; chaque enregistrement comporte une clé **`source`** (nom de la source, ex. `monavis_citoyen`). Tu peux filtrer dans un éditeur, Excel, ou en JSON avec `jq` pour ne garder que MonAvis.
+
+### 4. Rapports versionnés (synthèse + `sync_log`)
+
+```bash
+python scripts/db_state_report.py
+```
+
+Génère **`reports/db_state_*.{md,json}`** avec :
+
+- totaux **`raw_data`** ;
+- **comptes par source** ;
+- **historique récent `sync_log`** (lignes synchronisées / statut par source).
+
+### 5. Exports globaux et dashboard
+
+- **`exports/raw.csv`** (et SILVER/GOLD) : colonne source pour filtrer **MonAvis** ou une autre source.
+- **`python scripts/show_dashboard.py`** : vue agrégée (articles par source, « nouveaux aujourd’hui », etc.).
+
+### 6. Scraping Botasaurus (debug ponctuel)
+
+Les traces **techniques** Botasaurus (requête brute) sont sous **`output/`** (gitignoré). Ce n’est **pas** le comptage métier : pour les volumes et l’historique, privilégier **`sync_log`**, **`raw_data`** et **`db_state_report`**.
 
 ---
 
@@ -275,9 +337,9 @@ python scripts/enrich_all_articles.py
 
 ### 6 Core Tables (E1)
 
-1. **source** — 10 configured sources
-2. **raw_data** — 216 articles (direct from extractors)
-3. **sync_log** — 20 logs (2 runs × 10 sources)
+1. **source** — une ligne par source configurée (alignée sur `sources_config.json` / setup)
+2. **raw_data** — articles stockés (après dédup), toutes sources
+3. **sync_log** — historique des runs par source (`rows_synced`, `sync_date`, `status`)
 4. **topic** — 8 predefined topics
 5. **document_topic** — 207 article-topic mappings
 6. **model_output** — 648 ML predictions

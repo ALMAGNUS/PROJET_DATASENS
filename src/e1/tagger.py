@@ -489,14 +489,10 @@ class TopicTagger:
             if tid:
                 # Topic_1 : "autre" avec confiance 0.3
                 c.execute(
-                    "INSERT INTO document_topic (raw_data_id, topic_id, confidence_score, tagger) VALUES (?, ?, ?, ?)",
+                    "INSERT OR IGNORE INTO document_topic (raw_data_id, topic_id, confidence_score, tagger) VALUES (?, ?, ?, ?)",
                     (raw_data_id, tid[0], 0.3, "keyword_default"),
                 )
-                # Topic_2 : "autre" avec confiance 0.1 (fallback)
-                c.execute(
-                    "INSERT INTO document_topic (raw_data_id, topic_id, confidence_score, tagger) VALUES (?, ?, ?, ?)",
-                    (raw_data_id, tid[0], 0.1, "keyword_fallback"),
-                )
+                # Topic_2 identique ignoré par le UNIQUE — comportement attendu quand aucun topic n'est trouvé
                 self.conn.commit()
                 return True
             return False
@@ -511,7 +507,7 @@ class TopicTagger:
             tid1 = c.fetchone()
             if tid1:
                 c.execute(
-                    "INSERT INTO document_topic (raw_data_id, topic_id, confidence_score, tagger) VALUES (?, ?, ?, ?)",
+                    "INSERT OR IGNORE INTO document_topic (raw_data_id, topic_id, confidence_score, tagger) VALUES (?, ?, ?, ?)",
                     (raw_data_id, tid1[0], topic1_conf, "keyword"),
                 )
         else:
@@ -528,7 +524,7 @@ class TopicTagger:
                 tid1 = c.fetchone()
             if tid1:
                 c.execute(
-                    "INSERT INTO document_topic (raw_data_id, topic_id, confidence_score, tagger) VALUES (?, ?, ?, ?)",
+                    "INSERT OR IGNORE INTO document_topic (raw_data_id, topic_id, confidence_score, tagger) VALUES (?, ?, ?, ?)",
                     (raw_data_id, tid1[0], 0.3, "keyword_default"),
                 )
 
@@ -539,7 +535,7 @@ class TopicTagger:
             tid2 = c.fetchone()
             if tid2:
                 c.execute(
-                    "INSERT INTO document_topic (raw_data_id, topic_id, confidence_score, tagger) VALUES (?, ?, ?, ?)",
+                    "INSERT OR IGNORE INTO document_topic (raw_data_id, topic_id, confidence_score, tagger) VALUES (?, ?, ?, ?)",
                     (raw_data_id, tid2[0], topic2_conf, "keyword"),
                 )
         else:
@@ -555,9 +551,8 @@ class TopicTagger:
                 c.execute("SELECT topic_id FROM topic WHERE name = ?", ("autre",))
                 tid2 = c.fetchone()
             if tid2:
-                # Topic_2 avec confiance très faible (0.1) pour indiquer qu'il s'agit d'un fallback
                 c.execute(
-                    "INSERT INTO document_topic (raw_data_id, topic_id, confidence_score, tagger) VALUES (?, ?, ?, ?)",
+                    "INSERT OR IGNORE INTO document_topic (raw_data_id, topic_id, confidence_score, tagger) VALUES (?, ?, ?, ?)",
                     (raw_data_id, tid2[0], 0.1, "keyword_fallback"),
                 )
 

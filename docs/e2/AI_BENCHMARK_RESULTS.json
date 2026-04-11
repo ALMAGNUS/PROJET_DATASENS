@@ -1,118 +1,118 @@
 {
   "bert_multilingual": {
     "accuracy": 0.375,
-    "f1_macro": 0.3095,
-    "f1_weighted": 0.3095,
-    "avg_confidence": 0.5856,
-    "avg_latency_ms": 242.3,
+    "f1_macro": 0.3034,
+    "f1_weighted": 0.3034,
+    "avg_confidence": 0.6121,
+    "avg_latency_ms": 279.1,
     "per_class": {
       "neg": {
-        "precision": 0.4179,
-        "recall": 0.7,
-        "f1": 0.5234,
-        "support": 40
+        "precision": 0.3981,
+        "recall": 0.7167,
+        "f1": 0.5119,
+        "support": 120
       },
       "neu": {
         "precision": 0.25,
-        "recall": 0.025,
-        "f1": 0.0455,
-        "support": 40
+        "recall": 0.0167,
+        "f1": 0.0312,
+        "support": 120
       },
       "pos": {
-        "precision": 0.3265,
-        "recall": 0.4,
-        "f1": 0.3596,
-        "support": 40
+        "precision": 0.3456,
+        "recall": 0.3917,
+        "f1": 0.3672,
+        "support": 120
       }
     },
-    "samples": 120,
+    "samples": 360,
     "model_name": "nlptown/bert-base-multilingual-uncased-sentiment"
   },
   "xlm_roberta_twitter": {
     "accuracy": 0.4583,
-    "f1_macro": 0.4324,
-    "f1_weighted": 0.4324,
-    "avg_confidence": 0.8295,
-    "avg_latency_ms": 206.73,
+    "f1_macro": 0.4314,
+    "f1_weighted": 0.4314,
+    "avg_confidence": 0.8253,
+    "avg_latency_ms": 252.13,
     "per_class": {
       "neg": {
-        "precision": 0.5227,
-        "recall": 0.575,
-        "f1": 0.5476,
-        "support": 40
+        "precision": 0.5682,
+        "recall": 0.625,
+        "f1": 0.5952,
+        "support": 120
       },
       "neu": {
-        "precision": 0.4098,
-        "recall": 0.625,
-        "f1": 0.495,
-        "support": 40
+        "precision": 0.3859,
+        "recall": 0.5917,
+        "f1": 0.4671,
+        "support": 120
       },
       "pos": {
-        "precision": 0.4667,
-        "recall": 0.175,
-        "f1": 0.2545,
-        "support": 40
+        "precision": 0.4318,
+        "recall": 0.1583,
+        "f1": 0.2317,
+        "support": 120
       }
     },
-    "samples": 120,
+    "samples": 360,
     "model_name": "cardiffnlp/twitter-xlm-roberta-base-sentiment-multilingual"
   },
   "sentiment_fr": {
-    "accuracy": 0.6,
-    "f1_macro": 0.5913,
-    "f1_weighted": 0.5913,
-    "avg_confidence": 0.7983,
-    "avg_latency_ms": 198.08,
+    "accuracy": 0.6139,
+    "f1_macro": 0.6093,
+    "f1_weighted": 0.6093,
+    "avg_confidence": 0.7946,
+    "avg_latency_ms": 283.65,
     "per_class": {
       "neg": {
-        "precision": 0.5455,
-        "recall": 0.75,
-        "f1": 0.6316,
-        "support": 40
+        "precision": 0.546,
+        "recall": 0.7417,
+        "f1": 0.629,
+        "support": 120
       },
       "neu": {
-        "precision": 0.65,
-        "recall": 0.65,
-        "f1": 0.65,
-        "support": 40
+        "precision": 0.7182,
+        "recall": 0.6583,
+        "f1": 0.687,
+        "support": 120
       },
       "pos": {
-        "precision": 0.64,
-        "recall": 0.4,
-        "f1": 0.4923,
-        "support": 40
+        "precision": 0.6092,
+        "recall": 0.4417,
+        "f1": 0.5121,
+        "support": 120
       }
     },
-    "samples": 120,
+    "samples": 360,
     "model_name": "ac0hik/Sentiment_Analysis_French"
   },
   "finetuned_local": {
-    "accuracy": 0.6667,
-    "f1_macro": 0.6676,
-    "f1_weighted": 0.6676,
-    "avg_confidence": 0.6572,
-    "avg_latency_ms": 196.86,
+    "accuracy": 0.6917,
+    "f1_macro": 0.693,
+    "f1_weighted": 0.693,
+    "avg_confidence": 0.6628,
+    "avg_latency_ms": 282.51,
     "per_class": {
       "neg": {
-        "precision": 0.5818,
-        "recall": 0.8,
-        "f1": 0.6737,
-        "support": 40
+        "precision": 0.5893,
+        "recall": 0.825,
+        "f1": 0.6875,
+        "support": 120
       },
       "neu": {
-        "precision": 0.8571,
-        "recall": 0.6,
-        "f1": 0.7059,
-        "support": 40
+        "precision": 0.9032,
+        "recall": 0.7,
+        "f1": 0.7887,
+        "support": 120
       },
       "pos": {
-        "precision": 0.6486,
-        "recall": 0.6,
-        "f1": 0.6234,
-        "support": 40
+        "precision": 0.6667,
+        "recall": 0.55,
+        "f1": 0.6027,
+        "support": 120
       }
     },
-    "samples": 120,
+    "samples": 360,
     "model_name": "C:\\Users\\Utilisateur\\Desktop\\PROJET_DATASENS\\models\\sentiment_fr-sentiment-finetuned"
   }
 }

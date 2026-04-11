@@ -5,7 +5,11 @@ import time
 from datetime import date, datetime
 from pathlib import Path
 
+from dotenv import load_dotenv
 from loguru import logger
+
+# .env à la racine du dépôt → disponible pour os.getenv (OPENWEATHERMAP_API_KEY, DB_PATH, …)
+load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
 
 # Imports depuis src/ (utilitaires - peuvent rester en src/ pour l'instant)
 # Note: Quand src/ est dans PYTHONPATH, utiliser imports sans préfixe src.
