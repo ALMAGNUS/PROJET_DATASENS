@@ -89,9 +89,25 @@ def _http_get_with_retries(
 
 
 def _insee_get_bearer_token() -> str | None:
-    """
-    Jeton INSEE : variable INSEE_API_TOKEN (Bearer), ou OAuth2 client_credentials
-    avec INSEE_CONSUMER_KEY + INSEE_CONSUMER_SECRET (portail api.insee.fr).
+    """Jeton INSEE pour les endpoints API officiels.
+
+    Deux modes :
+
+    1. **Bearer direct** via `INSEE_API_TOKEN` (ou `INSEE_API_BEARER`).
+       Chemin le plus simple : obtenir un token via le portail et le coller dans `.env`.
+
+    2. **OAuth2 client_credentials** via `INSEE_CONSUMER_KEY` + `INSEE_CONSUMER_SECRET`.
+       L'endpoint du token est configurable via `INSEE_TOKEN_URL` pour suivre les
+       evolutions du portail INSEE.
+
+       Migration 2026 : l'ancien endpoint ``https://api.insee.fr/token`` renvoie
+       HTTP 404 (deprecated). Le nouveau portail est ``https://portail-api.insee.fr/``.
+       Consulter la section OAuth du portail pour l'URL exacte et la definir dans `.env` :
+
+           INSEE_TOKEN_URL=https://portail-api.insee.fr/token
+
+       En attendant la migration, le fallback silencieux recupere les donnees via
+       `_extract_insee_indicators` (site public, sans auth).
     """
     token = (os.getenv("INSEE_API_TOKEN") or os.getenv("INSEE_API_BEARER") or "").strip()
     if token:
@@ -100,9 +116,10 @@ def _insee_get_bearer_token() -> str | None:
     sec = (os.getenv("INSEE_CONSUMER_SECRET") or os.getenv("INSEE_API_SECRET") or "").strip()
     if not key or not sec:
         return None
+    token_url = (os.getenv("INSEE_TOKEN_URL") or "https://api.insee.fr/token").strip()
     try:
         r = requests.post(
-            "https://api.insee.fr/token",
+            token_url,
             data={"grant_type": "client_credentials"},
             auth=(key, sec),
             headers={"Content-Type": "application/x-www-form-urlencoded"},
@@ -111,7 +128,14 @@ def _insee_get_bearer_token() -> str | None:
         if r.status_code == 200:
             data = r.json()
             return (data.get("access_token") or data.get("token") or "").strip() or None
-        logger.warning("INSEE OAuth token: HTTP {} — {}", r.status_code, r.text[:150])
+        if r.status_code == 404:
+            logger.warning(
+                "INSEE OAuth token: HTTP 404 sur {} — endpoint deprecated. "
+                "Definir INSEE_TOKEN_URL dans .env (voir portail-api.insee.fr).",
+                token_url,
+            )
+        else:
+            logger.warning("INSEE OAuth token: HTTP {} — {}", r.status_code, r.text[:150])
     except Exception as e:
         logger.warning("INSEE OAuth: {}", str(e)[:100])
     return None
