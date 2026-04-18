@@ -41,7 +41,7 @@ PROJET_DATASENS/
 │   ├── PROJECT_STRUCTURE.md
 │   ├── CHEMIN_DONNEE.md
 │   ├── PROJECT_ANALYSIS.md
-│   └── AUDIT_ARCHITECTURE.md
+│   └── _archive/         # Audits historiques (AUDIT_ARCHITECTURE, etc.)
 │
 ├── data/                     # Données (RAW/SILVER/GOLD)
 └── exports/                  # Exports CSV/Parquet

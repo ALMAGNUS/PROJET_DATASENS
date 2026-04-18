@@ -41,7 +41,7 @@ PROJET_DATASENS/
 │   ├── PROJECT_STRUCTURE.md # Ce fichier
 │   ├── CHEMIN_DONNEE.md    # Chemin de la donnée (détails)
 │   ├── PROJECT_ANALYSIS.md # Analyse du projet
-│   └── AUDIT_ARCHITECTURE.md # Audit architecture
+│   └── _archive/          # Audits historiques (AUDIT_ARCHITECTURE, etc.)
 │
 ├── data/                     # Données (ignorées par Git)
 │   ├── raw/                 # Zone RAW

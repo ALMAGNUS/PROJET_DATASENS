@@ -133,7 +133,7 @@ src/
 - ✅ `docs/RBAC_ZONES_METIER.md` : Logique métier RBAC
 - ✅ `docs/MISTRAL_IA_INSIGHTS.md` : Intégration Mistral
 - ✅ `docs/ROADMAP_EVOLUTION.md` : Roadmap complète
-- ✅ `docs/AUDIT_OOP_SOLID_DRY.md` : Audit code qualité
+- ✅ `docs/_archive/AUDIT_OOP_SOLID_DRY.md` : Audit code qualité (archive)
 
 ---
 
