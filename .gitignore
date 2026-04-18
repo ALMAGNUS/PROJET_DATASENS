@@ -139,3 +139,9 @@ error_logs/
 
 # Rapport de validation régénéré par scripts/validate_e1_project.py
 validation_report.json
+
+# ============================================================
+# Backups de sécurité générés par scripts/retag_full_pipeline.py
+# (snapshots parquet + SQLite, trop volumineux pour git)
+# ============================================================
+backups/

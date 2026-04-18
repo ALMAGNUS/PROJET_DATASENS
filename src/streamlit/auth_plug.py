@@ -3,18 +3,29 @@ Auth plug - Authentification RBAC / OAuth2 pour le cockpit Streamlit
 ======================================================================
 - Login par email/mot de passe (JWT via API E2).
 - Session stockee dans st.session_state (token, user, role).
+- Decodage non verifie du JWT pour exposer l'expiration (TTL) cote UI.
+- Helpers RBAC (`has_role`, `has_any_role`, `can_write`, `can_admin`).
 - Optionnel: brancher OAuth2 (Google, GitHub) plus tard.
 """
 
 from __future__ import annotations
 
+import base64
+import json
 import os
+import time
 from typing import Any
 
 import requests
 
 import streamlit as st
 from src.config import get_settings
+
+ROLES_HIERARCHY = ("reader", "writer", "deleter", "admin")
+FORGOT_PASSWORD_HELP = (
+    "Mot de passe oublie ? Contactez l'administrateur de la plateforme "
+    "(aucun workflow self-service n'est expose par l'API E2)."
+)
 
 
 def _api_base() -> str:
@@ -59,6 +70,89 @@ def has_role(role: str) -> bool:
         return False
     r = (user.get("role") or "").lower()
     return r == role.lower() or r == "admin"
+
+
+def has_any_role(*allowed: str) -> bool:
+    """True si l'utilisateur a l'un des roles donnes (admin accepte implicitement)."""
+    user = get_user()
+    if not user:
+        return False
+    r = (user.get("role") or "").lower()
+    if r == "admin":
+        return True
+    return r in {a.lower() for a in allowed}
+
+
+def can_write() -> bool:
+    """True pour writer, deleter ou admin (lance une action write-side)."""
+    return has_any_role("writer", "deleter", "admin")
+
+
+def can_admin() -> bool:
+    """True uniquement pour les administrateurs."""
+    return has_any_role("admin")
+
+
+def gate_by_role(allowed: tuple[str, ...], action_label: str) -> bool:
+    """
+    Retourne True si l'utilisateur peut executer l'action.
+    Sinon, affiche un avertissement dans l'UI et retourne False.
+    Ne stoppe pas l'application (on gate uniquement le bloc appelant).
+    """
+    if has_any_role(*allowed):
+        return True
+    st.info(
+        f"Action reservee aux roles {', '.join(allowed)} : **{action_label}** "
+        f"(votre role courant : `{(get_user() or {}).get('role', '?')}`)."
+    )
+    return False
+
+
+# ---------------------------------------------------------------------------
+# JWT: decodage non verifie (lecture du payload uniquement)
+# ---------------------------------------------------------------------------
+def _decode_jwt_unsafe(token: str | None) -> dict[str, Any]:
+    """Decode le payload d'un JWT sans verifier la signature (UX uniquement)."""
+    if not token:
+        return {}
+    try:
+        parts = token.split(".")
+        if len(parts) < 2:
+            return {}
+        payload_b64 = parts[1] + "=" * (-len(parts[1]) % 4)
+        raw = base64.urlsafe_b64decode(payload_b64.encode("ascii"))
+        return json.loads(raw.decode("utf-8"))
+    except Exception:
+        return {}
+
+
+def token_seconds_remaining() -> int | None:
+    """Retourne le nombre de secondes restantes avant expiration (ou None si indispo)."""
+    payload = _decode_jwt_unsafe(get_token())
+    exp = payload.get("exp")
+    if not isinstance(exp, (int, float)):
+        return None
+    return int(exp - time.time())
+
+
+def is_token_expired() -> bool:
+    """True si le token est expire (exp <= now). False si pas d'info d'expiration."""
+    remaining = token_seconds_remaining()
+    return remaining is not None and remaining <= 0
+
+
+def _fmt_ttl(seconds: int | None) -> str:
+    if seconds is None:
+        return "TTL inconnu"
+    if seconds <= 0:
+        return "expire"
+    m, s = divmod(seconds, 60)
+    h, m = divmod(m, 60)
+    if h:
+        return f"{h}h{m:02d}m"
+    if m:
+        return f"{m}m{s:02d}s"
+    return f"{s}s"
 
 
 def login(email: str, password: str) -> tuple[bool, str]:
@@ -122,18 +216,34 @@ def render_login_form() -> bool:
             st.sidebar.success(msg)
             return True
         st.sidebar.error(msg)
+    st.sidebar.caption(FORGOT_PASSWORD_HELP)
     return False
 
 
 def render_user_and_logout() -> None:
-    """Affiche dans la sidebar l'utilisateur connecte et un bouton Deconnexion."""
+    """Affiche dans la sidebar l'utilisateur connecte, la TTL et un bouton Deconnexion."""
     user = get_user()
     if not user:
         return
+
+    # Auto-logout si le JWT est expire cote client
+    if is_token_expired():
+        logout()
+        st.sidebar.warning("Session expiree. Merci de vous reconnecter.")
+        return
+
     email = user.get("email") or "?"
     role = user.get("role") or "?"
     st.sidebar.caption(f"Connecte: {email}")
     st.sidebar.caption(f"Role: {role}")
+    remaining = token_seconds_remaining()
+    if remaining is not None:
+        if remaining <= 60:
+            st.sidebar.warning(f"Session: {_fmt_ttl(remaining)}")
+        elif remaining <= 300:
+            st.sidebar.info(f"Session: {_fmt_ttl(remaining)}")
+        else:
+            st.sidebar.caption(f"Session: {_fmt_ttl(remaining)}")
     if st.sidebar.button("Deconnexion", key="auth_logout"):
         logout()
         st.rerun()

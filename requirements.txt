@@ -58,6 +58,7 @@ email-validator==2.3.0  # Email validation
 streamlit==1.36.0
 streamlit-aggrid==0.3.4  # Advanced data grid
 streamlit-plotly-events==0.0.6  # Interactive plots
+altair>=5.0,<6  # Graphiques cockpit (enrichissement pipeline, étape par étape)
 
 # ============================================================
 # E3: Mistral AI (Generative AI)
