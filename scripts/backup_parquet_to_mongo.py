@@ -94,10 +94,26 @@ def main() -> int:
     skipped = 0
     errors = 0
 
-    def _backup(path: Path, logical_name: str, extra_meta: dict | None = None) -> None:
+    def _backup(
+        path: Path,
+        logical_name: str,
+        extra_meta: dict | None = None,
+        *,
+        optional: bool = False,
+    ) -> None:
+        """Sauvegarde un fichier vers MongoDB GridFS.
+
+        Args:
+            path: chemin du fichier.
+            logical_name: nom logique dans GridFS.
+            extra_meta: metadata additionnelles.
+            optional: si True, un fichier absent est loggue "OPTIONAL absent" (pas critique).
+                      Sinon, "MISSING" (fichier attendu).
+        """
         nonlocal stored, skipped, errors
         if not path.exists():
-            print(f"  -- ABSENT  {path.name}")
+            tag = "OPTIONAL absent" if optional else "MISSING   "
+            print(f"  -- {tag} {path.name}")
             return
         meta: dict = {
             "logical_name": logical_name,
@@ -189,20 +205,45 @@ def main() -> int:
         print("\n--- Modèle IA entraîné ---")
 
         # Modèle fine-tuné (model.safetensors + config + tokenizer)
+        # Required : présents pour tout modèle HuggingFace.
+        # Optional : dépendent du type de tokenizer (SentencePiece, WordPiece, BPE, etc.)
+        #   - sentencepiece.bpe.model : CamemBERT, XLM-RoBERTa
+        #   - spiece.model            : T5, ALBERT
+        #   - vocab.txt               : BERT, DistilBERT
+        #   - vocab.json + merges.txt : GPT-2, RoBERTa
+        required_model_files = [
+            "model.safetensors",
+            "config.json",
+            "tokenizer_config.json",
+        ]
+        optional_model_files = [
+            "tokenizer.json",
+            "special_tokens_map.json",
+            "sentencepiece.bpe.model",
+            "spiece.model",
+            "vocab.txt",
+            "vocab.json",
+            "merges.txt",
+        ]
         models_dir = project_root / "models"
         for model_dir in sorted(models_dir.iterdir()) if models_dir.exists() else []:
             if not model_dir.is_dir():
                 continue
             model_name = model_dir.name
-            # Fichiers essentiels du modèle (pas le checkpoint intermédiaire ni optimizer)
-            for fname in ["model.safetensors", "config.json", "tokenizer.json",
-                          "tokenizer_config.json", "sentencepiece.bpe.model",
-                          "special_tokens_map.json"]:
+            for fname in required_model_files:
                 fp = model_dir / fname
                 _backup(fp, f"model_{model_name}_{fname}", {
                     "model_name": model_name,
                     "file_type": "model_artifact",
                 })
+            for fname in optional_model_files:
+                fp = model_dir / fname
+                _backup(
+                    fp,
+                    f"model_{model_name}_{fname}",
+                    {"model_name": model_name, "file_type": "model_artifact"},
+                    optional=True,
+                )
 
     except Exception as e:
         print(f"Erreur générale: {e}")
