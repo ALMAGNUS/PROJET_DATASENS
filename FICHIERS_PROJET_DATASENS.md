@@ -16,7 +16,6 @@
 | `docker-compose.yml` | Stack Docker (API, Prometheus, Grafana, etc.) | ✅ Oui |
 | `Dockerfile` | Image Docker | ✅ Oui |
 | `Dockerfile.windows` | Image Docker Windows | ✅ Oui |
-| `validation_report.json` | Rapport de validation (généré) | ⚠️ Généré |
 
 ---
 
@@ -273,8 +272,8 @@
 
 | Fichier | Raison |
 |---------|--------|
-| `fix_ruff_unicode.py` | Script one-shot correctif Unicode — exécuté une fois | ❌ Obsolète |
-| `_fix_unicode_prometheus.py` | Idem, correctif one-shot | ❌ Obsolète |
+| ~~fix_ruff_unicode.py~~ | Script one-shot correctif Unicode | ❌ Supprimé |
+| ~~_fix_unicode_prometheus.py~~ | Correctif one-shot Unicode Prometheus | ❌ Supprimé |
 | ~~src/api/~~ | Supprimé (doublon e2/api/) | ❌ Nettoyé |
 | ~~src/repository.py~~ | Supprimé (doublon e1/repository) | ❌ Nettoyé |
 | `RUFF.md` | Ruff retiré du CI — doc obsolète |

@@ -136,3 +136,6 @@ Veille Techno
 # Scraping error artifacts (HTML + screenshots générés par Botasaurus en cas d'échec)
 # ============================================================
 error_logs/
+
+# Rapport de validation régénéré par scripts/validate_e1_project.py
+validation_report.json
