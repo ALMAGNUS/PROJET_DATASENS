@@ -10,7 +10,7 @@ Demontrer C6, C7, C8 en 15 minutes avec des preuves concretes: veille, benchmark
 "E2 couvre l'accompagnement du choix IA et son integration operationnelle. Je montre la chaine complete: veille, benchmark, integration API, supervision."
 
 ### Preuve
-- Ouvrir `docs/Dossier_E2_A3_C6_C7_C8_FINAL_VERSION_PROPRE.md`.
+- Ouvrir `docs/Dossier_E2_A3_C6_C7_C8_FINAL.md`.
 
 ## 1:30 - 4:00 | C6 Veille outillee
 
