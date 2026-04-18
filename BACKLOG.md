@@ -7,74 +7,82 @@
 
 ## 1. API INSEE — migration OAuth2
 
-**Contexte.** L'endpoint OAuth historique renvoie `HTTP 404` :
+**Contexte.** L'endpoint OAuth historique `https://api.insee.fr/token` renvoie `HTTP 404` depuis 2026 :
 
 ```
 WARNING | e1.core:_insee_get_bearer_token | INSEE OAuth token: HTTP 404
-— url deprecated, visit https://portail-api.insee.fr/
+— endpoint deprecated. Definir INSEE_TOKEN_URL dans .env (voir portail-api.insee.fr).
 ```
 
-**État actuel.** Le fallback `_extract_insee_indicators` sur le site public récupère 35 indicateurs par run. La source reste donc alimentée (résilience OK), mais sans authentification ni quotas négociés.
+**État actuel.**
+- Code `src/e1/core.py::_insee_get_bearer_token` : endpoint OAuth rendu **configurable** via `INSEE_TOKEN_URL` (commit phase 14). Le defaut reste l'ancien endpoint pour retro-compatibilite ; il suffit de le surcharger dans `.env` des que le nouveau portail le publie.
+- `.env.example` : variable `INSEE_TOKEN_URL` documentee.
+- Le fallback `_extract_insee_indicators` sur le site public recupere 35 indicateurs par run (resilience OK), sans auth ni quotas negocies.
 
-**Action.**
-- Créer un compte sur `https://portail-api.insee.fr/`
-- Mettre à jour `_insee_get_bearer_token` avec le nouvel endpoint OAuth2
-- Ajouter les credentials au `.env` (variables déjà prévues : `INSEE_CLIENT_ID`, `INSEE_CLIENT_SECRET`)
-- Supprimer le fallback une fois la nouvelle API stabilisée
+**Action restante.**
+- Creer un compte sur `https://portail-api.insee.fr/`.
+- Noter l'URL exacte du token endpoint (documentation OAuth du portail).
+- Renseigner dans `.env` :
+  ```
+  INSEE_TOKEN_URL=https://portail-api.insee.fr/token   # a confirmer
+  INSEE_CONSUMER_KEY=...
+  INSEE_CONSUMER_SECRET=...
+  ```
+- Optionnel : supprimer le fallback une fois la nouvelle API stabilisee.
 
 **Priorité.** P2 — fonctionnel actuellement grâce au fallback.
 
-**Fichiers concernés.** `src/e1/core.py` (`_insee_get_bearer_token`, `_extract_insee_indicators`), `.env.example`.
+**Fichiers concernés.** `src/e1/core.py`, `.env.example`.
 
 ---
 
-## 2. Modèle `sentiment_fr-sentiment-finetuned` — tokenizer incomplet
+## 2. Modèle `sentiment_fr-sentiment-finetuned` — tokenizer « incomplet »
 
-**Contexte.** Le script de backup MongoDB signale l'absence du fichier `sentencepiece.bpe.model` pour le second modèle fine-tuné :
+**Statut : diagnostic clarifie, pas d'action requise.**
 
-```
--- ABSENT  sentencepiece.bpe.model  (modèle sentiment_fr-sentiment-finetuned)
-```
+**Contexte.** Le script `scripts/backup_parquet_to_mongo.py` signalait l'absence du fichier `sentencepiece.bpe.model` pour `sentiment_fr-sentiment-finetuned`, alors que `camembert-sentiment-finetuned` le contient (~0.77 MB).
 
-Le modèle `camembert-sentiment-finetuned` possède bien le sien (0.77 MB).
+**Diagnostic.** Ce fichier est **optionnel** et specifique aux tokenizers SentencePiece (CamemBERT, XLM-RoBERTa). Les modeles bases sur DistilBERT/BERT utilisent `vocab.txt` a la place. L'absence n'est donc pas une erreur fonctionnelle.
 
-**Impact potentiel.** Une tentative de chargement de ce modèle via `AutoTokenizer.from_pretrained(...)` peut échouer selon la classe de tokenizer demandée. Pas de problème pour le run quotidien car l'inférence s'appuie actuellement sur `camembert-sentiment-finetuned`.
+**Action effectuee (commit phase 13).** Le script de backup distingue desormais :
 
-**Action.**
-- Vérifier le répertoire du modèle (`models/sentiment_fr-sentiment-finetuned/`)
-- Ré-exporter le tokenizer complet depuis le notebook/training script :
-  ```python
-  tokenizer.save_pretrained("models/sentiment_fr-sentiment-finetuned/")
-  ```
-- Re-lancer le backup MongoDB pour confirmer la présence (STORED attendu)
+- `required_model_files` — `model.safetensors`, `config.json`, `tokenizer_config.json` (log `MISSING` si absent).
+- `optional_model_files` — `tokenizer.json`, `special_tokens_map.json`, `sentencepiece.bpe.model`, `spiece.model`, `vocab.txt`, `vocab.json`, `merges.txt` (log `OPTIONAL absent`).
 
-**Priorité.** P3 — cosmétique tant que ce modèle n'est pas utilisé en inférence.
+**Action restante (optionnelle).** Verifier que `tokenizer_config.json` + le fichier vocab approprie sont bien presents pour `sentiment_fr-sentiment-finetuned`. Si oui, le modele est utilisable tel quel via `AutoTokenizer.from_pretrained(...)`.
+
+**Priorité.** P3 — cosmetique, resolu cote outillage.
 
 ---
 
 ## 3. Confiance moyenne des topics — 0.12
 
-**Contexte.** Le dashboard affiche `Confiance moyenne: 0.12` sur 48 151 articles taggés. Distribution cohérente mais score bas.
+**Statut : documente.**
 
-**Explication.** Comportement attendu d'un classifier zero-shot multi-classes sur 20 topics (probabilité diluée mécaniquement). Ne traduit pas une erreur du modèle.
+**Contexte.** Le dashboard affiche `Confiance moyenne: 0.12` sur ~48 000 articles tagges.
 
-**Action (optionnelle).**
-- Documenter cette valeur dans le `README` ou dans la doc du pipeline comme « métrique structurelle liée au multi-label, non à la qualité du modèle »
-- Alternative : remplacer la moyenne brute par la moyenne du top-1 par article, plus représentative
-- Alternative : réduire la taxonomie à 8-10 topics majeurs, ce qui mécaniquement remonterait la confiance moyenne
+**Explication.** Valeur **structurellement basse** : moyenne des liaisons `document_topic` (jusqu'a 2 par article sur 20 topics), incluant systematiquement les seconds topics faibles et les assignations par defaut `autre` (0.3). Ne traduit pas une erreur du modele.
 
-**Priorité.** P3 — amélioration de lisibilité, pas de correction.
+**Action effectuee (commit phase 12).**
+- Section `2.4 Interpreter la « confiance moyenne »` ajoutee a `docs/Dossier_E1_topics_sentiments+scripts.md`.
+- Ligne d'explication inline ajoutee dans la sortie console de `src/dashboard.py` (pointe vers la doc).
 
-**Fichiers concernés.** `src/dashboard.py` (calcul de la moyenne), doc topics.
+**Action restante (optionnelle).** Complementer la moyenne brute par deux metriques plus parlantes :
+- Moyenne du `confidence_score` **top-1 par article** (seulement le meilleur topic).
+- Part des articles avec `topic_1 != "autre"` (couverture effective).
 
----
+**Priorité.** P3 — amelioration de lisibilite, pas de correction.
 
-## Améliorations transverses (déjà identifiées)
-
-- **`docker-compose.yml`** : retirer `restart: unless-stopped` du service `datasens-e1` ou le remplacer par `on-failure:3`, pour éviter toute boucle de restart en cas de crash répété (retour d'expérience du 2026-04-18).
-- **Nettoyage manuel** : voir `GUIDE_NETTOYAGE_MANUEL.md` (non versionné) pour la liste des fichiers candidats à suppression.
-- **Inventaire** : voir `INVENTAIRE_PROJET.md` (non versionné) pour l'état des lieux complet.
+**Fichiers concernés.** `src/dashboard.py`, `docs/Dossier_E1_topics_sentiments+scripts.md`.
 
 ---
 
-*Dernière mise à jour : 2026-04-18*
+## Améliorations transverses
+
+- **`docker-compose.yml`** — **traite (commit phase 11)**. Le service `datasens-e1` (one-shot) est passe a `restart: "no"` avec un commentaire explicatif. Les autres services (metrics, prometheus, API, mongodb, uptime-kuma, grafana) conservent `unless-stopped` (services permanents).
+- **Nettoyage manuel** : voir `GUIDE_NETTOYAGE_MANUEL.md` (non versionne) pour la liste des fichiers candidats a suppression.
+- **Inventaire** : voir `INVENTAIRE_PROJET.md` (non versionne) pour l'etat des lieux complet.
+
+---
+
+*Dernière mise à jour : 2026-04-18 (phases 11-14 traitees).*
