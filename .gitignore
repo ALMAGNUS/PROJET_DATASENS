@@ -131,3 +131,8 @@ Veille Techno
 !docs/e2/
 !docs/e2/ANNEXE_C6_VEILLE_*.json
 !docs/e2/ANNEXE_C6_VEILLE_*.md
+
+# ============================================================
+# Scraping error artifacts (HTML + screenshots générés par Botasaurus en cas d'échec)
+# ============================================================
+error_logs/
