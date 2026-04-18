@@ -207,8 +207,8 @@
 | `demo_proof_e1.py` | Preuve E1 | ⚠️ Démo |
 | `demo_collecte.py` | Démo collecte | ⚠️ Démo |
 | `verify_audit_trail.py` | Vérif audit trail | ✅ Oui |
-| `deploy*.ps1`, `deploy.sh` | Déploiement | ⚠️ Ops |
-| `check_docker*.ps1/sh` | Vérif Docker | ✅ Oui |
+| `deploy*.ps1` | Déploiement | ⚠️ Ops |
+| `check_docker.ps1` | Vérif Docker | ✅ Oui |
 
 ---
 

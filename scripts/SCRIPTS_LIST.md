@@ -184,11 +184,7 @@
 
 ---
 
-## 🐳 Docker (Scripts Shell)
-
-### `check_docker.sh` (Linux/Mac)
-**Description**: Vérifie l'installation Docker  
-**Usage**: `bash scripts/check_docker.sh`
+## 🐳 Docker
 
 ### `check_docker.ps1` (Windows)
 **Description**: Vérifie l'installation Docker  
@@ -207,8 +203,8 @@
 | **Export** | `export_gold.py`, `regenerate_exports.py` | 2 |
 | **Tests** | `test_pipeline.py`, `test_before_build.py`, `test_project.py`, `validate_json.py` | 4 |
 | **Planification** | `scheduler.py` | 1 |
-| **Docker** | `check_docker.sh`, `check_docker.ps1` | 2 |
-| **TOTAL** | | **19 scripts** |
+| **Docker** | `check_docker.ps1` | 1 |
+| **TOTAL** | | **18 scripts** |
 
 ---
 
