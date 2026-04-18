@@ -72,6 +72,7 @@ Le modèle `camembert-sentiment-finetuned` possède bien le sien (0.77 MB).
 ## Améliorations transverses (déjà identifiées)
 
 - **`docker-compose.yml`** : retirer `restart: unless-stopped` du service `datasens-e1` ou le remplacer par `on-failure:3`, pour éviter toute boucle de restart en cas de crash répété (retour d'expérience du 2026-04-18).
+- **`CONTRIBUTING.md` — arbre désynchronisé** : la section "Structure du projet" référence `E1_UNIFIED_MINIMAL.ipynb` à la racine alors qu'il vit désormais dans `notebooks/datasens_E1_v1/`, et parle du notebook comme "pipeline principal" alors que c'est `main.py` + `src/e1/` depuis la refacto. Priorité P3, documentation.
 - **Nettoyage manuel** : voir `GUIDE_NETTOYAGE_MANUEL.md` (non versionné) pour la liste des fichiers candidats à suppression.
 - **Inventaire** : voir `INVENTAIRE_PROJET.md` (non versionné) pour l'état des lieux complet.
 
