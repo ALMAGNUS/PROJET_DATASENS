@@ -202,6 +202,7 @@ class DataSensDashboard:
         console_write(f"   Articles taggés:        {self.stats['topics']['tagged']:,}")
         console_write(f"   Topics utilisés:       {self.stats['topics']['topics_used']}")
         console_write(f"   Confiance moyenne:     {self.stats['topics']['avg_confidence']:.2f}")
+        console_write("   (moyenne des liaisons document-topic, structurellement basse sur 20 topics ; cf. docs/Dossier_E1_topics_sentiments+scripts.md §2.4)")
         if self.stats["topics_dist"]:
             console_write("   Distribution (liaisons document-topic, max 2 par article):")
             links_total = sum(self.stats["topics_dist"].values())

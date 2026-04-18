@@ -46,6 +46,30 @@ Le **TopicTagger** associe à chaque article jusqu'à deux sujets principaux. Il
 raw_data_id | topic_id | confidence_score
 ```
 
+### 2.4 Interpréter la « confiance moyenne » affichée par le dashboard
+
+Le dashboard console remonte régulièrement une ligne du type :
+
+```
+Confiance moyenne:     0.12
+```
+
+Cette valeur est la moyenne de **toutes** les liaisons `document_topic` en base, soit jusqu'à deux liens par article sur une taxonomie de 20 topics. Elle est **structurellement basse** et ne traduit pas une erreur du classifier.
+
+Explications :
+
+- Le `confidence_score` par liaison est un ratio `nb_matches / nb_keywords`, borné à 1.0.
+- La moyenne inclut systématiquement le second topic (souvent faible) et les assignations « autre » (0.3 par convention) — deux sources de dilution mécanique.
+- Sur 20 topics et avec 2 topics par article, même un classifier parfait converge vers une moyenne ≈ 0.15 à 0.25.
+
+**Métriques complémentaires plus parlantes** :
+
+- Moyenne du **top-1 par article** (seulement la catégorie principale).
+- Part des articles avec `topic_1 != "autre"` (couverture effective).
+- Distribution des scores > 0.5 (confiance « forte »).
+
+Ces trois indicateurs, calculables via une simple requête SQL sur `document_topic`, sont pertinents pour la qualité du tagging ; la moyenne brute actuelle reste un indicateur **structurel**, pas un indicateur de qualité.
+
 ---
 
 ## 3. Sentiments — Classification par mots-clés
