@@ -21,12 +21,12 @@ Nous nous engageons à fournir un environnement accueillant et inclusif. Tous le
    ```
    **Bug**: SILVER zone contient 0 articles
    **Étapes**:
-   1. Lancé python quick_start.py
-   2. Vérification datasens_cleaned.db
+   1. Lancé python main.py --mode daily
+   2. Vérification data/datasens.db (table silver_data)
    **Résultat attendu**: ~3500 articles nettoyés
    **Résultat obtenu**: 0 articles
-   **Logs**: [Voir cleaning_audit table]
-   **Env**: Python 3.9, Windows 11
+   **Logs**: [Voir reports/db_state_*.md et logs/]
+   **Env**: Python 3.13, Windows 11
    ```
 
 ### 💡 Proposer une Fonctionnalité
@@ -35,10 +35,10 @@ Nous nous engageons à fournir un environnement accueillant et inclusif. Tous le
 2. **Décrire**: Cas d'usage, bénéfice, implémentation proposée
 3. **Exemple**:
    ```
-   **Titre**: Support Streaming Kafka pour Phase 05
+   **Titre**: Support Streaming Kafka pour E1
    **Cas d'usage**: Ingestion temps réel ~1M articles/jour
-   **Approche**: Ajouter kafka_consumer() dans quick_start.py
-   **Impact**: +50 lignes code max (keep minimaliste)
+   **Approche**: Ajouter un extractor Kafka dans src/e1/core.py
+   **Impact**: module dédié, respect SOLID (isolé du reste du pipeline)
    ```
 
 ### 🔧 Soumettre une Pull Request
@@ -53,29 +53,36 @@ git checkout -b feature/ma-feature
 #### 2. Faire les Changements
 
 **Standards de code**:
-- ✅ **Minimalisme**: Garder < 500 lignes total (E1)
-- ✅ **PEP 8**: Format Python standard
-- ✅ **Documentation**: Commenter code complexe
-- ✅ **Tests**: CRUD tests pour nouvelles features
-- ✅ **Logs**: Traçabilité complète (sync_log + audit)
+- ✅ **SOLID/DRY**: architecture modulaire (`src/e1/`, `src/e2/`, `src/e3/`, `src/spark/`, `src/ml/`)
+- ✅ **PEP 8 / Ruff**: format vérifié par `run_ruff.bat` (ou `ruff check .`)
+- ✅ **Documentation**: docstrings pour classes/fonctions publiques
+- ✅ **Tests**: tests unitaires (`pytest tests/`) pour nouvelles features
+- ✅ **Logs**: traçabilité via `loguru` (voir `src/logging_config.py`)
 
 **Exemples de contributions acceptées**:
-- ✅ Nouvelles sources (RSS, API) — +10 lignes
-- ✅ Amélioration qualité scoring — Optimisation existante
-- ✅ Nouveaux dashboards — Dans visualize_dashboard.py
-- ✅ Documentation (README, LOGGING) — Pas de limite code
+- ✅ Nouvelles sources de données (RSS, API, scraping) — dans `src/e1/core.py` + `sources_config.json`
+- ✅ Nouveaux endpoints API — dans `src/e2/api/routes/`
+- ✅ Nouveaux traitements Spark — dans `src/spark/processors/`
+- ✅ Améliorations du cockpit Streamlit — dans `src/streamlit/`
+- ✅ Documentation (README, annexes E1–E5) — toujours bienvenue
 
-**Exemples refusés** (hors scope):
-- ❌ Tensorflow/Keras (Phase 06 seulement)
-- ❌ Spark integrations (E2 seulement)
-- ❌ Microservices (E3 seulement)
+**Exemples refusés** (hors scope projet DataSens) :
+- ❌ Dépendances lourdes non justifiées (TensorFlow/Keras — HuggingFace suffit)
+- ❌ Code hors du périmètre des 5 compétences E1–E5 sans discussion préalable
 
 #### 3. Tester Localement
 ```powershell
-python quick_start.py
-# Vérifier: datasens.db + datasens_cleaned.db existent
-# Vérifier: rapport_complet_e1.html généré
-# Vérifier: sync_log et cleaning_audit remplis
+# Pipeline E1 complet (scraping + enrichissement + export)
+python main.py --mode daily
+
+# Vérifier la cohérence (doit être OK)
+python scripts/db_state_report.py
+
+# Lancer les tests unitaires
+.venv\Scripts\python.exe -m pytest tests/ -v
+
+# Vérifier le lint (Ruff)
+.\run_ruff.bat
 ```
 
 #### 4. Commit avec Message Clair
@@ -118,9 +125,11 @@ Brève description de la PR
 
 ## Exemple d'Exécution
 ```
-python quick_start.py
+python main.py --mode daily
 RAW: 5240 articles
 SILVER: 4150 articles (quality ≥ 0.5)
+GOLD: 4150 articles enrichis (sentiment + topics)
+Coherence: OK
 ```
 ```
 
@@ -130,20 +139,41 @@ SILVER: 4150 articles (quality ≥ 0.5)
 
 ```
 PROJET_DATASENS/
-├── E1_UNIFIED_MINIMAL.ipynb      # Pipeline principal
-├── quick_start.py                 # Orchestrateur
-├── visualize_dashboard.py          # Dashboards
-├── datasens.db                     # SQLite RAW
-├── datasens_cleaned.db             # SQLite SILVER
-├── data/
-│   ├── raw/                        # Articles bruts (source/date/)
-│   └── gold/                       # Parquet (Phase 05)
-├── visualizations/                 # PNG + HTML outputs
+├── main.py                         # Point d'entrée du pipeline E1
+├── sources_config.json             # Configuration des sources
+├── requirements.txt                # Dépendances Python
+├── pyproject.toml                  # Config Ruff
+├── docker-compose.yml              # Services conteneurisés
+├── Dockerfile                      # Image E1
+├── src/
+│   ├── e1/                         # C1-C5 : extraction, aggregation, export
+│   ├── e2/api/                     # C6-C10 : API REST FastAPI (auth + RAW/SILVER/GOLD)
+│   ├── e3/mistral/                 # C11-C15 : orchestration IA
+│   ├── spark/                      # Traitements Spark (GOLD + enrichissements)
+│   ├── ml/inference/               # Modèles HuggingFace (sentiment, topics)
+│   ├── streamlit/                  # Cockpit dashboard
+│   ├── storage/                    # MongoDB GridFS (backup modèles)
+│   ├── monitoring/                 # Intégration Prometheus
+│   ├── observability/              # Lineage service
+│   ├── data_contracts/             # Schemas + guards
+│   └── config.py, dashboard.py, metrics.py, logging_config.py
+├── data/                           # Données (ignorées par Git)
+│   ├── datasens.db                 # SQLite principal (RAW + SILVER)
+│   ├── raw/silver/gold/            # Zones Parquet
+│   └── lake/                       # Data lake consolidé
+├── tests/                          # Tests unitaires (pytest)
+├── notebooks/                      # Notebooks pédagogiques E1 + référence
+├── scripts/                        # Scripts utilitaires (manage_parquet, db_state_report, …)
+├── docs/                           # Documentation complète (E1 → E5 + annexes + _archive)
+├── reports/                        # Rapports quotidiens db_state_*.{md,json}
+├── monitoring/                     # Prometheus + Grafana (provisioning)
+├── models/                         # Modèles fine-tunés (ignorés par Git)
 ├── README.md                       # Documentation principale
 ├── CHANGELOG.md                    # Historique versions
 ├── CONTRIBUTING.md                 # Ce fichier
 ├── LICENSE.md                      # MIT License
-└── LOGGING.md                      # Documentation logs
+├── LOGGING.md                      # Documentation logs
+└── BACKLOG.md                      # Dette technique identifiée
 ```
 
 ---
@@ -287,15 +317,15 @@ print("Sync done")
 ## Processus de Review
 
 1. **Automated Checks**:
-   - ✅ Code format (PEP 8)
-   - ✅ Tests CRUD passent
-   - ✅ Line count < 500 (E1)
+   - ✅ Format du code (Ruff / PEP 8)
+   - ✅ Tests unitaires `pytest tests/` passent
+   - ✅ Rapport `db_state_report.py` → `coherence: OK`
 
 2. **Code Review** (par maintainers):
-   - Est-ce que ça suit la vision minimaliste ?
-   - Documentation complète ?
-   - Logs appropriés ?
-   - Impacts sur autres composants ?
+   - Respect des principes SOLID/DRY ?
+   - Documentation (docstrings + mise à jour docs/ si nécessaire) ?
+   - Logs appropriés via `loguru` ?
+   - Impacts sur autres composants (E1-E5) ?
 
 3. **Merge**:
    - Approuvé: Merge et release versioning
@@ -313,5 +343,5 @@ print("Sync done")
 
 **Merci de contribuer à DataSens!** 🙌
 
-**Dernière mise à jour**: 15 décembre 2025  
+**Dernière mise à jour**: 18 avril 2026  
 **Mainteneurs**: DataSens Team
