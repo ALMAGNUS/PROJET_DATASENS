@@ -10,7 +10,7 @@ Plan de migration M6 :
                    enrich_profile, build_enrichment_table
   Phase 3 (fait) : load_benchmark_results, sentiment_benchmark_diagnosis,
                    go_no_go_snapshot, scan_trained_models
-  Phase 4 : découper app.py en sous-modules src/streamlit/pages/*.py
+  Phase 4 : découper app.py en sous-modules src/streamlit/page_modules/*.py
 """
 
 from __future__ import annotations
@@ -130,10 +130,14 @@ def stage_time_range(stage_path: Path, stage_key: str) -> tuple[str, str]:
 
 
 def chrono_data(root: Path) -> pd.DataFrame:
-    """Construit un DataFrame date -> stage -> nb fichiers, taille pour les graphes."""
+    """Construit un DataFrame date -> stage -> nb fichiers, taille pour les graphes.
+
+    Accepte les deux conventions de nommage rencontrées dans le projet :
+    `date=YYYY-MM-DD` (format Hive standard) et `v_YYYY-MM-DD` (schéma legacy).
+    """
     rows: list[dict] = []
-    date_re = re.compile(r"^date=(\d{4}-\d{2}-\d{2})$")
-    silver_re = re.compile(r"^v_(\d{4}-\d{2}-\d{2})$")
+    # Tolère date=YYYY-MM-DD ET v_YYYY-MM-DD.
+    date_re = re.compile(r"^(?:date=|v_)(\d{4}-\d{2}-\d{2})$")
 
     def _scan_stage_dir(stage_dir: Path, stage_name: str, pattern: re.Pattern) -> None:
         if not stage_dir.exists():
@@ -150,7 +154,7 @@ def chrono_data(root: Path) -> pd.DataFrame:
             rows.append({"date": dt, "stage": stage_name, "count": len(files), "size": size})
 
     _scan_stage_dir(root / "data" / "gold", "GOLD", date_re)
-    _scan_stage_dir(root / "data" / "silver", "SILVER", silver_re)
+    _scan_stage_dir(root / "data" / "silver", "SILVER", date_re)
     _scan_stage_dir(root / "data" / "goldai", "GoldAI", date_re)
 
     if not rows:
@@ -230,8 +234,23 @@ def ia_metrics_from_parquet(root: Path) -> dict | None:
         else:
             out["label_source_breakdown"] = {"lexical": total, "ml_model": 0, "total": total}
     if "topic_1" in df.columns:
-        top = df["topic_1"].value_counts().head(15)
-        out["topic_distribution"] = top.to_dict()
+        # Normalise la casse et les espaces pour éviter que "Météo" et "météo"
+        # apparaissent séparément. Conserve la forme lowercase comme clé canonique.
+        topic_series = (
+            df["topic_1"]
+            .astype("string")
+            .str.strip()
+            .str.lower()
+            .replace({"": pd.NA, "nan": pd.NA, "none": pd.NA, "<na>": pd.NA})
+            .dropna()
+        )
+        if len(topic_series) > 0:
+            full = topic_series.value_counts()
+            out["topic_distribution_full"] = full.to_dict()
+            out["topic_distribution"] = full.head(15).to_dict()
+            out["topic_distinct_count"] = int(full.size)
+            out["topic_total_rows"] = int(full.sum())
+            out["topic_other_rows"] = int(full.get("autre", 0))
     if "sentiment_score" in df.columns:
         out["sentiment_score_mean"] = float(df["sentiment_score"].mean())
         out["sentiment_score_std"] = float(df["sentiment_score"].std())

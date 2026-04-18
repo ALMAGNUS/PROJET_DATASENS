@@ -199,15 +199,10 @@ class DataAggregator:
         )
         df = df.drop(columns=[c for c in df.columns if "raw_data_id" in c], errors="ignore")
 
-        # GARANTIR topic_2 : Si topic_2 est vide mais topic_1 existe, assigner "autre" comme topic_2
-        mask_topic2_empty = df["topic_2"].isna() | (df["topic_2"] == "")
-        mask_topic1_exists = df["topic_1"].notna() & (df["topic_1"] != "")
-        mask_fill_topic2 = mask_topic2_empty & mask_topic1_exists
-
-        df.loc[mask_fill_topic2, "topic_2"] = "autre"
-        df.loc[mask_fill_topic2, "topic_2_score"] = 0.1  # Confiance faible pour fallback
-
-        # Fillna pour les cas où topic_1 est aussi vide
+        # topic_2 reste vide si le tagger v2 n'a pas trouvé de second topic
+        # suffisamment pertinent (seuil de confiance en amont). On ne force
+        # plus "autre" artificiellement en seconde position : mieux vaut un
+        # topic_2 absent qu'un faux signal.
         df[["topic_1", "topic_2"]] = df[["topic_1", "topic_2"]].fillna("")
         df[["topic_1_score", "topic_2_score"]] = df[["topic_1_score", "topic_2_score"]].fillna(0.0)
         return df
