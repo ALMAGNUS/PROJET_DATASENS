@@ -15,13 +15,11 @@ import pandas as pd
 import requests
 import streamlit as st
 
-from src.observability.lineage_service import LineageService
 from src.streamlit._cockpit_helpers import (
     PageContext,
     activate_model as _activate_model,
     csv_row_count_cached as _csv_row_count_cached,
     get_active_model as _get_active_model,
-    ia_history as _ia_history,
     inject_css as _inject_css,
     inject_demo_css as _inject_demo_css,
     inject_readability_css as _inject_readability_css,
@@ -155,49 +153,6 @@ def render(ctx: PageContext) -> None:
         checks = gate.get("checks", [])
         for label, ok in checks:
             st.markdown(f"- {'✅' if ok else '❌'} {label}")
-
-    # ── Section 0 : Évolution des datasets ─────────────────────────────────────
-    st.divider()
-    st.subheader("0. Évolution du volume de données")
-    st.caption(
-        "Plus vous collectez, plus le modèle s'améliore. "
-        "Cette courbe montre la croissance cumulative des articles labellisés dans GoldAI."
-    )
-
-    df_hist = _ia_history(PROJECT_ROOT)
-    if not df_hist.empty:
-        col_h1, col_h2, col_h3 = st.columns(3)
-        ia_dir_path = PROJECT_ROOT / "data" / "goldai" / "ia"
-        n_train = len(pd.read_parquet(ia_dir_path / "train.parquet")) if (ia_dir_path / "train.parquet").exists() else 0
-        n_val = len(pd.read_parquet(ia_dir_path / "val.parquet")) if (ia_dir_path / "val.parquet").exists() else 0
-        n_test = len(pd.read_parquet(ia_dir_path / "test.parquet")) if (ia_dir_path / "test.parquet").exists() else 0
-        col_h1.metric("Train", f"{n_train:,}")
-        col_h2.metric("Validation", f"{n_val:,}")
-        col_h3.metric("Test", f"{n_test:,}")
-        st.line_chart(df_hist.set_index("date")["lignes_cumulées"], use_container_width=True)
-        st.caption("Données collectées par date → plus de données = meilleur fine-tuning.")
-    else:
-        st.info("Aucun historique disponible. Lancez le pipeline et la fusion GoldAI.")
-
-    # Évolution des runs d'entraînement (si plusieurs modèles fine-tunés)
-    trained_models_hist = _scan_trained_models(PROJECT_ROOT)
-    if len(trained_models_hist) >= 1:
-        st.caption("**Historique des runs de fine-tuning**")
-        run_rows = []
-        for m in trained_models_hist:
-            if m.get("eval_accuracy"):
-                run_rows.append({
-                    "Run": m["name"],
-                    "Date": m.get("trained_at", "—"),
-                    "Accuracy": round(m["eval_accuracy"], 4),
-                    "F1": round(m.get("eval_f1") or 0, 4),
-                    "Epochs": m.get("epochs", "—"),
-                })
-        if run_rows:
-            df_runs = pd.DataFrame(run_rows)
-            st.dataframe(df_runs, use_container_width=True, hide_index=True)
-            if len(run_rows) > 1:
-                st.line_chart(df_runs.set_index("Run")[["Accuracy", "F1"]], use_container_width=True)
 
     # ── Section 1 : Benchmark ───────────────────────────────────────────────────
     st.divider()
@@ -379,6 +334,26 @@ def render(ctx: PageContext) -> None:
             "Allez dans **Pilotage** → choisissez un backbone → **Lancer le fine-tuning**."
         )
 
+    # Historique des runs (utile si plusieurs entraînements successifs)
+    trained_models_hist = _scan_trained_models(PROJECT_ROOT)
+    if len(trained_models_hist) >= 1:
+        st.caption("**Historique des runs de fine-tuning**")
+        run_rows = []
+        for m in trained_models_hist:
+            if m.get("eval_accuracy"):
+                run_rows.append({
+                    "Run": m["name"],
+                    "Date": m.get("trained_at", "—"),
+                    "Accuracy": round(m["eval_accuracy"], 4),
+                    "F1": round(m.get("eval_f1") or 0, 4),
+                    "Epochs": m.get("epochs", "—"),
+                })
+        if run_rows:
+            df_runs = pd.DataFrame(run_rows)
+            st.dataframe(df_runs, use_container_width=True, hide_index=True)
+            if len(run_rows) > 1:
+                st.line_chart(df_runs.set_index("Run")[["Accuracy", "F1"]], use_container_width=True)
+
     # ── Section 3 : Sélection & Activation ─────────────────────────────────────
     st.divider()
     st.subheader("3. Sélection & Activation pour la production")
@@ -452,39 +427,3 @@ def render(ctx: PageContext) -> None:
                 if ok:
                     st.success(f"Meilleur modèle activé : `{best['name']}` ({best['eval_accuracy']:.1%})")
                     st.rerun()
-
-    # ── Section 4 : Dataset IA prêt pour Mistral ───────────────────────────────
-    st.divider()
-    st.subheader("4. Dataset IA — Prêt pour Mistral")
-    st.caption(
-        "Ce dataset (labellisé sentiment + topics) est ce que vous vendez à vos clients : "
-        "il alimente l'assistant Mistral pour les analyses politique / économie."
-    )
-
-    ia_dir = PROJECT_ROOT / "data" / "goldai" / "ia"
-    splits_info = []
-    for split in ["train", "val", "test"]:
-        p = ia_dir / f"{split}.parquet"
-        if p.exists():
-            try:
-                n = len(pd.read_parquet(p))
-                splits_info.append({"Split": split, "Lignes": n, "Chemin": str(p.relative_to(PROJECT_ROOT))})
-            except Exception:
-                splits_info.append({"Split": split, "Lignes": "?", "Chemin": str(p.relative_to(PROJECT_ROOT))})
-
-    if splits_info:
-        df_splits = pd.DataFrame(splits_info)
-        total = sum(r["Lignes"] for r in splits_info if isinstance(r["Lignes"], int))
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Total exemples étiquetés", f"{total:,}")
-        c2.metric("Modèle actif (inférence)", active_model.split("/")[-1] if active_model else "sentiment_fr")
-        c3.metric("Splits disponibles", len(splits_info))
-        st.dataframe(df_splits, use_container_width=True, hide_index=True)
-        st.caption(
-            "Pour Mistral : le dataset `data/goldai/ia/` contient `sentiment` (positif/négatif/neutre) "
-            "+ `topic_1/topic_2` pour chaque article. L'assistant peut s'en servir pour les insights clients."
-        )
-    else:
-        st.info(
-            "Dataset IA absent. Lancez : **Pilotage** → Copie IA → Fine-tuning → revenir ici."
-        )
