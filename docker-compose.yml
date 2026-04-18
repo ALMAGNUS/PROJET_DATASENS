@@ -38,7 +38,11 @@ services:
       - datasens-network
     # Run unique du pipeline E1 (extract RSS/API/scraping → DB → exports)
     command: ["python", "main.py"]
-    restart: unless-stopped
+    # ⚠️ Pipeline one-shot : NE PAS mettre unless-stopped.
+    # Lancer via `docker-compose run --rm datasens-e1`, ou `docker-compose up datasens-e1` sans auto-restart.
+    # Retour d'expérience 2026-04-18 : unless-stopped + image obsolète = boucle de restart
+    # qui a reintroduit exports/gold.csv et cassé la cohérence (voir BACKLOG.md).
+    restart: "no"
     healthcheck:
       test: ["CMD", "python", "-c", "from src.e1.pipeline import E1Pipeline; import sqlite3; import os; db_path = os.getenv('DB_PATH', '/app/data/datasens.db'); conn = sqlite3.connect(db_path); conn.close(); print('✅ Health check OK')"]
       interval: 30s
