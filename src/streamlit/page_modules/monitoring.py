@@ -436,49 +436,52 @@ def render(ctx: PageContext) -> None:
             f"API metrics : {api_base}/metrics · Prometheus : {prometheus_url} · Grafana : {grafana_url}"
         )
 
-    st.divider()
-    st.subheader("Observabilite cockpit (session)")
-    snap = get_telemetry_snapshot()
-    c_age, c_runs, c_err, c_avg = st.columns(4)
-    age = snap["session_age_s"]
-    h, rem = divmod(age, 3600)
-    m, s = divmod(rem, 60)
-    c_age.metric("Session", f"{h:02d}:{m:02d}:{s:02d}")
-    c_runs.metric(
-        "Commandes lancees",
-        f"{snap['total_runs']:,}",
-        delta=f"ok={snap['success_runs']} / ko={snap['failure_runs']}",
-    )
-    c_err.metric("Erreurs cockpit", f"{snap['errors']:,}")
-    c_avg.metric("Duree moyenne", f"{snap['avg_run_duration_s']:.2f} s")
+    with st.expander("Détail technique — activité de session (télémétrie)", expanded=False):
+        st.caption(
+            "Comptage interne des clics et des commandes lancées depuis ce navigateur. "
+            "Réservé au débogage ; la lecture métier se fait dans **Vue d'ensemble** et **Pipeline**."
+        )
+        snap = get_telemetry_snapshot()
+        c_age, c_runs, c_err, c_avg = st.columns(4)
+        age = snap["session_age_s"]
+        h, rem = divmod(age, 3600)
+        m, s = divmod(rem, 60)
+        c_age.metric("Session", f"{h:02d}:{m:02d}:{s:02d}")
+        c_runs.metric(
+            "Commandes lancées",
+            f"{snap['total_runs']:,}",
+            delta=f"ok={snap['success_runs']} / ko={snap['failure_runs']}",
+        )
+        c_err.metric("Erreurs cockpit", f"{snap['errors']:,}")
+        c_avg.metric("Durée moyenne", f"{snap['avg_run_duration_s']:.2f} s")
 
-    col_clicks, col_runs = st.columns(2)
-    with col_clicks:
-        st.markdown("**Clics par action**")
-        clicks = snap.get("clicks") or {}
-        if clicks:
-            df_clicks = (
-                pd.DataFrame(
-                    [{"action": k, "clics": v} for k, v in clicks.items()]
+        col_clicks, col_runs = st.columns(2)
+        with col_clicks:
+            st.markdown("**Clics par action**")
+            clicks = snap.get("clicks") or {}
+            if clicks:
+                df_clicks = (
+                    pd.DataFrame(
+                        [{"action": k, "clics": v} for k, v in clicks.items()]
+                    )
+                    .sort_values("clics", ascending=False)
+                    .reset_index(drop=True)
                 )
-                .sort_values("clics", ascending=False)
-                .reset_index(drop=True)
-            )
-            st.dataframe(df_clicks, use_container_width=True, hide_index=True)
-        else:
-            st.caption("Aucun clic d'action enregistre dans cette session.")
-    with col_runs:
-        st.markdown("**Derniers runs**")
-        runs = snap.get("recent_runs") or []
-        if runs:
-            df_runs = pd.DataFrame(runs)
-            df_runs["status"] = df_runs["ok"].map({True: "OK", False: "KO"})
-            df_runs = df_runs[["label", "duration_s", "status"]]
-            st.dataframe(df_runs, use_container_width=True, hide_index=True)
-        else:
-            st.caption("Aucun run declenche dans cette session.")
+                st.dataframe(df_clicks, use_container_width=True, hide_index=True)
+            else:
+                st.caption("Aucun clic d'action enregistré dans cette session.")
+        with col_runs:
+            st.markdown("**Derniers runs**")
+            runs = snap.get("recent_runs") or []
+            if runs:
+                df_runs = pd.DataFrame(runs)
+                df_runs["status"] = df_runs["ok"].map({True: "OK", False: "KO"})
+                df_runs = df_runs[["label", "duration_s", "status"]]
+                st.dataframe(df_runs, use_container_width=True, hide_index=True)
+            else:
+                st.caption("Aucun run déclenché dans cette session.")
 
-    if st.button("Reinitialiser la telemetrie cockpit", key="reset_telemetry"):
-        reset_telemetry()
-        st.success("Telemetrie reinitialisee.")
-        st.rerun()
+        if st.button("Réinitialiser la télémétrie cockpit", key="reset_telemetry"):
+            reset_telemetry()
+            st.success("Télémétrie réinitialisée.")
+            st.rerun()

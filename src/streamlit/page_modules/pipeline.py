@@ -41,7 +41,10 @@ from src.streamlit.auth_plug import (
     render_login_form,
     render_user_and_logout,
 )
-from src.streamlit.pipeline_proof import render_last_run_proof_full
+from src.streamlit.pipeline_proof import (
+    render_article_journey,
+    render_last_run_proof_full,
+)
 from src.streamlit.metrics import (
     build_enrichment_table as _build_enrichment_table,
     chrono_data as _chrono_data,
@@ -79,7 +82,12 @@ def render(ctx: PageContext) -> None:
     merged_path = goldai_dir / "merged_all_dates.parquet"
     meta_path = goldai_dir / "metadata.json"
 
-    # Preuve d'enrichissement du dernier run (audit / traçabilité pipeline).
+    # The cockpit show : suivi visuel d'un article à travers les 4 étapes.
+    # Posé en haut car c'est la preuve la plus parlante de l'enrichissement.
+    render_article_journey(ctx)
+    st.divider()
+
+    # Preuve chiffrée du dernier run (deltas par étape + lignes réelles).
     render_last_run_proof_full(ctx)
     st.divider()
 
@@ -151,65 +159,6 @@ def render(ctx: PageContext) -> None:
         df_goldai = _read_parquet_cached(str(merged_path), cols_goldai)
     n_gold = _parquet_row_count_cached(str(gold_file)) if (gold_file and gold_file.exists()) else 0
     n_goldai = _parquet_row_count_cached(str(merged_path)) if merged_path.exists() else 0
-
-    # Bloc de vérité métier: un seul périmètre (partition GOLD sélectionnée -> fusion GoldAI -> fichiers IA)
-    st.markdown("#### Périmètre métier du jour (partition unique)")
-    st.caption(
-        "Lecture unique: `GOLD(date sélectionnée)` -> fusion dans `GoldAI` -> génération des fichiers IA. "
-        "Ne pas mélanger ici avec les compteurs globaux `raw_data`."
-    )
-    ia_train = goldai_dir / "ia" / "train.parquet"
-    ia_val = goldai_dir / "ia" / "val.parquet"
-    ia_test = goldai_dir / "ia" / "test.parquet"
-    ia_annot = goldai_dir / "ia" / "merged_all_dates_annotated.parquet"
-    ia_labelled = goldai_dir / "ia" / "gold_ia_labelled.parquet"
-    app_input = goldai_dir / "app" / "gold_app_input.parquet"
-    pred_files = (
-        sorted((goldai_dir / "predictions").glob("date=*/run=*/predictions.parquet"), key=lambda p: p.stat().st_mtime, reverse=True)
-        if (goldai_dir / "predictions").exists()
-        else []
-    )
-    pred_latest = pred_files[0] if pred_files else None
-    n_ia_train = _parquet_row_count_cached(str(ia_train)) if ia_train.exists() else 0
-    n_ia_val = _parquet_row_count_cached(str(ia_val)) if ia_val.exists() else 0
-    n_ia_test = _parquet_row_count_cached(str(ia_test)) if ia_test.exists() else 0
-    n_ia_annot = _parquet_row_count_cached(str(ia_annot)) if ia_annot.exists() else 0
-    n_ia_labelled = _parquet_row_count_cached(str(ia_labelled)) if ia_labelled.exists() else 0
-    n_app_input = _parquet_row_count_cached(str(app_input)) if app_input.exists() else 0
-    n_pred_latest = _parquet_row_count_cached(str(pred_latest)) if pred_latest and pred_latest.exists() else 0
-
-    clarity_rows = [
-        {"Étape": "1) GOLD SQLite du jour", "Objet": f"data/gold/date={selected_date}/articles.parquet", "Lignes": n_gold},
-        {"Étape": "2) GoldAI fusion long terme", "Objet": "data/goldai/merged_all_dates.parquet", "Lignes": n_goldai},
-        {"Étape": "3) GOLD_APP_INPUT (inférence, sans label)", "Objet": "data/goldai/app/gold_app_input.parquet", "Lignes": n_app_input},
-        {"Étape": "4) GOLD_IA_LABELLED (entraînement)", "Objet": "data/goldai/ia/gold_ia_labelled.parquet", "Lignes": n_ia_labelled},
-        {"Étape": "5) IA annoté (compat historique)", "Objet": "data/goldai/ia/merged_all_dates_annotated.parquet", "Lignes": n_ia_annot},
-        {"Étape": "6) IA split train", "Objet": "data/goldai/ia/train.parquet", "Lignes": n_ia_train},
-        {"Étape": "7) IA split val", "Objet": "data/goldai/ia/val.parquet", "Lignes": n_ia_val},
-        {"Étape": "8) IA split test", "Objet": "data/goldai/ia/test.parquet", "Lignes": n_ia_test},
-        {
-            "Étape": "9) GOLD_APP_PREDICTIONS (dernier run)",
-            "Objet": (
-                str(pred_latest.relative_to(PROJECT_ROOT)).replace("\\", "/")
-                if pred_latest is not None
-                else "data/goldai/predictions/date=*/run=*/predictions.parquet"
-            ),
-            "Lignes": n_pred_latest,
-        },
-    ]
-    st.dataframe(pd.DataFrame(clarity_rows), use_container_width=True, hide_index=True)
-    st.code(
-        "\n".join(
-            [
-                f"Partition GOLD du jour: {n_gold:,} lignes",
-                f"GoldAI courant: {n_goldai:,} lignes (stock long terme, dédupliqué)",
-                f"Branche inférence: app_input={n_app_input:,} -> predictions(last)={n_pred_latest:,}",
-                f"Branche entraînement: ia_labelled={n_ia_labelled:,} -> split={n_ia_train + n_ia_val + n_ia_test:,}",
-                f"IA split total: {n_ia_train + n_ia_val + n_ia_test:,} = {n_ia_train:,} + {n_ia_val:,} + {n_ia_test:,}",
-            ]
-        ),
-        language="text",
-    )
 
     def _stable_keys_local(df: pd.DataFrame) -> pd.Series:
         if "id" in df.columns:
@@ -381,176 +330,10 @@ def render(ctx: PageContext) -> None:
         st.info("—")
 
     st.divider()
-    st.markdown("### Datasets par étape")
-    st.caption("RAW → SILVER → GOLD → GoldAI → Copie IA")
-
-    def _load_df_sample(path: Path, max_rows: int = 100) -> pd.DataFrame | None:
-        """Charge un DataFrame à partir d'un CSV ou Parquet, limité à max_rows."""
-        if not path.exists():
-            return None
-        try:
-            if path.suffix.lower() == ".parquet":
-                return pd.read_parquet(path).head(max_rows)
-            if path.suffix.lower() == ".csv":
-                return pd.read_csv(path, nrows=max_rows, encoding="utf-8", on_bad_lines="skip")
-            return None
-        except Exception:
-            return None
-
-    def _load_df_full(path: Path) -> pd.DataFrame | None:
-        """Charge un DataFrame complet (pour count uniquement)."""
-        if not path.exists():
-            return None
-        try:
-            if path.suffix.lower() == ".parquet":
-                return pd.read_parquet(path)
-            if path.suffix.lower() == ".csv":
-                return pd.read_csv(path, encoding="utf-8", on_bad_lines="skip")
-            return None
-        except Exception:
-            return None
-
-    def _render_stage_block(
-        title: str,
-        desc: str,
-        paths: list[Path],
-        primary_idx: int = 0,
-        exclude_zzdb: bool = False,
-    ) -> None:
-        """Affiche un bloc pour une étape."""
-        primary = (
-            paths[primary_idx] if primary_idx < len(paths) else (paths[0] if paths else None)
-        )
-        if not primary or not primary.exists():
-            with st.expander(f"**{title}** – données absentes", expanded=True):
-                st.caption(desc)
-                st.info("Aucun fichier trouvé.")
-                return
-        df_full = _load_df_full(primary)
-        if df_full is None:
-            with st.expander(f"**{title}** – erreur lecture", expanded=True):
-                st.caption(desc)
-                st.error(f"Impossible de lire {primary.name}")
-                return
-        if exclude_zzdb and "source" in df_full.columns:
-            mask = ~df_full["source"].astype(str).str.lower().str.contains("zzdb", na=False)
-            df_full = df_full[mask]
-        n_rows = len(df_full)
-        cols = list(df_full.columns)
-        if n_rows == 0 and exclude_zzdb:
-            with st.expander(f"**{title}**", expanded=True):
-                st.caption(desc)
-                st.info("Aucune donnée hors sources synthétiques dans les exports.")
-            return
-        df_preview = df_full.head(50)
-        with st.expander(f"**{title}** · {n_rows:,} lignes · {len(cols)} col.", expanded=True):
-            st.caption(desc)
-            st.caption(f"`{primary.relative_to(PROJECT_ROOT)}`")
-            st.dataframe(df_preview, use_container_width=True, height=320)
-
-    exports_dir = PROJECT_ROOT / "exports"
-    raw_dir = PROJECT_ROOT / "data" / "raw"
-    silver_dir = PROJECT_ROOT / "data" / "silver"
-    gold_dir = PROJECT_ROOT / "data" / "gold"
-    goldai_dir = PROJECT_ROOT / "data" / "goldai"
-    ia_dir = goldai_dir / "ia"
-
-    # Déterminer les fichiers sources par étape
-    raw_paths = []
-    if (exports_dir / "raw.csv").exists():
-        raw_paths.append(exports_dir / "raw.csv")
-    for d in sorted(raw_dir.iterdir(), reverse=True):
-        if d.is_dir() and "sources" in d.name:
-            for f in [d / "raw_articles.csv", d / "raw_articles.json"]:
-                if f.exists() and f.suffix == ".csv":
-                    raw_paths.append(f)
-                    break
-            if raw_paths:
-                break
-
-    silver_paths = []
-    if (exports_dir / "silver.csv").exists():
-        silver_paths.append(exports_dir / "silver.csv")
-    for d in sorted(silver_dir.iterdir(), reverse=True):
-        if d.is_dir():
-            for f in d.rglob("*.parquet"):
-                silver_paths.append(f)
-                break
-        if silver_paths:
-            break
-
-    gold_paths = []
-    if (exports_dir / "gold.parquet").exists():
-        gold_paths.append(exports_dir / "gold.parquet")
-    if (exports_dir / "gold.csv").exists():
-        gold_paths.append(exports_dir / "gold.csv")
-    for d in sorted(gold_dir.iterdir(), reverse=True):
-        if d.is_dir() and d.name.startswith("date="):
-            p = d / "articles.parquet"
-            if p.exists():
-                gold_paths.append(p)
-                break
-
-    _render_stage_block(
-        "1. RAW",
-        "Sources brutes (RSS, agrégateurs).",
-        raw_paths or [exports_dir / "raw.csv"],
-        exclude_zzdb=True,
+    st.caption(
+        "Pour inspecter les données brutes de chaque étape (RAW, SILVER, GOLD, GoldAI, "
+        "Copie IA), utilise l'onglet **Flux & visualisation**."
     )
-    _render_stage_block(
-        "2. SILVER",
-        "Nettoyage, fusion, topics.",
-        silver_paths or [exports_dir / "silver.csv"],
-        exclude_zzdb=True,
-    )
-    _render_stage_block(
-        "3. GOLD",
-        "Parquet quotidien, sentiment IA.",
-        gold_paths or [goldai_dir / "merged_all_dates.parquet"],
-    )
-    _render_stage_block(
-        "4. GoldAI",
-        "Fusion long terme des GOLD.",
-        [goldai_dir / "merged_all_dates.parquet"],
-    )
-    # Copie IA : merged_all_dates_annotated ou train comme fallback
-    ia_paths = [
-        ia_dir / "merged_all_dates_annotated.parquet",
-        ia_dir / "train.parquet",
-        ia_dir / "val.parquet",
-        ia_dir / "test.parquet",
-    ]
-    ia_existing = [p for p in ia_paths if p.exists()]
-    ia_primary = (
-        ia_existing[0] if ia_existing else ia_dir / "merged_all_dates_annotated.parquet"
-    )
-    if not ia_primary.exists():
-        with st.expander("**5. Copie IA** – données absentes", expanded=True):
-            st.caption("Split train/val/test pour l'entraînement.")
-            st.info("Pilotage → bouton « Créer copie IA (split) »")
-    else:
-        _render_stage_block(
-            "5. Copie IA",
-            "Split train/val/test.",
-            ia_existing,
-        )
-
-    for idx, (name, path) in enumerate(
-        [
-            ("train", ia_dir / "train.parquet"),
-            ("val", ia_dir / "val.parquet"),
-            ("test", ia_dir / "test.parquet"),
-        ]
-    ):
-        if path.exists():
-            substep = chr(ord("a") + idx)
-            with st.expander(f"5{substep}. {name}", expanded=False):
-                df = _load_df_full(path)
-                if df is not None:
-                    st.dataframe(df.head(30), use_container_width=True, height=280)
-
-    # ── Tableau d'enrichissement ─────────────────────────────────────────────
-    st.divider()
     st.markdown("### Enrichissement étape par étape")
     st.caption(
         "Progression du pipeline de bout en bout. À chaque étape, on ajoute "
