@@ -507,3 +507,17 @@ Le référentiel OWASP Top 10 pour les API (2023) est pris en compte comme suit 
 - ✅ Documentation complète
 - ✅ Scripts de vérification
 - ⚠️  NOTE: Écriture SILVER (501 - isolation E1, optionnel)
+
+---
+
+## Snapshot OpenAPI
+
+Un export figé du schéma OpenAPI 3.1 de l'API E2 est disponible dans
+[`docs/e2/API_OPENAPI_SCHEMA_E2.json`](e2/API_OPENAPI_SCHEMA_E2.json).
+
+Il peut servir à la génération de clients (openapi-generator, swagger-codegen)
+ou au diff de contrat entre versions. Il est régénérable à tout moment via :
+
+```bash
+curl http://localhost:8001/openapi.json -o docs/e2/API_OPENAPI_SCHEMA_E2.json
+```
