@@ -55,10 +55,7 @@ Utilisez le script `scripts/manage_parquet.py` pour manipuler vos fichiers Parqu
 # Windows
 scripts\manage_parquet.bat
 
-# Linux/Mac
-bash scripts/manage_parquet.sh
-
-# Directement
+# Linux/Mac / CI (cross-platform, source de verite)
 python scripts/manage_parquet.py
 ```
 

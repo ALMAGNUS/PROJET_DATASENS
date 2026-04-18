@@ -557,8 +557,8 @@ Utilisez le script interactif pour manipuler vos fichiers Parquet :
 # Windows
 scripts\manage_parquet.bat
 
-# Linux/Mac
-bash scripts/manage_parquet.sh
+# Linux/Mac / CI (cross-platform)
+python scripts/manage_parquet.py
 ```
 
 **Fonctionnalités disponibles** :
