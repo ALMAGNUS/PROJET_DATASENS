@@ -27,6 +27,8 @@ from src.streamlit._cockpit_helpers import (
     inject_demo_css as _inject_demo_css,
     inject_readability_css as _inject_readability_css,
     latest_db_state_reports as _latest_db_state_reports,
+    latest_run_summary_reports as _latest_run_summary_reports,
+    run_summary_history as _run_summary_history,
     launch_api_in_new_window as _launch_api_in_new_window,
     mongo_status as _mongo_status,
     parquet_row_count_cached as _parquet_row_count_cached,
@@ -89,6 +91,63 @@ def render(ctx: PageContext) -> None:
 
     # Preuve chiffrée du dernier run (deltas par étape + lignes réelles).
     render_last_run_proof_full(ctx)
+    st.divider()
+
+    run_summary, _run_summary_prev = _latest_run_summary_reports(PROJECT_ROOT)
+    if run_summary:
+        k = run_summary.get("kpis", {}) if isinstance(run_summary, dict) else {}
+        reasons = run_summary.get("reasons", []) if isinstance(run_summary, dict) else []
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Run status", str(run_summary.get("status", "—")))
+        c2.metric("Loaded", f"{int(k.get('loaded', 0)):,}")
+        c3.metric("Clean ratio", f"{float(k.get('clean_ratio', 0.0)) * 100:.1f}%")
+        c4.metric("Durée run", f"{float(k.get('run_duration_sec', 0.0)):.1f}s")
+        if reasons:
+            with st.expander("WARN_REASONS (run summary)", expanded=False):
+                for r in reasons:
+                    st.write(f"- {r}")
+        hist = _run_summary_history(PROJECT_ROOT, limit=10)
+        if hist:
+            rows = []
+            pass_count = 0
+            warn_rows = []
+            for item in hist:
+                status = str(item.get("status", "—"))
+                if status == "PASS":
+                    pass_count += 1
+                kpi = item.get("kpis", {}) if isinstance(item, dict) else {}
+                reasons_item = item.get("reasons", []) if isinstance(item, dict) else []
+                rows.append(
+                    {
+                        "run_file": item.get("_file", "—"),
+                        "status": status,
+                        "loaded": int(float(kpi.get("loaded", 0.0) or 0.0)),
+                        "clean_ratio_%": round(float(kpi.get("clean_ratio", 0.0) or 0.0) * 100, 1),
+                        "enriched_ratio_%": round(
+                            float(kpi.get("enriched_ratio", 0.0) or 0.0) * 100, 1
+                        ),
+                        "duration_s": round(float(kpi.get("run_duration_sec", 0.0) or 0.0), 1),
+                    }
+                )
+                if status == "WARN":
+                    warn_rows.append(
+                        {
+                            "run_file": item.get("_file", "—"),
+                            "loaded": int(float(kpi.get("loaded", 0.0) or 0.0)),
+                            "reasons": " | ".join(str(r) for r in reasons_item) if reasons_item else "—",
+                        }
+                    )
+            pass_rate = (pass_count / len(hist)) * 100 if hist else 0.0
+            st.caption(f"Stabilité quality gate (10 derniers runs max): {pass_rate:.0f}% PASS")
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            st.markdown("#### Vue anomalies (quality gates)")
+            if warn_rows:
+                st.warning(f"{len(warn_rows)} run(s) en WARN détecté(s) dans l'historique.", icon="⚠️")
+                st.dataframe(pd.DataFrame(warn_rows), use_container_width=True, hide_index=True)
+            else:
+                st.success("Aucune anomalie quality gate détectée dans l'historique chargé.", icon="✅")
+    else:
+        st.info("Aucun `run_summary_*.json` trouvé dans `reports/`.")
     st.divider()
 
     fusion_err = st.session_state.pop("fusion_error", None)
