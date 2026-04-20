@@ -34,6 +34,18 @@ _DEFAULT_BROWSER_HEADERS = {
 }
 
 
+def _env_int(name: str, default: int, minimum: int = 1, maximum: int = 500) -> int:
+    """Lit un entier d'env avec bornes et fallback robuste."""
+    raw = (os.getenv(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return max(minimum, min(maximum, value))
+
+
 def _http_get_with_retries(
     url: str,
     *,
@@ -96,7 +108,8 @@ def _insee_get_bearer_token() -> str | None:
     1. **Bearer direct** via `INSEE_API_TOKEN` (ou `INSEE_API_BEARER`).
        Chemin le plus simple : obtenir un token via le portail et le coller dans `.env`.
 
-    2. **OAuth2 client_credentials** via `INSEE_CONSUMER_KEY` + `INSEE_CONSUMER_SECRET`.
+    2. **OAuth2 client_credentials** via `INSEE_CLIENT_ID` + `INSEE_CLIENT_SECRET`
+       (ou aliases `INSEE_CONSUMER_KEY` + `INSEE_CONSUMER_SECRET`).
        L'endpoint du token est configurable via `INSEE_TOKEN_URL` pour suivre les
        evolutions du portail INSEE.
 
@@ -112,17 +125,39 @@ def _insee_get_bearer_token() -> str | None:
     token = (os.getenv("INSEE_API_TOKEN") or os.getenv("INSEE_API_BEARER") or "").strip()
     if token:
         return token
-    key = (os.getenv("INSEE_CONSUMER_KEY") or os.getenv("INSEE_API_KEY") or "").strip()
-    sec = (os.getenv("INSEE_CONSUMER_SECRET") or os.getenv("INSEE_API_SECRET") or "").strip()
+    # Mode API Gateway (apim): certaines souscriptions utilisent une clé
+    # d'intégration via header X-INSEE-Api-Key-Integration plutôt qu'un bearer OAuth.
+    # Dans ce cas on évite de tenter OAuth inutilement (et donc les warnings 404).
+    if (os.getenv("INSEE_API_KEY_INTEGRATION") or "").strip():
+        return None
+    key = (
+        os.getenv("INSEE_CLIENT_ID")
+        or os.getenv("INSEE_CONSUMER_KEY")
+        or os.getenv("INSEE_API_KEY")
+        or ""
+    ).strip()
+    sec = (
+        os.getenv("INSEE_CLIENT_SECRET")
+        or os.getenv("INSEE_CONSUMER_SECRET")
+        or os.getenv("INSEE_API_SECRET")
+        or ""
+    ).strip()
     if not key or not sec:
         return None
     token_url = (os.getenv("INSEE_TOKEN_URL") or "https://api.insee.fr/token").strip()
+    cert_pem = (os.getenv("INSEE_CLIENT_CERT_PEM") or "").strip()
+    key_pem = (os.getenv("INSEE_CLIENT_KEY_PEM") or "").strip()
+    ca_bundle = (os.getenv("INSEE_CA_BUNDLE") or "").strip()
+    cert = (cert_pem, key_pem) if cert_pem and key_pem else (cert_pem or None)
+    verify = ca_bundle or True
     try:
         r = requests.post(
             token_url,
             data={"grant_type": "client_credentials"},
             auth=(key, sec),
             headers={"Content-Type": "application/x-www-form-urlencoded"},
+            cert=cert,
+            verify=verify,
             timeout=35,
         )
         if r.status_code == 200:
@@ -139,6 +174,17 @@ def _insee_get_bearer_token() -> str | None:
     except Exception as e:
         logger.warning("INSEE OAuth: {}", str(e)[:100])
     return None
+
+
+def _insee_build_auth_headers() -> dict[str, str]:
+    """Construit les headers d'auth INSEE selon la config disponible."""
+    token = _insee_get_bearer_token()
+    if token:
+        return {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    api_key = (os.getenv("INSEE_API_KEY_INTEGRATION") or "").strip()
+    if api_key:
+        return {"X-INSEE-Api-Key-Integration": api_key, "Accept": "application/json"}
+    return {"Accept": "application/json"}
 
 
 def _insee_json_items(payload: object) -> list[dict]:
@@ -297,13 +343,14 @@ class BaseExtractor(ABC):
 class RSSExtractor(BaseExtractor):
     def extract(self) -> list[Article]:
         articles = []
+        rss_limit = _env_int("RSS_FEEDS_LIMIT", 50, minimum=5, maximum=200)
         try:
             feed = feedparser.parse(self.url)
             if feed.bozo and feed.bozo_exception:
                 logger.warning(
                     "RSS parse error for {}: {}", self.name, str(feed.bozo_exception)[:40]
                 )
-            for entry in feed.entries[:50]:
+            for entry in feed.entries[:rss_limit]:
                 title = entry.get("title", "").strip()
                 content = entry.get("summary", "") or entry.get("description", "")
                 url = entry.get("link", "")
@@ -324,15 +371,26 @@ class RSSExtractor(BaseExtractor):
 
 class APIExtractor(BaseExtractor):
     def _extract_insee_indicators(self) -> list[Article]:
-        """API officielle (métadonnées, Melodi, BDM) + fallback site public sans jeton."""
-        token = _insee_get_bearer_token()
+        """API INSEE (metadonnees/BDM/SIRENE) + fallback site public."""
+        h = _insee_build_auth_headers()
         articles: list[Article] = []
-        if token:
-            h = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+        raw_siren_list = (os.getenv("INSEE_SIREN_LIST") or "").strip()
+        siren_values = [s.strip() for s in raw_siren_list.split(",") if s.strip()]
+        if not siren_values:
+            siren_values = ["552100554"]  # Valeur de démonstration si non configuré.
+        sirene_endpoints = [
+            (f"https://api.insee.fr/api-sirene/3.11/siren/{siren}", "SIRENE")
+            for siren in siren_values
+        ]
+        insee_core_endpoints = [
+            ((os.getenv("INSEE_METADONNEES_URL") or "https://api.insee.fr/metadonnees").strip(), "Métadonnées"),
+            ((os.getenv("INSEE_MELODI_URL") or "https://api.insee.fr/melodi").strip(), "Melodi"),
+            ((os.getenv("INSEE_BDM_URL") or "https://api.insee.fr/series/BDM").strip(), "BDM"),
+        ]
+        if "Authorization" in h or "X-INSEE-Api-Key-Integration" in h:
             for ep_url, tag in (
-                ("https://api.insee.fr/metadonnees", "Métadonnées"),
-                ("https://api.insee.fr/melodi", "Melodi"),
-                ("https://api.insee.fr/series/BDM", "BDM"),
+                *insee_core_endpoints,
+                *sirene_endpoints,
             ):
                 try:
                     r = requests.get(ep_url, headers=h, timeout=45)
@@ -343,7 +401,22 @@ class APIExtractor(BaseExtractor):
                     if "json" not in ct and r.text.strip()[:1] not in "{[":
                         continue
                     data = r.json()
-                    for item in _insee_json_items(data):
+                    items = _insee_json_items(data)
+                    if not items and tag == "SIRENE" and isinstance(data, dict):
+                        # Réponse SIRENE standard: {"header": ..., "uniteLegale": {...}}
+                        ul = data.get("uniteLegale")
+                        if isinstance(ul, dict):
+                            items = [
+                                {
+                                    "title": f"SIRENE {ul.get('siren', '').strip()}",
+                                    "label": ul.get("denominationUniteLegale")
+                                    or ul.get("categorieEntreprise")
+                                    or ul.get("activitePrincipaleUniteLegale"),
+                                    "url": ep_url,
+                                    "source": "api-sirene",
+                                }
+                            ]
+                    for item in items:
                         a = _insee_dict_to_article(item, self.name, tag)
                         if a and a.is_valid():
                             articles.append(a)
@@ -364,11 +437,23 @@ class APIExtractor(BaseExtractor):
             if src_low == "insee_indicators":
                 return self._extract_insee_indicators()
             if "reddit" in src_low:
-                for sr in ["france", "actualites"]:
+                raw_subs = (os.getenv("REDDIT_SUBREDDITS") or "").strip()
+                subreddits = [s.strip() for s in raw_subs.split(",") if s.strip()] or [
+                    "france",
+                    "actualites",
+                    "politique",
+                    "vosfinances",
+                ]
+                reddit_api_limit = _env_int("REDDIT_API_LIMIT", 50, minimum=10, maximum=100)
+                reddit_posts_per_sub = _env_int(
+                    "REDDIT_POSTS_PER_SUBREDDIT", 25, minimum=5, maximum=100
+                )
+                reddit_min_score = _env_int("REDDIT_MIN_SCORE", 3, minimum=0, maximum=1000)
+                for sr in subreddits:
                     try:
                         # Try JSON API first
                         resp = requests.get(
-                            f"https://www.reddit.com/r/{sr}/top.json?t=week&limit=25",
+                            f"https://www.reddit.com/r/{sr}/top.json?t=week&limit={reddit_api_limit}",
                             headers={
                                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                             },
@@ -376,9 +461,9 @@ class APIExtractor(BaseExtractor):
                         )
                         if resp.status_code == 200:
                             data = resp.json().get("data", {}).get("children", [])
-                            for post in data[:15]:
+                            for post in data[:reddit_posts_per_sub]:
                                 pd = post.get("data", {})
-                                if pd.get("title") and pd.get("score", 0) > 5:
+                                if pd.get("title") and pd.get("score", 0) >= reddit_min_score:
                                     a = Article(
                                         title=f"[{sr.upper()}] {pd['title']}"[:500],
                                         content=pd.get("selftext", "")[:2000]
@@ -400,7 +485,7 @@ class APIExtractor(BaseExtractor):
                             if html_resp.status_code == 200:
                                 soup = BeautifulSoup(html_resp.text, "html.parser")
                                 for item in soup.find_all(["a"], {"data-testid": "post-title"})[
-                                    :15
+                                    :reddit_posts_per_sub
                                 ]:
                                     title = item.get_text().strip()
                                     href = item.get("href", "")
@@ -619,6 +704,7 @@ class ScrapingExtractor(BaseExtractor):
         articles, src_low = [], self.name.lower()
         try:
             if "trustpilot" in src_low:
+                trustpilot_limit = _env_int("TRUSTPILOT_REVIEWS_LIMIT", 40, minimum=10, maximum=200)
                 tp_url = (self.url or "https://www.trustpilot.com").rstrip("/")
                 resp = _http_get_with_retries(tp_url, timeout=15, attempts=2)
                 if not resp:
@@ -626,7 +712,7 @@ class ScrapingExtractor(BaseExtractor):
                 soup = BeautifulSoup(resp.text, "html.parser")
                 for review in soup.find_all(
                     ["article", "div"], class_=re.compile(r".*review|rating.*", re.I)
-                )[:30]:
+                )[:trustpilot_limit]:
                     title = review.find(["h2", "h3", "h1"])
                     if title:
                         a = Article(
@@ -703,6 +789,7 @@ class ScrapingExtractor(BaseExtractor):
                         if a.is_valid():
                             articles.append(a)
             elif "monavis" in src_low or "monaviscitoyen" in src_low:
+                monavis_limit = _env_int("MONAVIS_ITEMS_LIMIT", 30, minimum=10, maximum=120)
                 base_url = "https://www.monaviscitoyen.fr"
                 seen = set()
 
@@ -732,9 +819,9 @@ class ScrapingExtractor(BaseExtractor):
                             add_item(
                                 title_e.get_text().strip(), content_text, link_e.get("href", "")
                             )
-                        if len(articles) >= 30:
+                        if len(articles) >= monavis_limit:
                             break
-                    if len(articles) < 10:
+                    if len(articles) < min(10, monavis_limit):
                         for link_e in soup.find_all("a", href=True):
                             text = link_e.get_text(" ", strip=True)
                             if len(text) < 20:
@@ -743,7 +830,7 @@ class ScrapingExtractor(BaseExtractor):
                             if "monaviscitoyen" not in href and not href.startswith("/"):
                                 continue
                             add_item(text, text, href)
-                            if len(articles) >= 30:
+                            if len(articles) >= monavis_limit:
                                 break
 
                 # Try Botasaurus first (if installed)
