@@ -59,6 +59,28 @@ from .tagger import TopicTagger
 from .ui_messages import UiMessages
 
 
+def _env_float(name: str, default: float, minimum: float = 0.0, maximum: float = 1.0) -> float:
+    raw = (os.getenv(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        return default
+    return max(minimum, min(maximum, value))
+
+
+def _env_int(name: str, default: int, minimum: int = 0, maximum: int = 1_000_000) -> int:
+    raw = (os.getenv(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return max(minimum, min(maximum, value))
+
+
 class E1Pipeline:
     """Complete E1 Pipeline - ISOLÉ"""
 
@@ -80,7 +102,19 @@ class E1Pipeline:
             "tagged": 0,
             "analyzed": 0,
         }
+        self.cleaning_rejects = {
+            "empty_title": 0,
+            "empty_content": 0,
+            "title_too_short": 0,
+            "content_too_short": 0,
+            "invalid_url": 0,
+            "other_invalid": 0,
+        }
+        self.cleaning_reject_examples: list[dict[str, str]] = []
+        self.source_run_stats: dict[str, dict[str, float | int | str]] = {}
+        self.source_anomalies: list[str] = []
         self.session_start = datetime.now().isoformat()
+        self.run_started_at = datetime.now()
 
         # Start Prometheus metrics server
         try:
@@ -106,6 +140,7 @@ class E1Pipeline:
     def extract(self, inject_csv_path: str | None = None, inject_source_name: str = "csv_inject") -> list:
         """Extract from all sources"""
         console_write = self.console.write
+        self.source_run_stats = {}
         console_write("\n" + UiMessages.extraction_title()[0])
         console_write(UiMessages.extraction_title()[1])
         console_write(UiMessages.extraction_title()[2])
@@ -148,6 +183,11 @@ class E1Pipeline:
                 self.stats["extracted"] += len(extracted)
                 articles_extracted_total.labels(source=source.source_name).inc(len(extracted))
                 articles.extend([(a, source.source_name) for a in extracted])
+                self.source_run_stats[source.source_name] = {
+                    "extracted": len(extracted),
+                    "duration_sec": round(duration, 3),
+                    "status": "OK",
+                }
 
                 # Log sync to database
                 source_id = self.db.get_source_id(source.source_name)
@@ -164,6 +204,11 @@ class E1Pipeline:
             except Exception as e:
                 source_errors_total.labels(source=source.source_name).inc()
                 logger.error("Extraction error: {}", str(e)[:40])
+                self.source_run_stats[source.source_name] = {
+                    "extracted": 0,
+                    "duration_sec": round(time.time() - start_time, 3),
+                    "status": "ERR",
+                }
                 console_write(f"ERR ({str(e)[:45]})")
 
         logger.info("Extraction complete: {} articles", self.stats["extracted"])
@@ -185,15 +230,110 @@ class E1Pipeline:
         logger.info("Cleaning start: {} articles", len(articles))
 
         cleaned = []
+        self.cleaning_rejects = {
+            "empty_title": 0,
+            "empty_content": 0,
+            "title_too_short": 0,
+            "content_too_short": 0,
+            "invalid_url": 0,
+            "other_invalid": 0,
+        }
+        self.cleaning_reject_examples = []
         for article, source_name in articles:
             article = ContentTransformer.transform(article)
             if article.is_valid():
                 cleaned.append((article, source_name))
                 self.stats["cleaned"] += 1
+            else:
+                reason = self._classify_cleaning_reject(article)
+                self.cleaning_rejects[reason] = self.cleaning_rejects.get(reason, 0) + 1
+                if len(self.cleaning_reject_examples) < 5:
+                    self.cleaning_reject_examples.append(
+                        {
+                            "source": source_name or (article.source_name or "unknown"),
+                            "reason": reason,
+                            "title": (article.title or "").strip()[:80],
+                        }
+                    )
 
         logger.info("Cleaning complete: {} articles", self.stats["cleaned"])
         console_write(f"OK Cleaned: {self.stats['cleaned']}")
+        rejected_total = len(articles) - self.stats["cleaned"]
+        if rejected_total > 0:
+            console_write("   Rejets cleaning (causes):")
+            for reason, count in sorted(self.cleaning_rejects.items(), key=lambda x: -x[1]):
+                if count > 0:
+                    console_write(f"      - {reason}: {count}")
+            if self.cleaning_reject_examples:
+                console_write("   Exemples de rejets:")
+                for ex in self.cleaning_reject_examples:
+                    title_preview = ex["title"] if ex["title"] else "<titre vide>"
+                    console_write(f"      - [{ex['source']}] {ex['reason']} | {title_preview}")
         return cleaned
+
+    def _classify_cleaning_reject(self, article) -> str:
+        """Explique la cause principale d'un rejet de nettoyage."""
+        title = (article.title or "").strip()
+        content = (article.content or "").strip()
+        url = (article.url or "").strip()
+        if not title:
+            return "empty_title"
+        if not content:
+            return "empty_content"
+        if len(title) <= 3:
+            return "title_too_short"
+        if len(content) <= 10:
+            return "content_too_short"
+        if url and not (url.startswith("http://") or url.startswith("https://")):
+            return "invalid_url"
+        return "other_invalid"
+
+    def _print_source_traceability(self):
+        """Affiche la traçabilité par source avec delta vs run précédent."""
+        console_write = self.console.write
+        self.source_anomalies = []
+        warn_drop_pct = _env_float("SOURCE_DROP_WARN_PCT", 80.0, minimum=1.0, maximum=100.0)
+        console_write("\n" + "=" * 70)
+        console_write("[SOURCE TRACEABILITY] Volumes et deltas")
+        console_write("=" * 70)
+        if not self.source_run_stats:
+            console_write("   Aucune source active dans ce run.")
+            return
+
+        c = self.db.conn.cursor()
+        for source_name in sorted(self.source_run_stats.keys()):
+            stats = self.source_run_stats[source_name]
+            prev = c.execute(
+                """
+                SELECT sl.rows_synced
+                FROM sync_log sl
+                JOIN source s ON s.source_id = sl.source_id
+                WHERE s.name = ? AND sl.status = 'OK'
+                ORDER BY sl.sync_date DESC
+                LIMIT 1 OFFSET 1
+                """,
+                (source_name,),
+            ).fetchone()
+            prev_rows = int(prev[0]) if prev else 0
+            current_rows = int(stats["extracted"])
+            if prev_rows > 0:
+                delta_pct = ((current_rows - prev_rows) / prev_rows) * 100.0
+                delta_txt = f"{delta_pct:+.1f}%"
+                if current_rows == 0:
+                    self.source_anomalies.append(
+                        f"source {source_name}: volume nul (prev={prev_rows}, now=0)"
+                    )
+                elif delta_pct <= -warn_drop_pct:
+                    self.source_anomalies.append(
+                        f"source {source_name}: chute volume {delta_pct:.1f}% (prev={prev_rows}, now={current_rows})"
+                    )
+            else:
+                delta_txt = "n/a"
+            console_write(
+                "   "
+                f"{source_name:<28} now={current_rows:>4} prev={prev_rows:>4} "
+                f"delta={delta_txt:>7} status={stats['status']}"
+            )
 
     def _is_foundation_source(self, source_name: str) -> tuple[bool, str, bool]:
         """
@@ -448,6 +588,73 @@ class E1Pipeline:
             console_write(f"      • {name}: {count:,}")
         console_write("=" * 70 + "\n")
 
+    def _build_run_contract(self) -> tuple[str, list[str], dict[str, float]]:
+        """Construit un statut de run lisible (PASS/WARN/FAIL) + KPI clés."""
+        reasons: list[str] = []
+        min_loaded = _env_int("MIN_LOADED_THRESHOLD", 20, minimum=0, maximum=1_000_000)
+        min_enriched_ratio = _env_float("MIN_ENRICHED_RATIO", 0.95, minimum=0.0, maximum=1.0)
+        min_clean_ratio = _env_float("MIN_CLEAN_RATIO", 0.90, minimum=0.0, maximum=1.0)
+        if self.stats["extracted"] <= 0:
+            reasons.append("Aucun article extrait")
+        if self.stats["cleaned"] > self.stats["extracted"]:
+            reasons.append("Incohérence: cleaned > extracted")
+        if self.stats["loaded"] < min_loaded:
+            reasons.append(
+                f"loaded sous seuil ({self.stats['loaded']} < MIN_LOADED_THRESHOLD={min_loaded})"
+            )
+        if self.stats["tagged"] < self.stats["loaded"] or self.stats["analyzed"] < self.stats["loaded"]:
+            reasons.append("Couverture enrichissement incomplète")
+        run_duration_sec = (datetime.now() - self.run_started_at).total_seconds()
+        enriched_ratio = 0.0
+        clean_ratio = 0.0
+        if self.stats["extracted"] > 0:
+            clean_ratio = self.stats["cleaned"] / self.stats["extracted"]
+        if self.stats["loaded"] > 0:
+            enriched_ratio = min(self.stats["tagged"], self.stats["analyzed"]) / self.stats["loaded"]
+        if clean_ratio < min_clean_ratio:
+            reasons.append(
+                f"clean_ratio sous seuil ({clean_ratio * 100:.1f}% < MIN_CLEAN_RATIO={min_clean_ratio * 100:.1f}%)"
+            )
+        if enriched_ratio < min_enriched_ratio:
+            reasons.append(
+                f"enriched_ratio sous seuil ({enriched_ratio * 100:.1f}% < MIN_ENRICHED_RATIO={min_enriched_ratio * 100:.1f}%)"
+            )
+        reasons.extend(self.source_anomalies)
+        status = "PASS" if not reasons else "WARN"
+        kpis = {
+            "extracted": float(self.stats["extracted"]),
+            "cleaned": float(self.stats["cleaned"]),
+            "loaded": float(self.stats["loaded"]),
+            "deduplicated": float(self.stats["deduplicated"]),
+            "clean_ratio": clean_ratio,
+            "enriched_ratio": enriched_ratio,
+            "run_duration_sec": run_duration_sec,
+            "min_loaded_threshold": float(min_loaded),
+            "min_clean_ratio": min_clean_ratio,
+            "min_enriched_ratio": min_enriched_ratio,
+        }
+        return status, reasons, kpis
+
+    def _persist_run_summary(self, status: str, reasons: list[str], kpis: dict[str, float]) -> None:
+        """Persist un résumé de run JSON dans reports/ pour le cockpit."""
+        try:
+            root = Path(__file__).parent.parent.parent
+            out_dir = root / "reports"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            ts = datetime.utcnow().strftime("%Y-%m-%dT%H%M%SZ")
+            payload = {
+                "generated_at_utc": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                "status": status,
+                "reasons": reasons,
+                "kpis": kpis,
+                "source_traceability": self.source_run_stats,
+            }
+            out_path = out_dir / f"run_summary_{ts}.json"
+            out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            logger.info("Run summary persisted: {}", out_path)
+        except Exception as e:
+            logger.warning("Run summary persistence failed: {}", str(e)[:120])
+
     def run(
         self,
         inject_csv_path: str | None = None,
@@ -552,6 +759,35 @@ class E1Pipeline:
                 logger.info("Metrics database stats updated")
             except Exception as e:
                 logger.warning("Metrics update failed: {}", str(e)[:120])
+
+            # Traçabilité par source (anti-boite-noire)
+            self._print_source_traceability()
+
+            # Contrat de run (anti boite noire) : statut + KPI + causes
+            status, reasons, kpis = self._build_run_contract()
+            console_write("\n" + "=" * 70)
+            console_write("[RUN CONTRACT] Synthese d'execution")
+            console_write("=" * 70)
+            console_write(f"   RUN_STATUS: {status}")
+            console_write(f"   extracted: {int(kpis['extracted']):,}")
+            console_write(f"   cleaned: {int(kpis['cleaned']):,}")
+            console_write(f"   loaded: {int(kpis['loaded']):,}")
+            console_write(f"   deduplicated: {int(kpis['deduplicated']):,}")
+            console_write(f"   clean_ratio: {kpis['clean_ratio'] * 100:.1f}%")
+            console_write(f"   enriched_ratio: {kpis['enriched_ratio'] * 100:.1f}%")
+            console_write(f"   run_duration_sec: {kpis['run_duration_sec']:.1f}")
+            console_write(
+                "   quality_gates: "
+                f"MIN_LOADED_THRESHOLD={int(kpis['min_loaded_threshold'])}, "
+                f"MIN_CLEAN_RATIO={kpis['min_clean_ratio'] * 100:.1f}%, "
+                f"MIN_ENRICHED_RATIO={kpis['min_enriched_ratio'] * 100:.1f}%"
+            )
+            if reasons:
+                console_write("   WARN_REASONS:")
+                for reason in reasons:
+                    console_write(f"      - {reason}")
+            logger.info("Run contract: status={}, reasons={}", status, reasons)
+            self._persist_run_summary(status, reasons, kpis)
 
         # Close DB connections
         try:

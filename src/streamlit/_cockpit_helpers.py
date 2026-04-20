@@ -374,7 +374,7 @@ def ia_history(root: Path) -> pd.DataFrame:
                 except Exception:
                     pass
     if not rows:
-        return pd.DataFrame(columns=["date", "lignes_cumulées"])
+        return pd.DataFrame(columns=pd.Index(["date", "lignes_cumulées"]))
     return pd.DataFrame(rows).sort_values("date")
 
 
@@ -394,6 +394,42 @@ def latest_db_state_reports(root: Path) -> tuple[dict | None, dict | None]:
     latest = _load(files[-1])
     previous = _load(files[-2]) if len(files) >= 2 else None
     return latest, previous
+
+
+def latest_run_summary_reports(root: Path) -> tuple[dict | None, dict | None]:
+    """Retourne (dernier, precedent) run_summary JSON."""
+    rep = root / "reports"
+    files = sorted(rep.glob("run_summary_*.json"))
+    if not files:
+        return None, None
+
+    def _load(p: Path) -> dict | None:
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+
+    latest = _load(files[-1])
+    previous = _load(files[-2]) if len(files) >= 2 else None
+    return latest, previous
+
+
+def run_summary_history(root: Path, limit: int = 10) -> list[dict]:
+    """Retourne l'historique des run_summary (du plus récent au plus ancien)."""
+    rep = root / "reports"
+    files = sorted(rep.glob("run_summary_*.json"), reverse=True)
+    if limit > 0:
+        files = files[:limit]
+    out: list[dict] = []
+    for p in files:
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                data["_file"] = p.name
+                out.append(data)
+        except Exception:
+            continue
+    return out
 
 
 def get_active_model(root: Path) -> str | None:
