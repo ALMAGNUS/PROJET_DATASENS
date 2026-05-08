@@ -14,11 +14,6 @@
   python scripts/show_tables.py
   ```
 
-- **`migrate_sources.py`** : Ajouter des sources manquantes à la DB
-  ```bash
-  python scripts/migrate_sources.py
-  ```
-
 ### 📊 Visualisation
 
 - **`show_dashboard.py`** : Afficher le dashboard global d'enrichissement
@@ -43,7 +38,13 @@
   python scripts/validate_json.py
   ```
 
+### 📦 Archivés (`scripts/_archive/`)
+
+One-shot terminés (migrations, démos, smoke tests). Restent exécutables mais ne sont plus référencés dans le pipeline runtime. Voir `docs/AUDIT_CODE_NETTOYAGE.md` pour le détail.
+
 ## 📖 Documentation
 
-Voir `docs/DASHBOARD_GUIDE.md` pour plus de détails sur l'utilisation.
+- `scripts/SCRIPTS_LIST.md` — fiche par script avec rôle et usage.
+- `docs/AUDIT_CODE_NETTOYAGE.md` — audit code et plan de nettoyage.
+- `docs/DASHBOARD_GUIDE.md` — détails d'utilisation du dashboard.
 

@@ -65,8 +65,8 @@ Toutes les modifications du processus de nettoyage sont documentées dans **`CHA
 | **Dossier_E1_nettoyage+scripts.md** | Règles de nettoyage, ContentTransformer, scripts exécutables |
 | **Dossier_E1_C33_processus_agregation.md** | Processus d'agrégation (extraction, normalisation, déduplication) |
 | **Dossier_E1_preuves.md** | Preuves concrètes (sources, SQL, nettoyage) |
-| **LOGGING.md** | sync_log, cleaning_audit, format des logs |
-| **FLOW_DONNEES.md** | Flow RAW → SILVER → GOLD |
+| **docs/dev/LOGGING.md** | sync_log, cleaning_audit, format des logs |
+| **docs/dev/FLOW_DONNEES.md** | Flow RAW → SILVER → GOLD |
 | **PIPELINE_ANALYSIS.md** | Analyse du pipeline E1 |
 
 ---
@@ -89,7 +89,7 @@ Toutes les modifications du processus de nettoyage sont documentées dans **`CHA
 
 ### 2.3 Pipeline
 
-**`docs/FLOW_DONNEES.md`** et **`docs/Dossier_E1_C33_processus_agregation.md`** décrivent :
+**`docs/dev/FLOW_DONNEES.md`** et **`docs/Dossier_E1_C33_processus_agregation.md`** décrivent :
 
 ```
 Extract (multi-sources)
@@ -105,7 +105,7 @@ Aggregate (RAW → SILVER → GOLD)
 
 ### 2.4 Logging
 
-**`LOGGING.md`** (racine) documente :
+**`docs/dev/LOGGING.md`** documente :
 
 | Table | Rôle |
 |-------|------|
@@ -136,6 +136,6 @@ Aggregate (RAW → SILVER → GOLD)
 |---------|----------------|
 | **Versioning Git** | Tags semver (v1.4.1, v1.5.0), commits descriptifs |
 | **CHANGELOG** | Entrées datées pour chaque modification du nettoyage |
-| **Documentation architecture** | docs/ARCHITECTURE.md, FLOW_DONNEES.md |
+| **Documentation architecture** | docs/ARCHITECTURE.md, docs/dev/FLOW_DONNEES.md |
 | **Documentation pipeline** | Dossier_E1_nettoyage+scripts.md, Dossier_E1_C33_processus_agregation.md |
-| **Documentation logging** | LOGGING.md (sync_log, cleaning_audit) |
+| **Documentation logging** | docs/dev/LOGGING.md (sync_log, cleaning_audit) |

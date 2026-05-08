@@ -20,7 +20,7 @@
 
 - Métriques : `src/e2/api/middleware/prometheus.py`
 - Règles d'alerte : `monitoring/prometheus_rules.yml`
-- Journalisation : `src/logging_config.py`, `run_e2_api.py` (setup_logging), `LOGGING.md`
+- Journalisation : `src/logging_config.py`, `run_e2_api.py` (setup_logging), `docs/dev/LOGGING.md`
 - Procédure incidents : `docs/PROCEDURE_INCIDENTS.md`
 - Métriques et seuils : `docs/METRIQUES_SEUILS_ALERTES.md`
 
@@ -34,4 +34,4 @@ Vérifie la présence des fichiers E5 et, si l'API est démarrée, l'accessibili
 
 ## Plan de lancement global
 
-Pour lancer tous les composants (Docker, API, MLflow, monitoring) dans le bon ordre : **`PLANCHE_LANCEMENT.md`** (à la racine du projet).
+Pour lancer tous les composants (Docker, API, MLflow, monitoring) dans le bon ordre : **`RUNBOOK.md`** (à la racine du projet).

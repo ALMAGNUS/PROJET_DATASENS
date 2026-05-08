@@ -1,5 +1,7 @@
 # 📋 Liste des Scripts Fonctionnels - DataSens E1
 
+> **Note (2026-05-08)** : audit code étape 4. Les scripts marqués `(archivé)` ont été déplacés dans `scripts/_archive/` (one-shot terminés, démos, tests ad-hoc). Ils restent exécutables (`python scripts/_archive/<nom>.py`) mais ne sont plus référencés dans le pipeline runtime. Voir `docs/AUDIT_CODE_NETTOYAGE.md`.
+
 ## 🚀 Pipeline Principal
 
 ### `main.py` (racine du projet)
@@ -36,13 +38,10 @@
 - Affiche le schéma de chaque table
 - Compte les enregistrements par table
 
-### `migrate_sources.py`
+### `migrate_sources.py` (archivé)
 **Description**: Ajoute les sources manquantes depuis `sources_config.json` à la base de données  
-**Usage**: `python scripts/migrate_sources.py`  
-**Fonctionnalités**:
-- Compare `sources_config.json` avec la table `source`
-- Insère les sources manquantes
-- Met à jour les sources existantes
+**Usage**: `python scripts/_archive/migrate_sources.py`  
+**Statut**: Migration ponctuelle terminée. Conservé pour réutilisation éventuelle.
 
 ---
 
@@ -134,32 +133,8 @@
 
 ## 🧪 Tests & Validation
 
-### `test_pipeline.py`
-**Description**: Teste le pipeline et vérifie les sentiments  
-**Usage**: `python scripts/test_pipeline.py`  
-**Fonctionnalités**:
-- Vérifie les sentiments dans la base de données
-- Vérifie les sentiments dans `gold.csv`
-- Affiche des exemples d'articles avec sentiment
-- Résumé des tests (OK/ERREUR)
-
-### `test_before_build.py`
-**Description**: Tests avant build (vérifie fichiers nécessaires)  
-**Usage**: `python scripts/test_before_build.py`  
-**Fonctionnalités**:
-- Vérifie l'existence des fichiers essentiels
-- Vérifie les imports Python
-- Vérifie la structure du projet
-- Exit code 0 si OK, 1 si erreur
-
-### `test_project.py`
-**Description**: Tests complets du projet  
-**Usage**: `python scripts/test_project.py`  
-**Fonctionnalités**:
-- Test des imports
-- Test du pipeline
-- Test des fichiers scripts
-- Test des chemins relatifs
+### `test_pipeline.py` (archivé), `test_before_build.py` (archivé), `test_project.py` (archivé)
+Smoke tests ad-hoc (Catégorie B de l'audit code). Couverture redondante avec la suite `tests/` (pytest, CI). Disponibles sous `scripts/_archive/` pour exécution manuelle si besoin.
 
 ### `validate_json.py`
 **Description**: Valide le fichier `sources_config.json`  
@@ -194,17 +169,17 @@
 
 ## 📊 Résumé par Catégorie
 
-| Catégorie | Scripts | Nombre |
+| Catégorie | Scripts actifs | Nombre |
 |-----------|---------|--------|
 | **Pipeline** | `main.py` | 1 |
-| **Base de données** | `setup_with_sql.py`, `show_tables.py`, `migrate_sources.py` | 3 |
+| **Base de données** | `setup_with_sql.py`, `show_tables.py` | 2 |
 | **Visualisation** | `show_dashboard.py`, `quick_view.py`, `visualize_sentiment.py`, `view_exports.py` | 4 |
 | **Enrichissement** | `enrich_all_articles.py`, `reanalyze_sentiment.py` | 2 |
 | **Export** | `export_gold.py`, `regenerate_exports.py` | 2 |
-| **Tests** | `test_pipeline.py`, `test_before_build.py`, `test_project.py`, `validate_json.py` | 4 |
+| **Tests** | `validate_json.py` (autres tests : suite pytest dans `tests/`) | 1 |
 | **Planification** | `scheduler.py` | 1 |
 | **Docker** | `check_docker.ps1` | 1 |
-| **TOTAL** | | **18 scripts** |
+| **Archivés** | `scripts/_archive/` (one-shot terminés, démos, smoke tests redondants) | 17 |
 
 ---
 
@@ -219,7 +194,7 @@
 ### Pour la maintenance:
 1. `python scripts/enrich_all_articles.py` - Enrichir tous les articles
 2. `python scripts/regenerate_exports.py` - Régénérer les exports
-3. `python scripts/test_pipeline.py` - Tester le pipeline
+3. `pytest tests/` - Suite de tests automatisés
 
 ### Pour le debugging:
 1. `python scripts/show_tables.py` - Voir la structure DB

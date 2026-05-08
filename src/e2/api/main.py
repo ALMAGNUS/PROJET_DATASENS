@@ -5,8 +5,8 @@ Application FastAPI principale avec tous les routers
 """
 
 from fastapi import FastAPI
-from fastapi.openapi.docs import get_redoc_html
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.docs import get_redoc_html
 from fastapi.responses import Response
 
 from src.config import get_settings

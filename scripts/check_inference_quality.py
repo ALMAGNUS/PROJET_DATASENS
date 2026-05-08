@@ -47,7 +47,7 @@ def find_latest() -> Path:
 def check_distribution(df: pd.DataFrame) -> list[tuple[str, str, str]]:
     """Vérifie la distribution des sentiments prédits."""
     results = []
-    total = len(df)
+    len(df)
     dist = df["predicted_sentiment"].value_counts(normalize=True)
 
     for label, pct in dist.items():

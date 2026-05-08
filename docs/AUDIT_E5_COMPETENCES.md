@@ -14,9 +14,9 @@
 | Documentation liste les métriques et les seuils/valeurs d'alerte | ✅ TRUE | `docs/METRIQUES_SEUILS_ALERTES.md` : tableau complet E1 + E2, seuils, niveaux, actions |
 | Documentation explicite les arguments des choix techniques (outillage) | ✅ TRUE | Section "Choix techniques" dans `docs/MONITORING_E2_API.md` : Prometheus, Grafana, architecture |
 | Outils installés et opérationnels en local | ✅ TRUE | Prometheus (scrape /metrics), Grafana (dashboards), PrometheusMiddleware, `start_grafana.bat`, `prometheus.local.yml` |
-| Règles de journalisation intégrées aux sources | ✅ TRUE | `sync_log`, `user_action_log`, `AuditMiddleware`, loguru ; `docs/LOGGING.md` documente les tables et flux |
+| Règles de journalisation intégrées aux sources | ✅ TRUE | `sync_log`, `user_action_log`, `AuditMiddleware`, loguru ; `docs/dev/LOGGING.md` documente les tables et flux |
 | Alertes configurées et en état de marche | ✅ TRUE | `prometheus_rules.yml` + `rule_files` dans `prometheus.local.yml` ; alertes actives en local |
-| Documentation procédure installation/config monitoring | ✅ TRUE | `monitoring/README_GRAFANA.md`, `docs/MONITORING_E2_API.md`, `LANCER_TOUT.md`, `DEPLOY.md` |
+| Documentation procédure installation/config monitoring | ✅ TRUE | `monitoring/README_GRAFANA.md`, `docs/MONITORING_E2_API.md`, `RUNBOOK.md`, `DEPLOY.md` |
 | Documentation format accessible | ✅ TRUE | `docs/ACCESSIBILITE_DOCUMENTATION.md` : références AVH/Microsoft, structure Markdown, procédure export |
 
 ### C21. Résoudre les incidents techniques
@@ -55,5 +55,5 @@
 
 | Critère | Fichiers |
 |---------|----------|
-| C20 | `docs/MONITORING_E2_API.md`, `monitoring/README_GRAFANA.md`, `monitoring/prometheus_rules.yml`, `monitoring/prometheus.local.yml`, `docs/LOGGING.md`, `src/e2/api/middleware/prometheus.py` |
+| C20 | `docs/MONITORING_E2_API.md`, `monitoring/README_GRAFANA.md`, `monitoring/prometheus_rules.yml`, `monitoring/prometheus.local.yml`, `docs/dev/LOGGING.md`, `src/e2/api/middleware/prometheus.py` |
 | C21 | `CHANGELOG.md`, dépôt Git, `.github/workflows/` |

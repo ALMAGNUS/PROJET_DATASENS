@@ -173,7 +173,6 @@ print("-" * 80)
 try:
     sys.path.insert(0, str(project_root))
     from src.e1.core import Source, create_extractor
-    from src.e1.repository import Repository
 
     test("Import modules core", True, "Article, Source, create_extractor")
     test("Import Repository", True, "Repository disponible")

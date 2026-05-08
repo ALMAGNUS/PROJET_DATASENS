@@ -141,7 +141,7 @@
 - ✅ Image Docker buildable
 - ✅ docker-compose.yml fonctionnel
 - ✅ 3 services (Pipeline, Prometheus, Grafana)
-- ✅ README_DOCKER.md complet
+- ✅ docs/dev/DOCKER_RUNTIME.md complet
 
 ---
 

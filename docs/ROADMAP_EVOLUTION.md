@@ -594,7 +594,7 @@ async def get_article(
 
 ### **Documentation**
 - Tables auth : `docs/TABLES_PROFILS_ACTION_LOG.md`
-- Flow données : `FLOW_DONNEES.md`
+- Flow données : `docs/dev/FLOW_DONNEES.md`
 
 ---
 

@@ -154,7 +154,7 @@ def main() -> int:
     id_col_label = "id" if "id" in labelled_df.columns else "raw_data_id"
 
     if id_col_pred not in pred_df.columns or id_col_label not in labelled_df.columns:
-        print(f"\nERREUR: impossible de joindre — colonnes ID introuvables.")
+        print("\nERREUR: impossible de joindre — colonnes ID introuvables.")
         print(f"  predictions: {list(pred_df.columns)}")
         print(f"  labelled:    {list(labelled_df.columns)}")
         return 1

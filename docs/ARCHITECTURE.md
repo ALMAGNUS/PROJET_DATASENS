@@ -43,7 +43,7 @@ PROJET_DATASENS/ (racine)
     ├── ARCHITECTURE_DB.md ............ Architecture bases de données (ZZDB, DataSens, PySpark)
     ├── CHANGELOG.md .................. Historique versions
     ├── CONTRIBUTING.md .............. Guide contributeurs
-    ├── LOGGING.md ................... Configuration logging
+    ├── dev/LOGGING.md ............... Configuration logging
     ├── SCHEMA_DESIGN.md ............ Design base données
     └── AGILE_ROADMAP.md ........... Roadmap produit
 ```
@@ -685,5 +685,5 @@ python main.py
 - [Base de données](#docs/SCHEMA_DESIGN.md)
 - [Changelog](#docs/CHANGELOG.md)
 - [Guide contributeurs](#docs/CONTRIBUTING.md)
-- [Configuration logging](#docs/LOGGING.md)
+- [Configuration logging](dev/LOGGING.md)
 - [Roadmap produit](#docs/AGILE_ROADMAP.md)

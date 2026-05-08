@@ -12,7 +12,6 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-
 BASE_MODELS = {
     # BERT multilingue 5★ (1-2→neg, 3→neu, 4-5→pos) — PyTorch, pas CamemBERT
     "bert_multilingual": "nlptown/bert-base-multilingual-uncased-sentiment",
@@ -167,16 +166,16 @@ def evaluate_model(model_name: str, dataset: list[dict], max_length: int) -> dic
 
     labels = ["neg", "neu", "pos"]
     total = len(y_true)
-    correct = sum(1 for yt, yp in zip(y_true, y_pred) if yt == yp)
+    correct = sum(1 for yt, yp in zip(y_true, y_pred, strict=False) if yt == yp)
     acc = correct / total if total else 0.0
 
     per_class = {}
     f1_sum = 0.0
     f1_weighted_sum = 0.0
     for lbl in labels:
-        tp = sum(1 for yt, yp in zip(y_true, y_pred) if yt == lbl and yp == lbl)
-        fp = sum(1 for yt, yp in zip(y_true, y_pred) if yt != lbl and yp == lbl)
-        fn = sum(1 for yt, yp in zip(y_true, y_pred) if yt == lbl and yp != lbl)
+        tp = sum(1 for yt, yp in zip(y_true, y_pred, strict=False) if yt == lbl and yp == lbl)
+        fp = sum(1 for yt, yp in zip(y_true, y_pred, strict=False) if yt != lbl and yp == lbl)
+        fn = sum(1 for yt, yp in zip(y_true, y_pred, strict=False) if yt == lbl and yp != lbl)
         support = sum(1 for yt in y_true if yt == lbl)
 
         precision = tp / (tp + fp) if (tp + fp) else 0.0

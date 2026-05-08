@@ -181,7 +181,7 @@ Les fichiers de configuration Prometheus, Grafana et les règles d'alerte sont v
 
 #### Rédiger la documentation technique et utilisateur.
 
-La documentation technique couvre les métriques, les seuils, les alertes et les procédures d'installation. Les documents de référence sont `docs/METRIQUES_SEUILS_ALERTES.md`, `docs/MONITORING_E2_API.md`, `docs/e5/PROCEDURE_INSTALLATION_MONITORING.md` et `monitoring/README_GRAFANA.md`. La documentation utilisateur est intégrée dans les annexes E5 et dans le guide de lancement `PLANCHE_LANCEMENT.md`.
+La documentation technique couvre les métriques, les seuils, les alertes et les procédures d'installation. Les documents de référence sont `docs/METRIQUES_SEUILS_ALERTES.md`, `docs/MONITORING_E2_API.md`, `docs/e5/PROCEDURE_INSTALLATION_MONITORING.md` et `monitoring/README_GRAFANA.md`. La documentation utilisateur est intégrée dans les annexes E5 et dans le guide de lancement `RUNBOOK.md`.
 
 ---
 
@@ -253,7 +253,7 @@ Les rapports d'évaluation (TRAINING_RESULTS.json, AI_BENCHMARK_RESULTS.json) so
 
 #### Intégrer l'étape de livraison.
 
-L'étape de livraison est réalisée manuellement ou via Docker. La commande `docker-compose up -d` déploie l'API, Prometheus, Grafana, Uptime Kuma et le service E1-metrics. Il n'y a pas de déploiement automatique dans la CI actuelle. La procédure de livraison est documentée dans `docker-compose.yml` et `PLANCHE_LANCEMENT.md`.
+L'étape de livraison est réalisée manuellement ou via Docker. La commande `docker-compose up -d` déploie l'API, Prometheus, Grafana, Uptime Kuma et le service E1-metrics. Il n'y a pas de déploiement automatique dans la CI actuelle. La procédure de livraison est documentée dans `docker-compose.yml` et `RUNBOOK.md`.
 
 Ce choix est adapté au contexte projet (démo, école) où un déploiement manuel ou semi-automatisé est suffisant. Une extension vers un déploiement automatique (ex. Kubernetes, cloud) est possible sans modifier la structure CI.
 
@@ -263,11 +263,11 @@ Le workflow et les scripts de la chaîne sont versionnés : `.github/workflows/e
 
 #### Documenter les procédures d'installation et de test de la chaîne.
 
-Les procédures sont documentées dans `PLANCHE_LANCEMENT.md` (ordre de démarrage, Docker, local), `docs/e5/PROCEDURE_INSTALLATION_MONITORING.md` (monitoring), et `README.md` (installation générale). Les procédures sont reproductibles et permettent à un nouvel intervenant de mettre en place l'environnement sans ambiguïté.
+Les procédures sont documentées dans `RUNBOOK.md` (ordre de démarrage, Docker, local), `docs/e5/PROCEDURE_INSTALLATION_MONITORING.md` (monitoring), et `README.md` (installation générale). Les procédures sont reproductibles et permettent à un nouvel intervenant de mettre en place l'environnement sans ambiguïté.
 
 #### Documenter l'utilisation de la chaîne.
 
-L'utilisation de la chaîne est documentée dans `LANCER_TOUT.md` (lancement simplifié), `PLANCHE_LANCEMENT.md` (scénarios complets), et les annexes E3 (preuves, captures, plan de démonstration). Ces documents fournissent les instructions pour lancer l'API, le cockpit, le monitoring, et pour valider le bon fonctionnement.
+L'utilisation de la chaîne est documentée dans `RUNBOOK.md` (scénarios de lancement complets) et les annexes E3 (preuves, captures, plan de démonstration). Ces documents fournissent les instructions pour lancer l'API, le cockpit, le monitoring, et pour valider le bon fonctionnement.
 
 ---
 

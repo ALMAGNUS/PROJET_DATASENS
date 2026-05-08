@@ -165,7 +165,7 @@ Avant toute annotation (topics, sentiment) ou ingestion dans un dataset GoldAI, 
 | `src/e1/core.py` | Extracteurs, ContentTransformer, fingerprint |
 | `src/e1/repository.py` | Schéma raw_data, sync_log, load_article_with_id |
 | `sources_config.json` | Configuration de toutes les sources |
-| `scripts/demo_proof_e1.py` | Script de démonstration des preuves |
+| `scripts/_archive/demo_proof_e1.py` | Script de démonstration des preuves (archivé, audit code étape 4) |
 | `docs/Dossier_E1_nettoyage+scripts.md` | Guide détaillé du nettoyage |
 | `docs/Dossier_E1_C33_processus_agregation.md` | **C3.3** Processus automatisé d'agrégation |
 | `docs/Dossier_E1_versioning_documentation.md` | Versioning (Git, tags, CHANGELOG) + documentation (docs/, pipeline, logging) |

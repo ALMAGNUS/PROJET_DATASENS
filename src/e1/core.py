@@ -1094,10 +1094,7 @@ class CSVExtractor(BaseExtractor):
             # Injection à la demande: si url est un chemin absolu existant, l'utiliser exclusivement
             if self.url:
                 p_inject = Path(self.url)
-                if p_inject.is_absolute() and p_inject.exists():
-                    csv_path = p_inject
-                else:
-                    csv_path = None
+                csv_path = p_inject if p_inject.is_absolute() and p_inject.exists() else None
             else:
                 csv_path = None
 

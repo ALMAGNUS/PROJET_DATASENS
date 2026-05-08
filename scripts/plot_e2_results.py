@@ -18,9 +18,10 @@ import json
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
@@ -158,9 +159,9 @@ def _plot_benchmark_overview(df: pd.DataFrame) -> None:
     ax0.set_title("Qualité globale", fontsize=11)
     ax0.legend(fontsize=9)
     ax0.grid(axis="y", alpha=0.25)
-    for bar, val in zip(bars_acc, df["accuracy"]):
+    for bar, val in zip(bars_acc, df["accuracy"], strict=False):
         ax0.text(bar.get_x() + bar.get_width() / 2, val + 0.015, f"{val:.1%}", ha="center", fontsize=7.5, fontweight="bold")
-    for bar, val in zip(bars_f1, df["f1_macro"]):
+    for bar, val in zip(bars_f1, df["f1_macro"], strict=False):
         ax0.text(bar.get_x() + bar.get_width() / 2, val + 0.015, f"{val:.3f}", ha="center", fontsize=7)
     # Seuil de qualité cible
     ax0.axhline(0.50, color="#059669", linestyle="--", linewidth=1.2, alpha=0.8)
@@ -173,7 +174,7 @@ def _plot_benchmark_overview(df: pd.DataFrame) -> None:
     ax1.set_ylabel("ms")
     ax1.set_title("Latence moyenne d'inférence (ms)", fontsize=11)
     ax1.grid(axis="y", alpha=0.25)
-    for bar, val in zip(bars_lat, df["avg_latency_ms"]):
+    for bar, val in zip(bars_lat, df["avg_latency_ms"], strict=False):
         ax1.text(bar.get_x() + bar.get_width() / 2, val + 3, f"{val:.0f} ms", ha="center", fontsize=8, fontweight="bold")
     ax1.axhline(300, color="#dc2626", linestyle="--", linewidth=1, alpha=0.7)
     ax1.text(0, 310, "Seuil latence API cible ≤ 300 ms", fontsize=7.5, color="#7f1d1d")
@@ -225,7 +226,7 @@ def _plot_benchmark_per_class(bench: dict) -> None:
         ax.annotate(
             "F1 pos = 0 !\nProblème class\nimbalance corrigé\n(class weights v2)",
             xy=(ft_idx + w, 0.02), xytext=(ft_idx + w + 0.4, 0.25),
-            arrowprops=dict(arrowstyle="->", color="#dc2626"),
+            arrowprops={"arrowstyle": "->", "color": "#dc2626"},
             fontsize=8, color="#dc2626", fontweight="bold",
         )
 
@@ -319,9 +320,7 @@ def _plot_quality_latency_pareto(df: pd.DataFrame) -> None:
     patches = [mpatches.Patch(color=MODEL_COLORS.get(m, "#94a3b8"),
                                label=MODEL_LABELS.get(m, m).replace("\n", " "))
                for m in data["model"]]
-    ax.legend(handles=patches + [
-        mpatches.Patch(color="#dc2626", label="Frontière de Pareto"),
-    ], fontsize=8.5, loc="upper left")
+    ax.legend(handles=[*patches, mpatches.Patch(color="#dc2626", label="Frontière de Pareto")], fontsize=8.5, loc="upper left")
 
     fig.tight_layout()
     fig.savefig(FIG_DIR / "e2_innovation_pareto_quality_latency.png", **STYLE)
@@ -353,7 +352,7 @@ def _plot_class_imbalance(bench: dict) -> None:
     ax0.set_title("Distribution des classes\ndans train.parquet (36 170 exemples)", fontsize=10)
     ax0.set_ylabel("Nombre d'articles")
     ax0.grid(axis="y", alpha=0.25)
-    for bar, pct, cnt in zip(bars, pcts, counts):
+    for bar, pct, cnt in zip(bars, pcts, counts, strict=False):
         ax0.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 200,
                  f"{cnt:,}\n({pct:.0f}%)", ha="center", fontsize=9, fontweight="bold")
     ax0.axhline(total / 3, color="#7c3aed", linestyle="--", linewidth=1.5, alpha=0.8)
@@ -378,7 +377,7 @@ def _plot_class_imbalance(bench: dict) -> None:
     ax1.axhline(0.5, color="#059669", linestyle="--", linewidth=1.2, alpha=0.8)
     ax1.text(0, 0.515, "Seuil acceptable ≥ 0.50", fontsize=8, color="#065f46")
 
-    for bar, val in zip(b, f1_pos_values):
+    for bar, val in zip(b, f1_pos_values, strict=False):
         if val < 0.01:
             ax1.text(bar.get_x() + bar.get_width() / 2, 0.03,
                      "0.000 ⚠\nClass imbalance\n→ corrigé v2",
@@ -392,7 +391,7 @@ def _plot_class_imbalance(bench: dict) -> None:
         "Solution :\nclass_weight='balanced'\n→ WeightedTrainer v2",
         xy=(0.5, 0.45), xycoords="axes fraction",
         fontsize=8.5, color="#7c3aed", fontweight="bold",
-        bbox=dict(boxstyle="round,pad=0.3", facecolor="#f3e8ff", edgecolor="#7c3aed", alpha=0.9),
+        bbox={"boxstyle": "round,pad=0.3", "facecolor": "#f3e8ff", "edgecolor": "#7c3aed", "alpha": 0.9},
     )
 
     fig.tight_layout()
@@ -425,14 +424,14 @@ def _plot_training_quick() -> None:
     ax.set_ylim(0, 1)
     ax.set_ylabel("Score")
     ax.grid(axis="y", alpha=0.25)
-    for bar, val in zip(bars, metrics_values):
+    for bar, val in zip(bars, metrics_values, strict=False):
         ax.text(bar.get_x() + bar.get_width() / 2, val + 0.02,
                 f"{val:.4f}\n({val:.1%})", ha="center", fontsize=11, fontweight="bold")
 
     ax.text(0.5, 0.08, "Note : class_weight='balanced' appliqué pour le déséquilibre des classes."
             if mode_label == "full" else "Note : run quick — class weights actifs.",
             ha="center", transform=ax.transAxes, fontsize=8.5, color="#065f46",
-            bbox=dict(boxstyle="round", facecolor="#d1fae5", alpha=0.8))
+            bbox={"boxstyle": "round", "facecolor": "#d1fae5", "alpha": 0.8})
 
     fig.tight_layout()
     fig.savefig(FIG_DIR / f"e2_training_{mode_label}_validation_metrics.png", **STYLE)
@@ -461,7 +460,7 @@ def _plot_training_quick() -> None:
         [throughput, float(tr.get("train_steps_per_second", 0)) * 10],
         color=["#ea580c", "#0891b2"], alpha=0.88, edgecolor="black", linewidth=0.5,
     )
-    for bar, val in zip(bars2b, [throughput, float(tr.get("train_steps_per_second", 0))]):
+    for bar, val in zip(bars2b, [throughput, float(tr.get("train_steps_per_second", 0))], strict=False):
         ax2b.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.05,
                   f"{val:.3f}", ha="center", fontsize=10, fontweight="bold")
     ax2b.set_ylabel("Taux")
@@ -511,7 +510,7 @@ def _plot_training_quick_curves() -> None:
 
     ax.text(0.5, 0.85, "Courbe approx. pédagogique — 1 epoch CPU\nNote : 3 epochs recommandés pour convergence optimale",
             ha="center", transform=ax.transAxes, fontsize=8.5, color="#475569",
-            bbox=dict(boxstyle="round", facecolor="#f1f5f9", alpha=0.8))
+            bbox={"boxstyle": "round", "facecolor": "#f1f5f9", "alpha": 0.8})
 
     fig.tight_layout()
     fig.savefig(FIG_DIR / f"e2_training_{mode_label}_loss_curve.png", **STYLE)

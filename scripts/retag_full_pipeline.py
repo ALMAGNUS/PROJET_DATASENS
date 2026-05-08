@@ -35,13 +35,12 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import pandas as pd  # noqa: E402
+import pandas as pd
 
-from src.config import get_db_path, get_goldai_dir, get_gold_dir  # noqa: E402
-from src.e1.aggregator import DataAggregator  # noqa: E402
-from src.e1.exporter import GoldExporter  # noqa: E402
-from src.e1.tagger import TopicTagger  # noqa: E402
-
+from src.config import get_db_path, get_gold_dir, get_goldai_dir
+from src.e1.aggregator import DataAggregator
+from src.e1.exporter import GoldExporter
+from src.e1.tagger import TopicTagger
 
 # ---------------------------------------------------------------------------
 # Logging sobre (stdout, pas de coloration pour compat Windows PowerShell)
