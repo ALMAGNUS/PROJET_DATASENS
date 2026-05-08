@@ -5,72 +5,46 @@ Extrait depuis src/streamlit/app.py (phase C, audit 2026-04).
 
 from __future__ import annotations
 
-import json
-import os
-import subprocess
 import sys
 from pathlib import Path
 
 import pandas as pd
-import requests
 import streamlit as st
 
 from src.streamlit._cockpit_helpers import (
     PageContext,
+)
+from src.streamlit._cockpit_helpers import (
     activate_model as _activate_model,
-    csv_row_count_cached as _csv_row_count_cached,
+)
+from src.streamlit._cockpit_helpers import (
     get_active_model as _get_active_model,
-    inject_css as _inject_css,
-    inject_demo_css as _inject_demo_css,
-    inject_readability_css as _inject_readability_css,
-    latest_db_state_reports as _latest_db_state_reports,
-    launch_api_in_new_window as _launch_api_in_new_window,
-    mongo_status as _mongo_status,
-    parquet_row_count_cached as _parquet_row_count_cached,
-    read_parquet_cached as _read_parquet_cached,
+)
+from src.streamlit._cockpit_helpers import (
     render_last_report as _render_last_report,
+)
+from src.streamlit._cockpit_helpers import (
     run_command as _run_command,
 )
 from src.streamlit.auth_plug import (
     can_admin,
     can_write,
-    get_token,
-    init_session_auth,
-    is_logged_in,
-    render_login_form,
-    render_user_and_logout,
 )
 from src.streamlit.metrics import (
-    build_enrichment_table as _build_enrichment_table,
-    chrono_data as _chrono_data,
-    enrich_profile as _enrich_profile,
-    fmt_size as _fmt_size,
     go_no_go_snapshot as _go_no_go_snapshot,
-    ia_metrics_from_parquet as _ia_metrics_from_parquet,
+)
+from src.streamlit.metrics import (
     load_benchmark_results as _load_benchmark_results,
-    scan_stage as _scan_stage,
+)
+from src.streamlit.metrics import (
     scan_trained_models as _scan_trained_models,
-    sentiment_benchmark_diagnosis as _sentiment_benchmark_diagnosis,
-    stage_time_range as _stage_time_range,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 def render(ctx: PageContext) -> None:
-    project_root = ctx.project_root
     PROJECT_ROOT = ctx.project_root
-    settings = ctx.settings
-    api_base = ctx.api_base
-    backend_ok = ctx.backend_ok
-    ux_mode = ctx.ux_mode
-    show_advanced = ctx.show_advanced
-    history_mode = ctx.history_mode
-    raw_dir = ctx.raw_dir
-    silver_dir = ctx.silver_dir
-    gold_dir = ctx.gold_dir
-    goldai_dir = ctx.goldai_dir
-    ia_dir = ctx.ia_dir
 
     st.markdown("### Modèles IA — Benchmark, Fine-tuning & Sélection")
     st.caption(
@@ -199,7 +173,7 @@ def render(ctx: PageContext) -> None:
             st.dataframe(df_bench, use_container_width=True, hide_index=True)
 
             best_key = rows_b_sorted[0]["Modèle"]
-            best_acc = bench_results.get(best_key, {}).get("accuracy", 0)
+            bench_results.get(best_key, {}).get("accuracy", 0)
 
             # Exclure finetuned_local pour suggérer un backbone pré-entraîné
             pretrained_sorted = [r for r in rows_b_sorted if r["Modèle"] != "finetuned_local"]
@@ -224,7 +198,7 @@ def render(ctx: PageContext) -> None:
                         type="primary",
                         disabled=not _may_admin,
                         help=(
-                            "Role admin requis."
+                            "Rôle admin requis."
                             if not _may_admin
                             else f"Lance le fine-tuning du meilleur backbone ({best_pt_key}) avec class weights"
                         ),
@@ -246,8 +220,8 @@ def render(ctx: PageContext) -> None:
     _may_run = can_write()
     if not _may_run:
         st.info(
-            "Role `reader` : les benchmarks et l'activation de modele sont en lecture seule. "
-            "Seuls `writer` ou `admin` peuvent declencher un run."
+            "Rôle `reader` : les benchmarks et l'activation de modèle sont en lecture seule. "
+            "Seuls `writer` ou `admin` peuvent déclencher un run."
         )
     col_bench1, col_bench2 = st.columns(2)
     with col_bench1:
@@ -359,7 +333,7 @@ def render(ctx: PageContext) -> None:
     st.subheader("3. Sélection & Activation pour la production")
     st.caption(
         "Activez le meilleur modèle ici. Il sera utilisé automatiquement par l'API `/ai/predict` "
-        "et pour les analyses Mistral (insights clients politique / économie)."
+        "et pour les insights Mistral (insights clients politique / économie)."
     )
 
     all_model_options: dict[str, str] = {
@@ -375,7 +349,7 @@ def render(ctx: PageContext) -> None:
 
     current_label = next(
         (lbl for lbl, path in all_model_options.items() if path == (active_model or "")),
-        list(all_model_options.keys())[0],
+        next(iter(all_model_options.keys())),
     )
     chosen_label = st.selectbox(
         "Modèle à activer pour la production",
@@ -393,7 +367,7 @@ def render(ctx: PageContext) -> None:
             type="primary",
             use_container_width=True,
             disabled=not _may_admin_activate,
-            help=("Role admin requis (ecriture de .env)." if not _may_admin_activate else None),
+            help=("Rôle admin requis (écriture de .env)." if not _may_admin_activate else None),
         ):
             if chosen_path:
                 ok = _activate_model(PROJECT_ROOT, chosen_path)
@@ -416,7 +390,7 @@ def render(ctx: PageContext) -> None:
             use_container_width=True,
             disabled=not _may_admin_activate,
             help=(
-                "Role admin requis."
+                "Rôle admin requis."
                 if not _may_admin_activate
                 else "Active le modèle fine-tuné avec la meilleure accuracy"
             ),

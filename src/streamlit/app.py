@@ -5,17 +5,10 @@ DataSens Streamlit Cockpit
 from __future__ import annotations
 
 import os
-import re
-import subprocess
 import sys
-import json
-import time
-import csv
 from pathlib import Path
 
-import pandas as pd
 import requests
-
 import streamlit as st
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -23,63 +16,50 @@ sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from src.config import get_settings
-from src.observability.lineage_service import LineageService
+from src.streamlit._cockpit_helpers import (
+    PageContext,
+)
+from src.streamlit._cockpit_helpers import (
+    inject_css as _inject_css,
+)
+from src.streamlit._cockpit_helpers import (
+    inject_demo_css as _inject_demo_css,
+)
+from src.streamlit._cockpit_helpers import (
+    inject_readability_css as _inject_readability_css,
+)
 from src.streamlit.auth_plug import (
-    get_token,
     init_session_auth,
     is_logged_in,
     render_login_form,
     render_user_and_logout,
 )
+
 # M6 refactor — helpers de calcul pur extraits dans metrics.py.
 # Phase 1 : fmt_size, scan_stage
 # Phase 2 : stage_time_range, chrono_data, ia_metrics_from_parquet, enrich_profile, build_enrichment_table
 # Phase 3 : load_benchmark_results, sentiment_benchmark_diagnosis, go_no_go_snapshot, scan_trained_models
 # Phase 4 (cockpit audit 2026-04) : helpers UI centralisés dans src/streamlit/_cockpit_helpers.py
-from src.streamlit.metrics import (
-    fmt_size as _fmt_size,
-    scan_stage as _scan_stage,
-    stage_time_range as _stage_time_range,
-    chrono_data as _chrono_data,
-    ia_metrics_from_parquet as _ia_metrics_from_parquet,
-    enrich_profile as _enrich_profile,
-    build_enrichment_table as _build_enrichment_table,
-    load_benchmark_results as _load_benchmark_results,
-    sentiment_benchmark_diagnosis as _sentiment_benchmark_diagnosis,
-    go_no_go_snapshot as _go_no_go_snapshot,
-    scan_trained_models as _scan_trained_models,
-)
-from src.streamlit._cockpit_helpers import (
-    PageContext,
-    inject_css as _inject_css,
-    inject_readability_css as _inject_readability_css,
-    inject_demo_css as _inject_demo_css,
-    read_parquet_cached as _read_parquet_cached,
-    parquet_row_count_cached as _parquet_row_count_cached,
-    csv_row_count_cached as _csv_row_count_cached,
-    mongo_status as _mongo_status,
-    ia_history as _ia_history,
-    latest_db_state_reports as _latest_db_state_reports,
-    get_active_model as _get_active_model,
-    activate_model as _activate_model,
-    launch_api_in_new_window as _launch_api_in_new_window,
-    run_command as _run_command,
-    render_last_report as _render_last_report,
-    record_click as _record_click,
-    get_telemetry_snapshot as _get_telemetry_snapshot,
-)
 # Modules d'onglet du cockpit : chaque onglet vit dans son propre module.
 # Dossier volontairement nommé `page_modules` (et non `pages`) pour désactiver
 # l'auto-découverte multi-pages de Streamlit qui polluerait la sidebar.
 from src.streamlit.page_modules import (
     demo as page_demo,
-    overview as page_overview,
-    pipeline as page_pipeline,
-    flux as page_flux,
-    pilotage as page_pilotage,
+)
+from src.streamlit.page_modules import (
     ia as page_ia,
-    modeles as page_modeles,
-    monitoring as page_monitoring,
+)
+from src.streamlit.page_modules import (
+    ia_models as page_ia_models,
+)
+from src.streamlit.page_modules import (
+    overview as page_overview,
+)
+from src.streamlit.page_modules import (
+    pilotage_ops as page_pilotage_ops,
+)
+from src.streamlit.page_modules import (
+    pipeline_data as page_pipeline_data,
 )
 
 
@@ -100,9 +80,9 @@ def main() -> None:
         st.subheader("Backend (API)")
         st.caption(f"`{api_base}`")
         if backend_ok:
-            st.success("Connecte")
+            st.success("Connecté")
         else:
-            st.warning("Arrete")
+            st.warning("Arrêté")
             st.caption("Lancer : start_full.bat ou python run_e2_api.py")
         st.divider()
         init_session_auth()
@@ -111,18 +91,22 @@ def main() -> None:
                 st.rerun()
         else:
             render_user_and_logout()
+            # Si la session vient d'expirer pendant ce render, proposer
+            # immédiatement le formulaire sans forcer un refresh manuel.
+            if not is_logged_in():
+                if render_login_form():
+                    st.rerun()
 
         st.divider()
         ux_mode = st.selectbox(
-            "Ergonomie cockpit",
-            ["Standard", "Lecture facile", "Mode démo", "Expert"],
+            "Profil d’usage",
+            ["Standard", "Mode démo", "Expert"],
             index=0,
             key="ux_mode_select",
             help=(
-                "Standard : vue opérationnelle. "
-                "Lecture facile : contraste renforcé. "
-                "Mode démo : narration simplifiée. "
-                "Expert : affiche les blocs techniques avancés (ex. Supervision buffer vs long terme)."
+                "Standard : onglet IA uniquement (utilisateur final). "
+                "Mode démo : 4 onglets épurés pour la démonstration (sans admin). "
+                "Expert : 4 onglets dont Pilotage & Ops (MongoDB, Prometheus, fine-tuning)."
             ),
         )
         show_compass = st.checkbox(
@@ -134,14 +118,11 @@ def main() -> None:
         compass_body = (
             """
             <ul class="ds-compass-list">
-              <li>🎬 Démo guidée : parcours narratif des 8 onglets</li>
-              <li>🏠 Vue d'ensemble : état global du système</li>
-              <li>🔁 Pipeline & Fusion : Gold/GoldAI, doublons, ajouts</li>
-              <li>🧬 Flux & Visualisation : rejets, enrichissement, qualité</li>
-              <li>⚙️ Pilotage : actions run (collecte, fusion, API)</li>
-              <li>🤖 IA : prédiction sentiment et insights Mistral</li>
-              <li>🎯 Modèles & Sélection : benchmark, fine-tuning, GO/NO-GO</li>
-              <li>📊 Monitoring : MLOps live, Prometheus/Grafana/Kuma</li>
+              <li>🎬 Démo guidée : narration (Mode démo seul)</li>
+              <li>🏠 Vue d'ensemble : état pipeline + Lineage de la donnée (SQLite → MongoDB)</li>
+              <li>🔁 Pipeline & Données : Pipeline du jour + preuve de fusion + exploration</li>
+              <li>🤖 IA &amp; Modèles : prédiction live, insights Mistral, benchmark</li>
+              <li>⚙️ Pilotage &amp; Ops : admin (run/backup, MongoDB, Prometheus) — Expert seul</li>
             </ul>
             """
             if show_compass
@@ -156,15 +137,21 @@ def main() -> None:
             """,
             unsafe_allow_html=True,
         )
+        mode_summary = {
+            "Standard": "Mode actif : Standard — onglet IA utilisateur uniquement.",
+            "Mode démo": "Mode actif : Démo — Démo guidée + Vue d'ensemble + Pipeline & Données + IA & Modèles. Pas d'admin technique.",
+            "Expert": "Mode actif : Expert — 4 onglets dont Pilotage & Ops (admin, MongoDB, Prometheus).",
+        }
+        st.caption(mode_summary.get(ux_mode, ""))
 
     # Securite : aucun panel accessible sans connexion
     if not is_logged_in():
-        st.warning("Connectez-vous dans la barre laterale pour acceder au cockpit.")
+        st.warning("Connectez-vous dans la barre latérale pour accéder au cockpit.")
         st.stop()
 
     st.title("DataSens Cockpit")
     _inject_css()
-    _inject_readability_css(ux_mode == "Lecture facile")
+    _inject_readability_css(False)
     _inject_demo_css(ux_mode == "Mode démo")
     history_mode = True
     show_advanced = ux_mode == "Expert"
@@ -190,33 +177,34 @@ def main() -> None:
         settings=settings,
     )
 
-    tab_demo, tab_overview, tab_pipeline, tab_flux, tab_pilotage, tab_ia, tab_modeles, tab_monitoring = st.tabs(
-        ["🎬 Démo guidée", "🏠 Vue d'ensemble", "🔁 Pipeline & Fusion", "🧬 Flux & Visualisation", "⚙️ Pilotage", "🤖 IA", "🎯 Modèles & Sélection", "📊 Monitoring"]
-    )
-
-    with tab_demo:
-        page_demo.render(ctx)
-
-    with tab_overview:
-        page_overview.render(ctx)
-
-    with tab_pipeline:
-        page_pipeline.render(ctx)
-
-    with tab_flux:
-        page_flux.render(ctx)
-
-    with tab_pilotage:
-        page_pilotage.render(ctx)
-
-    with tab_ia:
-        page_ia.render(ctx)
-
-    with tab_modeles:
-        page_modeles.render(ctx)
-
-    with tab_monitoring:
-        page_monitoring.render(ctx)
+    page_registry = {
+        "🎬 Démo guidée": page_demo.render,
+        "🏠 Vue d'ensemble": page_overview.render,
+        "🔁 Pipeline & Données": page_pipeline_data.render,
+        "🤖 IA": page_ia.render,
+        "🤖 IA & Modèles": page_ia_models.render,
+        "⚙️ Pilotage & Ops": page_pilotage_ops.render,
+    }
+    tabs_by_mode = {
+        "Standard": ["🤖 IA"],
+        "Mode démo": [
+            "🎬 Démo guidée",
+            "🏠 Vue d'ensemble",
+            "🔁 Pipeline & Données",
+            "🤖 IA & Modèles",
+        ],
+        "Expert": [
+            "🏠 Vue d'ensemble",
+            "🔁 Pipeline & Données",
+            "🤖 IA & Modèles",
+            "⚙️ Pilotage & Ops",
+        ],
+    }
+    selected_tabs = tabs_by_mode.get(ux_mode, tabs_by_mode["Standard"])
+    rendered_tabs = st.tabs(selected_tabs)
+    for tab_ui, tab_label in zip(rendered_tabs, selected_tabs, strict=False):
+        with tab_ui:
+            page_registry[tab_label](ctx)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,6 @@ Extrait depuis src/streamlit/app.py (phase C, audit 2026-04).
 
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 import sys
@@ -13,80 +12,53 @@ from pathlib import Path
 
 import altair as alt
 import pandas as pd
-import requests
 import streamlit as st
 
-from src.observability.lineage_service import LineageService
 from src.streamlit._cockpit_helpers import (
     PageContext,
-    activate_model as _activate_model,
-    csv_row_count_cached as _csv_row_count_cached,
-    get_active_model as _get_active_model,
-    ia_history as _ia_history,
-    inject_css as _inject_css,
-    inject_demo_css as _inject_demo_css,
-    inject_readability_css as _inject_readability_css,
-    latest_db_state_reports as _latest_db_state_reports,
-    latest_run_summary_reports as _latest_run_summary_reports,
-    run_summary_history as _run_summary_history,
-    launch_api_in_new_window as _launch_api_in_new_window,
-    mongo_status as _mongo_status,
-    parquet_row_count_cached as _parquet_row_count_cached,
-    read_parquet_cached as _read_parquet_cached,
-    render_last_report as _render_last_report,
-    run_command as _run_command,
 )
-from src.streamlit.auth_plug import (
-    get_token,
-    init_session_auth,
-    is_logged_in,
-    render_login_form,
-    render_user_and_logout,
+from src.streamlit._cockpit_helpers import (
+    latest_run_summary_reports as _latest_run_summary_reports,
+)
+from src.streamlit._cockpit_helpers import (
+    parquet_row_count_cached as _parquet_row_count_cached,
+)
+from src.streamlit._cockpit_helpers import (
+    read_parquet_cached as _read_parquet_cached,
+)
+from src.streamlit._cockpit_helpers import (
+    run_summary_history as _run_summary_history,
+)
+from src.streamlit.data_lineage import render_row_trace
+from src.streamlit.metrics import (
+    build_enrichment_table as _build_enrichment_table,
 )
 from src.streamlit.pipeline_proof import (
     render_article_journey,
     render_last_run_proof_full,
-)
-from src.streamlit.metrics import (
-    build_enrichment_table as _build_enrichment_table,
-    chrono_data as _chrono_data,
-    enrich_profile as _enrich_profile,
-    fmt_size as _fmt_size,
-    go_no_go_snapshot as _go_no_go_snapshot,
-    ia_metrics_from_parquet as _ia_metrics_from_parquet,
-    load_benchmark_results as _load_benchmark_results,
-    scan_stage as _scan_stage,
-    scan_trained_models as _scan_trained_models,
-    sentiment_benchmark_diagnosis as _sentiment_benchmark_diagnosis,
-    stage_time_range as _stage_time_range,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 def render(ctx: PageContext) -> None:
-    project_root = ctx.project_root
     PROJECT_ROOT = ctx.project_root
-    settings = ctx.settings
-    api_base = ctx.api_base
-    backend_ok = ctx.backend_ok
-    ux_mode = ctx.ux_mode
     show_advanced = ctx.show_advanced
-    history_mode = ctx.history_mode
-    raw_dir = ctx.raw_dir
-    silver_dir = ctx.silver_dir
     gold_dir = ctx.gold_dir
     goldai_dir = ctx.goldai_dir
-    ia_dir = ctx.ia_dir
 
     gold_dir = PROJECT_ROOT / "data" / "gold"
     goldai_dir = PROJECT_ROOT / "data" / "goldai"
     merged_path = goldai_dir / "merged_all_dates.parquet"
     meta_path = goldai_dir / "metadata.json"
 
-    # The cockpit show : suivi visuel d'un article à travers les 4 étapes.
-    # Posé en haut car c'est la preuve la plus parlante de l'enrichissement.
+    # Suivi visuel d'un article à travers les 5 étapes du lineage.
+    # Placé en tête : audit visuel direct de l'enrichissement et de la persistance.
     render_article_journey(ctx)
+    st.divider()
+
+    # Trace par les lignes : MEMES articles dans SQLite, GOLD, GoldAI, GridFS.
+    render_row_trace(ctx)
     st.divider()
 
     # Preuve chiffrée du dernier run (deltas par étape + lignes réelles).
@@ -98,10 +70,10 @@ def render(ctx: PageContext) -> None:
         k = run_summary.get("kpis", {}) if isinstance(run_summary, dict) else {}
         reasons = run_summary.get("reasons", []) if isinstance(run_summary, dict) else []
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Run status", str(run_summary.get("status", "—")))
-        c2.metric("Loaded", f"{int(k.get('loaded', 0)):,}")
-        c3.metric("Clean ratio", f"{float(k.get('clean_ratio', 0.0)) * 100:.1f}%")
-        c4.metric("Durée run", f"{float(k.get('run_duration_sec', 0.0)):.1f}s")
+        c1.metric("Statut", str(run_summary.get("status", "—")))
+        c2.metric("Chargées", f"{int(k.get('loaded', 0)):,}")
+        c3.metric("Ratio net", f"{float(k.get('clean_ratio', 0.0)) * 100:.1f}%")
+        c4.metric("Durée", f"{float(k.get('run_duration_sec', 0.0)):.1f}s")
         if reasons:
             with st.expander("WARN_REASONS (run summary)", expanded=False):
                 for r in reasons:
@@ -119,7 +91,7 @@ def render(ctx: PageContext) -> None:
                 reasons_item = item.get("reasons", []) if isinstance(item, dict) else []
                 rows.append(
                     {
-                        "run_file": item.get("_file", "—"),
+                        "execution_file": item.get("_file", "—"),
                         "status": status,
                         "loaded": int(float(kpi.get("loaded", 0.0) or 0.0)),
                         "clean_ratio_%": round(float(kpi.get("clean_ratio", 0.0) or 0.0) * 100, 1),
@@ -132,7 +104,7 @@ def render(ctx: PageContext) -> None:
                 if status == "WARN":
                     warn_rows.append(
                         {
-                            "run_file": item.get("_file", "—"),
+                            "execution_file": item.get("_file", "—"),
                             "loaded": int(float(kpi.get("loaded", 0.0) or 0.0)),
                             "reasons": " | ".join(str(r) for r in reasons_item) if reasons_item else "—",
                         }
@@ -210,8 +182,8 @@ def render(ctx: PageContext) -> None:
         if selected_date != "—"
         else None
     )
-    cols_min = tuple(["id", "fingerprint", "url", "title", "source", "collected_at", "sentiment"])
-    cols_goldai = tuple(["id", "fingerprint", "url", "title", "source", "collected_at", "sentiment", "raw_data_id"])
+    cols_min = ("id", "fingerprint", "url", "title", "source", "collected_at", "sentiment")
+    cols_goldai = ("id", "fingerprint", "url", "title", "source", "collected_at", "sentiment", "raw_data_id")
     if gold_file and gold_file.exists():
         df_gold = _read_parquet_cached(str(gold_file), cols_min)
     if merged_path.exists():
@@ -289,14 +261,14 @@ def render(ctx: PageContext) -> None:
             st.metric("Lignes", f"{n_gold:,}")
             st.caption("Lot source du jour à fusionner.")
         else:
-            st.info("—")
+            st.info("Aucun lot GOLD chargé pour la date sélectionnée.")
     with w2:
         st.markdown("#### 2. GoldAI")
         if df_goldai is not None:
             st.metric("Lignes", f"{n_goldai:,}")
             st.caption("Stock long terme consolidé.")
         else:
-            st.info("—")
+            st.info("Stock GoldAI indisponible. Lancez une fusion pour le créer.")
     with w3:
         st.markdown("#### 3. À ajouter")
         st.metric("Nouvelles lignes", f"{n_new:,}")
@@ -309,6 +281,44 @@ def render(ctx: PageContext) -> None:
                     if already_merged_selected
                     else "Lot entièrement dédupliqué."
                 )
+    st.markdown("#### Preuve d'enrichissement GOLD -> GoldAI")
+    if df_gold is not None and df_goldai is not None:
+        added_pct = (n_new / n_gold * 100.0) if n_gold > 0 else 0.0
+        c_proof1, c_proof2, c_proof3, c_proof4 = st.columns(4)
+        c_proof1.metric("GOLD du jour", f"{n_gold:,}")
+        c_proof2.metric("Déjà présents", f"{n_overlap:,}")
+        c_proof3.metric("Nouvelles lignes", f"{n_new:,}", delta=f"{added_pct:.1f}% du lot")
+        c_proof4.metric("GoldAI actuel", f"{n_goldai:,}")
+        if n_new > 0:
+            st.success(
+                f"Enrichissement visible: le lot GOLD du jour apporte **{n_new:,}** nouvelles lignes "
+                "au stock GoldAI consolidé."
+            )
+        else:
+            st.info(
+                "Aucune nouvelle ligne détectée sur ce lot: la date est déjà fusionnée "
+                "ou le lot est entièrement dédupliqué."
+            )
+        st.markdown("**Lignes incrémentales (échantillon)**")
+        if df_new is not None and not df_new.empty:
+            cols_lineage = [c for c in ["id", "title", "source", "collected_at", "sentiment"] if c in df_new.columns]
+            preview_new_lines = (
+                df_new[cols_lineage].copy().head(30)
+                if cols_lineage
+                else df_new.copy().head(30)
+            )
+            st.caption(
+                "Ces lignes sont réellement absentes de GoldAI avant fusion "
+                "(comparaison par identifiant stable id/fingerprint/url)."
+            )
+            st.dataframe(preview_new_lines, use_container_width=True, hide_index=True)
+        else:
+            st.caption(
+                "Aucune ligne nouvelle à afficher sur ce lot "
+                "(déjà fusionné ou entièrement en doublon)."
+            )
+    else:
+        st.info("Preuve indisponible: chargez un lot GOLD et le stock GoldAI.")
     st.markdown("#### Résultat de la fusion")
     if df_gold is not None and df_goldai is not None:
         n_res_keys = len(ids.union(keys_gold_set))
@@ -327,76 +337,180 @@ def render(ctx: PageContext) -> None:
                 "seront ajoutées à GoldAI."
             )
 
-        with st.expander("Détail technique (administrateurs)", expanded=False):
-            proof_df = pd.DataFrame(
-                [
-                    {"Indicateur": "IDs GoldAI existants (avant fusion)", "Valeur": n_goldai_keys},
-                    {"Indicateur": "IDs GOLD du jour", "Valeur": n_gold_keys},
-                    {"Indicateur": "Recouvrement (doublons détectés)", "Valeur": n_overlap},
-                    {"Indicateur": "Nouveaux IDs", "Valeur": n_new},
-                    {"Indicateur": "Total attendu après fusion", "Valeur": n_res_keys},
-                ]
-            )
-            st.dataframe(proof_df, use_container_width=True, hide_index=True)
-            if n_gold_missing_keys or n_goldai_missing_keys:
-                st.caption(
-                    f"Lignes sans identifiant stable ignorées dans le contrôle : "
-                    f"GOLD {n_gold_missing_keys:,} · GoldAI {n_goldai_missing_keys:,}."
+        if show_advanced:
+            with st.expander("Détail technique (administrateurs)", expanded=False):
+                proof_df = pd.DataFrame(
+                    [
+                        {"Indicateur": "IDs GoldAI existants (avant fusion)", "Valeur": n_goldai_keys},
+                        {"Indicateur": "IDs GOLD du jour", "Valeur": n_gold_keys},
+                        {"Indicateur": "Recouvrement (doublons détectés)", "Valeur": n_overlap},
+                        {"Indicateur": "Nouveaux IDs", "Valeur": n_new},
+                        {"Indicateur": "Total attendu après fusion", "Valeur": n_res_keys},
+                    ]
                 )
-
-        tab_new, tab_gold_prev, tab_goldai_prev = st.tabs(
-            ["Nouvelles lignes", "Aperçu GOLD du jour", "Aperçu GoldAI"]
-        )
-        with tab_new:
-            if df_new is not None and not df_new.empty:
-                cols_focus = [c for c in ["id", "title", "source", "collected_at"] if c in df_new.columns]
-                preview_new = df_new[cols_focus].copy().head(120) if cols_focus else df_new.copy().head(120)
-                if "id" in preview_new.columns:
-                    preview_new["id"] = (
-                        preview_new["id"]
-                        .astype("string")
-                        .fillna("—")
-                        .replace({"<NA>": "—", "": "—"})
+                st.dataframe(proof_df, use_container_width=True, hide_index=True)
+                if n_gold_missing_keys or n_goldai_missing_keys:
+                    st.caption(
+                        f"Lignes sans identifiant stable ignorées dans le contrôle : "
+                        f"GOLD {n_gold_missing_keys:,} · GoldAI {n_goldai_missing_keys:,}."
                     )
-                st.dataframe(preview_new, use_container_width=True, height=300)
-            elif df_new is not None:
-                st.info("Aucune nouvelle ligne à afficher.")
-            else:
-                st.info("—")
-        with tab_gold_prev:
-            cols_focus = [c for c in ["id", "title", "source", "collected_at"] if c in df_gold.columns]
-            gold_view = df_gold[cols_focus].copy().head(220) if cols_focus else df_gold.copy().head(220)
-            if not gold_view.empty:
-                key_series = _stable_keys_local(gold_view)
-                gold_view.insert(
-                    0,
-                    "Statut",
-                    key_series.apply(
-                        lambda v: "Nouveau" if v != "" and v not in ids
-                        else "Déjà présent" if v != ""
-                        else "Sans identifiant"
-                    ),
-                )
-                gold_view = gold_view.sort_values(by="Statut", ascending=True)
-            st.dataframe(gold_view.head(120), use_container_width=True, height=320)
-        with tab_goldai_prev:
-            cols_focus_goldai = [c for c in ["id", "title", "source", "collected_at", "sentiment"] if c in df_goldai.columns]
-            preview_goldai = df_goldai[cols_focus_goldai].copy().head(120) if cols_focus_goldai else df_goldai.copy().head(120)
-            st.dataframe(preview_goldai, use_container_width=True, height=320)
+
+            tab_new, tab_gold_prev, tab_goldai_prev = st.tabs(
+                ["Nouvelles lignes", "Aperçu GOLD du jour", "Aperçu GoldAI"]
+            )
+            with tab_new:
+                if df_new is not None and not df_new.empty:
+                    cols_focus = [c for c in ["id", "title", "source", "collected_at"] if c in df_new.columns]
+                    preview_new = df_new[cols_focus].copy().head(120) if cols_focus else df_new.copy().head(120)
+                    if "id" in preview_new.columns:
+                        preview_new["id"] = (
+                            preview_new["id"]
+                            .astype("string")
+                            .fillna("—")
+                            .replace({"<NA>": "—", "": "—"})
+                        )
+                    st.dataframe(preview_new, use_container_width=True, height=300)
+                elif df_new is not None:
+                    st.info("Aucune nouvelle ligne à afficher.")
+                else:
+                    st.info("Aucun aperçu disponible: chargez GOLD puis GoldAI.")
+            with tab_gold_prev:
+                cols_focus = [c for c in ["id", "title", "source", "collected_at"] if c in df_gold.columns]
+                gold_view = df_gold[cols_focus].copy().head(220) if cols_focus else df_gold.copy().head(220)
+                if not gold_view.empty:
+                    key_series = _stable_keys_local(gold_view)
+                    gold_view.insert(
+                        0,
+                        "Statut",
+                        key_series.apply(
+                            lambda v: "Nouveau" if v != "" and v not in ids
+                            else "Déjà présent" if v != ""
+                            else "Sans identifiant"
+                        ),
+                    )
+                    gold_view = gold_view.sort_values(by="Statut", ascending=True)
+                st.dataframe(gold_view.head(120), use_container_width=True, height=320)
+            with tab_goldai_prev:
+                cols_focus_goldai = [c for c in ["id", "title", "source", "collected_at", "sentiment"] if c in df_goldai.columns]
+                preview_goldai = df_goldai[cols_focus_goldai].copy().head(120) if cols_focus_goldai else df_goldai.copy().head(120)
+                st.dataframe(preview_goldai, use_container_width=True, height=320)
+        else:
+            st.caption("Aperçus détaillés et preuve technique complète disponibles en mode Expert.")
     elif df_goldai is not None:
         st.metric("Lignes", f"{n_goldai:,}")
     else:
-        st.info("—")
+        st.info("Aucune donnée GoldAI disponible pour afficher le résultat de fusion.")
 
     st.divider()
+    st.markdown("### Pipeline du jour")
     st.caption(
-        "Pour inspecter les données brutes de chaque étape (RAW, SILVER, GOLD, GoldAI, "
-        "Copie IA), utilise l'onglet **Flux & visualisation**."
+        "Lecture cohérente du run courant : volumes par étape, même grain (jour), "
+        "même direction (filtrage / déduplication). À ne pas confondre avec les stocks cumulés ci-dessus."
     )
-    st.markdown("### Enrichissement étape par étape")
+
+    last_run, _prev_run = _latest_run_summary_reports(PROJECT_ROOT)
+    if last_run:
+        extracted = int(last_run.get("extracted", 0) or 0)
+        cleaned = int(last_run.get("cleaned", 0) or 0)
+        loaded = int(last_run.get("loaded", 0) or 0)
+        deduped = int(last_run.get("deduplicated", 0) or 0)
+        run_status = str(last_run.get("status", "—") or "—")
+    else:
+        extracted = cleaned = loaded = deduped = 0
+        run_status = "—"
+
+    goldai_total_after = (
+        _parquet_row_count_cached(str(merged_path)) if merged_path.exists() else 0
+    )
+    goldai_growth = loaded
+
+    def _pct(num: int, denom: int) -> str:
+        if denom <= 0:
+            return "—"
+        return f"{(num/denom)*100:.1f}%"
+
+    journey_steps = [
+        {
+            "etape": "1. Extraits (sources)",
+            "lignes": extracted,
+            "lecture": "articles bruts collectés sur les 15 sources actives",
+        },
+        {
+            "etape": "2. Validés (cleaned)",
+            "lignes": cleaned,
+            "lecture": f"après nettoyage, ratio {_pct(cleaned, extracted)}",
+        },
+        {
+            "etape": "3. Nouveaux (dédupliqués)",
+            "lignes": loaded,
+            "lecture": (
+                f"déjà connus filtrés : {deduped:,} | "
+                f"taux de nouveauté {_pct(loaded, cleaned)}"
+            ),
+        },
+        {
+            "etape": "4. Ajoutés à GoldAI",
+            "lignes": goldai_growth,
+            "lecture": "lignes incrémentales fusionnées dans le stock historique",
+        },
+    ]
+
+    cols_steps = st.columns(len(journey_steps))
+    for col, step in zip(cols_steps, journey_steps, strict=False):
+        with col, st.container(border=True):
+            st.caption(step["etape"])
+            st.metric(
+                label=" ",
+                value=f"{step['lignes']:,}",
+                label_visibility="collapsed",
+            )
+            st.caption(step["lecture"])
+
     st.caption(
-        "Progression du pipeline de bout en bout. À chaque étape, on ajoute "
-        "de la structure (colonnes) ou de la valeur métier (sentiment, topics)."
+        f"Statut du run : **{run_status}** · "
+        f"Stock GoldAI cumulé après fusion : **{goldai_total_after:,} lignes** "
+        f"(le run du jour ajoute +{goldai_growth:,})."
+    )
+
+    journey_df = pd.DataFrame(
+        [
+            {"Étape": s["etape"], "Lignes": s["lignes"]}
+            for s in journey_steps
+            if s["lignes"] > 0
+        ]
+    )
+    if not journey_df.empty:
+        chart_journey = (
+            alt.Chart(journey_df)
+            .mark_bar(cornerRadiusEnd=4, height=28, color="#06b6d4")
+            .encode(
+                y=alt.Y("Étape:N", sort=None, title=None),
+                x=alt.X("Lignes:Q", title="Lignes du jour"),
+                tooltip=[alt.Tooltip("Étape:N"), alt.Tooltip("Lignes:Q", format=",")],
+            )
+            .properties(height=max(180, 56 * len(journey_df)))
+        )
+        labels_journey = (
+            alt.Chart(journey_df)
+            .mark_text(align="left", baseline="middle", dx=6, fontSize=13, fontWeight=600, color="#e2e8f0")
+            .encode(
+                y=alt.Y("Étape:N", sort=None),
+                x=alt.X("Lignes:Q"),
+                text=alt.Text("Lignes:Q", format=","),
+            )
+        )
+        st.altair_chart(chart_journey + labels_journey, use_container_width=True)
+    else:
+        st.info("Aucun run récent détecté. Lancez `python main.py` pour produire le run du jour.")
+
+    if not show_advanced:
+        return
+
+    st.divider()
+    st.markdown("### Détail technique : enrichissement étape par étape (Expert)")
+    st.caption(
+        "Vue brute des stocks par couche. Attention : les périmètres sont hétérogènes "
+        "(RAW/SILVER = partition du jour, GOLD/GoldAI = stocks cumulés)."
     )
     enrich_rows = _build_enrichment_table(PROJECT_ROOT)
     if enrich_rows:

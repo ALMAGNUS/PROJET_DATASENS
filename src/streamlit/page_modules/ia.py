@@ -5,72 +5,32 @@ Extrait depuis src/streamlit/app.py (phase C, audit 2026-04).
 
 from __future__ import annotations
 
-import json
 import os
-import subprocess
-import sys
 from pathlib import Path
 
-import pandas as pd
 import requests
 import streamlit as st
 
-from src.observability.lineage_service import LineageService
 from src.streamlit._cockpit_helpers import (
     PageContext,
-    activate_model as _activate_model,
-    csv_row_count_cached as _csv_row_count_cached,
+)
+from src.streamlit._cockpit_helpers import (
     get_active_model as _get_active_model,
-    ia_history as _ia_history,
-    inject_css as _inject_css,
-    inject_demo_css as _inject_demo_css,
-    inject_readability_css as _inject_readability_css,
-    latest_db_state_reports as _latest_db_state_reports,
-    launch_api_in_new_window as _launch_api_in_new_window,
-    mongo_status as _mongo_status,
-    parquet_row_count_cached as _parquet_row_count_cached,
-    read_parquet_cached as _read_parquet_cached,
-    render_last_report as _render_last_report,
-    run_command as _run_command,
 )
 from src.streamlit.auth_plug import (
     get_token,
-    init_session_auth,
-    is_logged_in,
-    render_login_form,
-    render_user_and_logout,
 )
 from src.streamlit.metrics import (
-    build_enrichment_table as _build_enrichment_table,
-    chrono_data as _chrono_data,
-    enrich_profile as _enrich_profile,
-    fmt_size as _fmt_size,
-    go_no_go_snapshot as _go_no_go_snapshot,
-    ia_metrics_from_parquet as _ia_metrics_from_parquet,
-    load_benchmark_results as _load_benchmark_results,
-    scan_stage as _scan_stage,
     scan_trained_models as _scan_trained_models,
-    sentiment_benchmark_diagnosis as _sentiment_benchmark_diagnosis,
-    stage_time_range as _stage_time_range,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 def render(ctx: PageContext) -> None:
-    project_root = ctx.project_root
     PROJECT_ROOT = ctx.project_root
     settings = ctx.settings
     api_base = ctx.api_base
-    backend_ok = ctx.backend_ok
-    ux_mode = ctx.ux_mode
-    show_advanced = ctx.show_advanced
-    history_mode = ctx.history_mode
-    raw_dir = ctx.raw_dir
-    silver_dir = ctx.silver_dir
-    gold_dir = ctx.gold_dir
-    goldai_dir = ctx.goldai_dir
-    ia_dir = ctx.ia_dir
 
     api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
     api_v1 = f"{api_base}{settings.api_v1_prefix}"
@@ -80,20 +40,24 @@ def render(ctx: PageContext) -> None:
         api_ok = requests.get(f"{api_base}/health", timeout=2).ok
     except Exception:
         api_ok = False
+    api_warning = (
+        "API indisponible. Ouvrez **Pilotage** puis lancez *API E2* avant d'utiliser "
+        "la prédiction ou l'assistant."
+    )
     if not api_ok:
-        st.warning(
-            "L’API n’est pas démarrée. Allez dans **Pilotage** → *Lancer API E2* avant d’utiliser la prédiction ou l’assistant."
-        )
-    with st.expander("Comment utiliser cet onglet ?", expanded=True):
+        st.warning(api_warning)
+    help_seen = st.session_state.get("ia_help_seen", False)
+    with st.expander("Comment utiliser cet onglet ?", expanded=not help_seen):
         st.markdown("""
-        **1. Prédiction** : Testez l’analyse de sentiment sur un texte (ex. « Le marché affiche une hausse »).  
+        **1. Prédiction** : Testez l’analyse de sentiment sur un texte (ex. « Le marché affiche une hausse »).
         → Saisissez un texte, choisissez un modèle, cliquez sur *Prédire*. Si un modèle fine-tuné est configuré (SENTIMENT_FINETUNED_MODEL_PATH), il est utilisé automatiquement.
 
-        **2. Assistant** : Posez des questions par domaine (Politique, Financier, Utilisateurs).  
+        **2. Assistant** : Posez des questions par domaine (Politique, Financier, Utilisateurs).
         → Sélectionnez un thème, tapez votre question dans le champ en bas. L’assistant répond en fonction des données du projet.
         """)
+    st.session_state["ia_help_seen"] = True
 
-    st.subheader("1. Prédiction de sentiment")
+    st.subheader("1. Classification sentiment (brique ML)")
     st.caption(
         "Analysez le sentiment (positif / négatif / neutre) d’un texte avec FlauBERT ou CamemBERT."
     )
@@ -103,17 +67,61 @@ def render(ctx: PageContext) -> None:
         height=70,
         help="Ex. une phrase ou un paragraphe",
     )
-    pred_model = st.selectbox(
-        "Modèle",
-        ["sentiment_fr", "camembert", "flaubert"],
-        format_func=lambda x: {
-            "sentiment_fr": "sentiment_fr — RECOMMANDÉ (57.5% bench, meilleur FR)",
-            "camembert": "CamemBERT distil (32.9% bench, léger/CPU)",
-            "flaubert": "FlauBERT base uncased (FR, non benchmarké seul)",
-        }.get(x, x),
-        key="pred_model",
-        help="sentiment_fr (ac0hik/Sentiment_Analysis_French) est le meilleur modèle sur vos données.",
+    active_model = _get_active_model(PROJECT_ROOT)
+    trained_models = _scan_trained_models(PROJECT_ROOT)
+    trained_by_path = {
+        str(m.get("path", "")).replace("\\", "/"): m for m in trained_models if m.get("path")
+    }
+    (
+        trained_by_path.get(str(active_model or "").replace("\\", "/"))
+        if active_model
+        else None
     )
+
+    best_local = None
+    if trained_models:
+        ranked = sorted(
+            trained_models,
+            key=lambda m: (
+                float(m.get("eval_f1_macro") or m.get("eval_f1") or 0.0),
+                float(m.get("eval_accuracy") or 0.0),
+            ),
+            reverse=True,
+        )
+        best_local = ranked[0]
+
+    effective_model_path = active_model or (best_local or {}).get("path")
+    effective_meta = (
+        trained_by_path.get(str(effective_model_path).replace("\\", "/"))
+        if effective_model_path
+        else None
+    )
+
+    # UX produit: un seul modèle exposé à l'utilisateur (le meilleur courant).
+    # Le backend reste piloté par SENTIMENT_FINETUNED_MODEL_PATH.
+    pred_model = "sentiment_fr"
+    st.markdown("**Modèle utilisé**")
+    if effective_model_path:
+        f1_local = effective_meta.get("eval_f1_macro") if effective_meta else None
+        acc_local = effective_meta.get("eval_accuracy") if effective_meta else None
+        perf = "métriques non lues"
+        if f1_local is not None:
+            perf = f"F1 macro val {float(f1_local):.1%}"
+        elif acc_local is not None:
+            perf = f"accuracy val {float(acc_local):.1%}"
+        st.success(f"Fine-tuné local (meilleur courant) — {effective_model_path} · {perf}")
+        if active_model:
+            st.caption(
+                "Inférence via backend avec modèle fine-tuné actif "
+                "(SENTIMENT_FINETUNED_MODEL_PATH)."
+            )
+        else:
+            st.caption(
+                "Fine-tuné local détecté. Pour l'activer côté backend, définissez "
+                "SENTIMENT_FINETUNED_MODEL_PATH sur ce chemin."
+            )
+    else:
+        st.info("Aucun fine-tuné local détecté. Fallback sur sentiment_fr.")
     if st.button("Prédire le sentiment"):
         token = get_token()
         headers = {"Content-Type": "application/json"}
@@ -131,23 +139,62 @@ def render(ctx: PageContext) -> None:
                 res = data.get("result", data)
                 if res and isinstance(res, list) and res[0].get("sentiment_score") is not None:
                     r0 = res[0]
+                    label_raw = str(r0.get("label", "-")).upper()
+                    label_fr = {
+                        "POSITIVE": "Positif",
+                        "NEGATIVE": "Négatif",
+                        "NEUTRAL": "Neutre",
+                    }.get(label_raw, str(r0.get("label", "-")))
+                    confidence = float(r0.get("confidence", 0.0) or 0.0)
+                    intensity = float(r0.get("sentiment_score", 0.0) or 0.0)
                     c1, c2, c3 = st.columns(3)
-                    c1.metric("Label", r0.get("label", "-"))
-                    c2.metric("Confidence", f"{r0.get('confidence', 0):.1%}")
-                    c3.metric("Score [-1,+1]", r0.get("sentiment_score", 0))
-                    st.json(res)
+                    c1.metric("Sentiment", label_fr)
+                    c2.metric("Confiance du modèle", f"{confidence:.1%}")
+                    c3.metric("Intensité [-1,+1]", f"{intensity:+.2f}")
+                    tone_map = {
+                        "Positif": ("#1b5e20", "#e8f5e9"),
+                        "Neutre": ("#37474f", "#eceff1"),
+                        "Négatif": ("#b71c1c", "#ffebee"),
+                    }
+                    fg, bg = tone_map.get(label_fr, ("#263238", "#eceff1"))
+                    st.markdown(
+                        (
+                            f"<div style='display:inline-block;padding:6px 12px;border-radius:999px;"
+                            f"background:{bg};color:{fg};font-weight:700;'>"
+                            f"Sentiment détecté : {label_fr}"
+                            "</div>"
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                    polarity = (
+                        "très positive"
+                        if intensity >= 0.6
+                        else "positive"
+                        if intensity >= 0.2
+                        else "neutre"
+                        if intensity > -0.2
+                        else "négative"
+                        if intensity > -0.6
+                        else "très négative"
+                    )
+                    st.caption(
+                        f"Lecture : sentiment **{label_fr.lower()}**, confiance "
+                        f"**{confidence:.1%}**, intensité **{intensity:+.2f}** ({polarity})."
+                    )
+                    with st.expander("Détail technique (probabilités brutes)", expanded=False):
+                        st.json(res)
                 else:
                     st.json(res)
             else:
                 err_detail = r.json().get("detail", r.text) if r.headers.get("content-type", "").startswith("application/json") else r.text
                 st.error(f"Erreur {r.status_code}: {err_detail[:300]}")
         except requests.exceptions.ConnectionError:
-            st.warning("API non démarrée (Pilotage → Lancer API E2)")
+            st.warning(api_warning)
         except Exception as e:
             st.error(str(e)[:150])
 
     st.divider()
-    st.subheader("2. Assistant Mistral — Analyse client en temps réel")
+    st.subheader("2. Insights métier assistés (Mistral + GoldAI)")
 
     # Statut Mistral
     mistral_ok = False
@@ -170,10 +217,10 @@ def render(ctx: PageContext) -> None:
             "Mistral non configure. Verifiez `MISTRAL_API_KEY` dans `.env`."
         )
     else:
-        st.warning("API non demarree. Pilotage → Lancer API E2.")
+        st.warning(api_warning)
 
     st.caption(
-        "Posez des questions metier sur vos donnees. Mistral repond en s'appuyant sur le contexte reel "
+        "Posez des questions métier sur vos données. Mistral répond en s'appuyant sur le contexte réel "
         "(distribution sentiment, topics, sources, tendances) extrait de votre dataset GoldAI."
     )
 
@@ -259,7 +306,7 @@ def render(ctx: PageContext) -> None:
                     detail = r.json().get("detail", r.text) if "application/json" in r.headers.get("content-type", "") else r.text
                     reply = f"Erreur {r.status_code} : {detail[:200]}"
             except requests.exceptions.ConnectionError:
-                reply = "API non disponible. Demarrez l'API (Pilotage → Lancer API E2)."
+                reply = api_warning
             except Exception as e:
                 reply = f"Erreur : {e!s}"[:200]
             st.markdown(reply)

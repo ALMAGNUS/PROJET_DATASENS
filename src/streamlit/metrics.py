@@ -15,7 +15,6 @@ Plan de migration M6 :
 
 from __future__ import annotations
 
-import csv
 import datetime
 import json
 import re
