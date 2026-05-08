@@ -46,9 +46,16 @@ Thumbs.db
 monitoring/prometheus/data/
 monitoring/grafana/data/
 
-# Environment
-.env
-.env.local
+# Environment — toutes les variantes .env* sont ignorees (eviter les fuites
+# accidentelles via .env.freeze, .env.local, .env.production, etc.).
+# Seul .env.example est versionne (modele sans secrets).
+.env*
+!.env.example
+
+# PDF generes du guide architecture (binaire derive du .md)
+docs/GUIDE_ARCHITECTURE_MODE_EMPLOI_FICHIERS.pdf
+# README.pdf (exporte au cas par cas, jamais versionne)
+README.pdf
 
 # Jupyter
 .ipynb_checkpoints/
