@@ -21,7 +21,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.13'
           cache: 'pip'
       
       - name: Install dependencies
@@ -41,8 +41,8 @@ jobs:
           python -c "from src.e1.pipeline import E1Pipeline; print('✅ E1Pipeline importable')"
           python -c "from src.shared.interfaces import E1DataReader; print('✅ E1DataReader importable')"
       
-      - name: Run other tests
-        run: pytest tests/ -v --ignore=tests/test_e1_isolation.py || true
+      - name: Run other tests (E2/E3 + auth + lineage)
+        run: pytest tests/ -v --ignore=tests/test_e1_isolation.py
 
   # Build Docker Image
   build:
