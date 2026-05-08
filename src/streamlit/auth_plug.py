@@ -17,14 +17,14 @@ import time
 from typing import Any
 
 import requests
-
 import streamlit as st
+
 from src.config import get_settings
 
 ROLES_HIERARCHY = ("reader", "writer", "deleter", "admin")
 FORGOT_PASSWORD_HELP = (
-    "Mot de passe oublie ? Contactez l'administrateur de la plateforme "
-    "(aucun workflow self-service n'est expose par l'API E2)."
+    "Mot de passe oublié ou à changer : `python scripts/change_password.py <email>` "
+    "(saisie masquée, met à jour la table PROFILS via bcrypt)."
 )
 
 
@@ -39,7 +39,7 @@ def _auth_prefix() -> str:
 
 
 def init_session_auth() -> None:
-    """Initialise les cles auth dans session_state si absentes."""
+    """Initialise les clés auth dans session_state si absentes."""
     if "auth_token" not in st.session_state:
         st.session_state.auth_token = None
     if "auth_user" not in st.session_state:
@@ -59,12 +59,12 @@ def get_user() -> dict[str, Any] | None:
 
 
 def is_logged_in() -> bool:
-    """True si un utilisateur est connecte."""
+    """True si un utilisateur est connecté."""
     return get_token() is not None
 
 
 def has_role(role: str) -> bool:
-    """True si l'utilisateur a le role donne (ou admin)."""
+    """True si l'utilisateur a le rôle donné (ou admin)."""
     user = get_user()
     if not user:
         return False
@@ -73,7 +73,7 @@ def has_role(role: str) -> bool:
 
 
 def has_any_role(*allowed: str) -> bool:
-    """True si l'utilisateur a l'un des roles donnes (admin accepte implicitement)."""
+    """True si l'utilisateur a l'un des rôles donnés (admin accepté implicitement)."""
     user = get_user()
     if not user:
         return False
@@ -95,15 +95,15 @@ def can_admin() -> bool:
 
 def gate_by_role(allowed: tuple[str, ...], action_label: str) -> bool:
     """
-    Retourne True si l'utilisateur peut executer l'action.
+    Retourne True si l'utilisateur peut exécuter l'action.
     Sinon, affiche un avertissement dans l'UI et retourne False.
     Ne stoppe pas l'application (on gate uniquement le bloc appelant).
     """
     if has_any_role(*allowed):
         return True
     st.info(
-        f"Action reservee aux roles {', '.join(allowed)} : **{action_label}** "
-        f"(votre role courant : `{(get_user() or {}).get('role', '?')}`)."
+        f"Action réservée aux rôles {', '.join(allowed)} : **{action_label}** "
+        f"(votre rôle courant : `{(get_user() or {}).get('role', '?')}`)."
     )
     return False
 
@@ -112,7 +112,7 @@ def gate_by_role(allowed: tuple[str, ...], action_label: str) -> bool:
 # JWT: decodage non verifie (lecture du payload uniquement)
 # ---------------------------------------------------------------------------
 def _decode_jwt_unsafe(token: str | None) -> dict[str, Any]:
-    """Decode le payload d'un JWT sans verifier la signature (UX uniquement)."""
+    """Décode le payload d'un JWT sans vérifier la signature (UX uniquement)."""
     if not token:
         return {}
     try:
@@ -130,13 +130,13 @@ def token_seconds_remaining() -> int | None:
     """Retourne le nombre de secondes restantes avant expiration (ou None si indispo)."""
     payload = _decode_jwt_unsafe(get_token())
     exp = payload.get("exp")
-    if not isinstance(exp, (int, float)):
+    if not isinstance(exp, int | float):
         return None
     return int(exp - time.time())
 
 
 def is_token_expired() -> bool:
-    """True si le token est expire (exp <= now). False si pas d'info d'expiration."""
+    """True si le token est expiré (exp <= now). False si pas d'info d'expiration."""
     remaining = token_seconds_remaining()
     return remaining is not None and remaining <= 0
 
@@ -145,7 +145,7 @@ def _fmt_ttl(seconds: int | None) -> str:
     if seconds is None:
         return "TTL inconnu"
     if seconds <= 0:
-        return "expire"
+        return "expiré"
     m, s = divmod(seconds, 60)
     h, m = divmod(m, 60)
     if h:
@@ -158,7 +158,7 @@ def _fmt_ttl(seconds: int | None) -> str:
 def login(email: str, password: str) -> tuple[bool, str]:
     """
     Appelle l'API E2 POST /auth/login. Retourne (success, message).
-    En cas de succes, stocke token et user dans session_state.
+    En cas de succès, stocke token et user dans session_state.
     """
     init_session_auth()
     url = f"{_api_base()}{_auth_prefix().rstrip('/')}/auth/login"
@@ -170,7 +170,7 @@ def login(email: str, password: str) -> tuple[bool, str]:
             headers={"Content-Type": "application/json"},
         )
     except requests.exceptions.RequestException as e:
-        return False, f"Erreur reseau: {e}"
+        return False, f"Erreur réseau: {e}"
 
     if r.status_code != 200:
         detail = (r.json().get("detail") if r.headers.get("content-type", "").startswith("application/json") else None) or r.text
@@ -179,7 +179,7 @@ def login(email: str, password: str) -> tuple[bool, str]:
     data = r.json()
     token = data.get("access_token")
     if not token:
-        return False, "Reponse API sans token"
+        return False, "Réponse API sans token"
 
     st.session_state.auth_token = token
     st.session_state.auth_user = {
@@ -189,20 +189,25 @@ def login(email: str, password: str) -> tuple[bool, str]:
         "firstname": data.get("firstname"),
         "lastname": data.get("lastname"),
     }
-    return True, "Connexion reussie"
+    # UX: toujours repartir en mode Standard après connexion
+    # pour éviter de réutiliser un ancien choix de session.
+    st.session_state["ux_mode_select"] = "Standard"
+    return True, "Connexion réussie"
 
 
 def logout() -> None:
-    """Deconnecte et vide la session auth."""
+    """Déconnecte et vide la session auth."""
     init_session_auth()
     st.session_state.auth_token = None
     st.session_state.auth_user = None
+    # Remet le profil d'usage par défaut pour la prochaine connexion.
+    st.session_state["ux_mode_select"] = "Standard"
 
 
 def render_login_form() -> bool:
     """
     Affiche le formulaire de login dans la sidebar.
-    Retourne True si une tentative de login a reussi (pour rerun).
+    Retourne True si une tentative de login a réussi (pour rerun).
     """
     init_session_auth()
     st.sidebar.subheader("Connexion")
@@ -221,21 +226,21 @@ def render_login_form() -> bool:
 
 
 def render_user_and_logout() -> None:
-    """Affiche dans la sidebar l'utilisateur connecte, la TTL et un bouton Deconnexion."""
+    """Affiche dans la sidebar l'utilisateur connecté, la TTL et un bouton Déconnexion."""
     user = get_user()
     if not user:
         return
 
-    # Auto-logout si le JWT est expire cote client
+    # Auto-logout si le JWT est expiré côté client
     if is_token_expired():
         logout()
-        st.sidebar.warning("Session expiree. Merci de vous reconnecter.")
+        st.sidebar.warning("Session expirée. Merci de vous reconnecter.")
         return
 
     email = user.get("email") or "?"
     role = user.get("role") or "?"
-    st.sidebar.caption(f"Connecte: {email}")
-    st.sidebar.caption(f"Role: {role}")
+    st.sidebar.caption(f"Connecté : {email}")
+    st.sidebar.caption(f"Rôle : {role}")
     remaining = token_seconds_remaining()
     if remaining is not None:
         if remaining <= 60:
@@ -244,28 +249,21 @@ def render_user_and_logout() -> None:
             st.sidebar.info(f"Session: {_fmt_ttl(remaining)}")
         else:
             st.sidebar.caption(f"Session: {_fmt_ttl(remaining)}")
-    if st.sidebar.button("Deconnexion", key="auth_logout"):
+    if st.sidebar.button("Déconnexion", key="auth_logout"):
         logout()
         st.rerun()
 
 
 def require_auth(show_message: bool = True) -> bool:
     """
-    Si non connecte: affiche un message (optionnel) et st.stop().
-    Retourne True si connecte (le code apres peut s'executer).
+    Si non connecté: affiche un message (optionnel) et st.stop().
+    Retourne True si connecté (le code après peut s'exécuter).
     """
     if is_logged_in():
         return True
     if show_message:
-        st.warning("Cette section necessite une connexion. Connectez-vous dans la barre laterale.")
+        st.warning("Cette section nécessite une connexion. Connectez-vous dans la barre latérale.")
     st.stop()
     return False
 
 
-# ---------------------------------------------------------------------------
-# OAuth2: point d'extension pour brancher Google / GitHub plus tard
-# ---------------------------------------------------------------------------
-# def login_oauth2(provider: str) -> bool:
-#     """Placeholder: redirection OAuth2 vers provider (google, github)."""
-#     # TODO: integrer streamlit-oauth ou authlib + redirect_uri
-#     return False
