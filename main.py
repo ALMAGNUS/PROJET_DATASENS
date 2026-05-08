@@ -26,10 +26,9 @@ os.chdir(_PROJECT_ROOT)
 
 sys.path.insert(0, str(_PROJECT_ROOT / "src"))
 # Import E1 isolé depuis package e1
-from loguru import logger
-
 from e1.pipeline import E1Pipeline
 from logging_config import setup_logging
+from loguru import logger
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="DataSens E1 pipeline")
@@ -58,7 +57,33 @@ if __name__ == "__main__":
     pipeline = E1Pipeline(quiet=args.quiet)
     pipeline.run(inject_csv_path=args.inject_csv, inject_source_name=args.source_name)
 
-    # Option : garder le processus vivant pour que Prometheus puisse scraper les métriques
+    # Best-effort : rafraîchir les gauges Prometheus de drift via l'API E2.
+    # Si l'API est down ou DRIFT_REFRESH_PASSWORD absent du .env, le script log et sort en 0
+    # (jamais bloquant pour le pipeline). Cf. RUNBOOK § 11.4.
+    if os.getenv("DRIFT_REFRESH_PASSWORD"):
+        import subprocess
+
+        refresh_script = _PROJECT_ROOT / "scripts" / "refresh_drift_metrics.py"
+        try:
+            result = subprocess.run(
+                [sys.executable, str(refresh_script), "--quiet"],
+                timeout=20,
+                check=False,
+                capture_output=True,
+                text=True,
+                cwd=str(_PROJECT_ROOT),
+            )
+            if result.returncode == 0:
+                logger.info("Drift gauges Prometheus rafraîchies (API E2)")
+            else:
+                logger.warning("Drift refresh skipped (API down ou auth KO)")
+        except subprocess.TimeoutExpired:
+            logger.warning("Drift refresh timeout — gauges non rafraîchies")
+        except Exception as e:
+            logger.warning(f"Drift refresh exception : {type(e).__name__}: {e}")
+    else:
+        logger.debug("DRIFT_REFRESH_PASSWORD absent : drift gauges non rafraîchies (cf. RUNBOOK § 11.4)")
+
     if args.keep_metrics or os.getenv("METRICS_KEEP_ALIVE") == "1":
         port = int(os.getenv("METRICS_PORT", "8000"))
         logger.info("Pipeline terminé. Métriques exposées sur :%d — Ctrl+C pour quitter.", port)

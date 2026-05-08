@@ -684,7 +684,15 @@ _SHOW_CSS = """
 <style>
 .ds-show-wrap {
   display: grid;
-  grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+  /* 5 cartes (RAW · SILVER · GOLD · GoldAI · MongoDB) + 4 fleches.
+     minmax(0, 1fr) permet aux cartes de se compresser sans deborder
+     et evite le wrap involontaire de la derniere carte en ligne 2. */
+  grid-template-columns:
+    minmax(0, 1fr) auto
+    minmax(0, 1fr) auto
+    minmax(0, 1fr) auto
+    minmax(0, 1fr) auto
+    minmax(0, 1fr);
   align-items: stretch;
   gap: 0;
   margin: 8px 0 4px 0;
@@ -697,26 +705,38 @@ _SHOW_CSS = """
   display: flex;
   flex-direction: column;
   min-height: 340px;
+  /* min-width: 0 indispensable dans un grid : sans cela, le contenu long
+     d'une carte (titre RAW) force l'expansion et compresse les autres
+     -> titres SILVER/GOLD/GoldAI tronques en SILV/GOLI/Gold. */
+  min-width: 0;
   overflow: hidden;
 }
 .ds-show-card__head {
-  padding: 10px 14px;
+  padding: 10px 12px;
   color: #ffffff;
   font-weight: 600;
   letter-spacing: 0.3px;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
+  /* le head ne doit jamais elargir la carte plus que sa fraction grid */
+  min-width: 0;
 }
 .ds-show-card__head .ds-step {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
   opacity: 0.85;
   letter-spacing: 1px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .ds-show-card__head .ds-name {
-  font-size: 1.0rem;
+  font-size: 0.92rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .ds-show-card__subhead {
   padding: 6px 14px;
@@ -809,19 +829,23 @@ _SHOW_CSS = """
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  font-size: 1.3rem;
+  width: 18px;
+  font-size: 1.1rem;
   font-weight: 700;
   color: #9ca3af;
   user-select: none;
+  flex-shrink: 0;
 }
-@media (max-width: 1100px) {
+/* En dessous de 1300px de viewport, 5 cartes cote a cote tronquent les titres
+   et compressent illisiblement le contenu. On bascule en pile verticale
+   (RAW au-dessus, MongoDB en bas) avec fleches retournees verticalement. */
+@media (max-width: 1300px) {
   .ds-show-wrap {
     grid-template-columns: 1fr;
   }
   .ds-show-arrow {
     width: 100%;
-    height: 20px;
+    height: 22px;
     transform: rotate(90deg);
   }
   .ds-show-card {

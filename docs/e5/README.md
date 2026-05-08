@@ -34,4 +34,4 @@ Vérifie la présence des fichiers E5 et, si l'API est démarrée, l'accessibili
 
 ## Plan de lancement global
 
-Pour lancer tous les composants (Docker, API, MLflow, monitoring) dans le bon ordre : **`RUNBOOK.md`** (à la racine du projet).
+Pour lancer tous les composants (Docker, API, monitoring Prometheus/Grafana/Uptime Kuma, MongoDB) dans le bon ordre : **`RUNBOOK.md`** (à la racine du projet). Le rafraîchissement automatique des gauges Prometheus de drift est documenté en § 11.4, et le tracking des entraînements ML en § 11.5 du RUNBOOK.

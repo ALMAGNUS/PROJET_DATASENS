@@ -63,7 +63,14 @@
 
 ### 2.6 MLOps — Versioning modèle (optionnel)
 
-**Constat** : `trainer_state.json` et `TRAINING_RESULTS.json` assurent la traçabilité. **MLflow est désormais intégré** dans `finetune_sentiment.py` (params, metrics, config.json → `mlruns/`).
+**Constat** : la traçabilité des entraînements est assurée par :
+- `trainer_state.json` (HuggingFace Trainer, log_history loss + eval par step) ;
+- `docs/e2/TRAINING_RESULTS.json` (résultats du dernier run, versionnés Git) ;
+- `docs/e2/AI_BENCHMARK_RESULTS.json` (benchmark multi-modèles, versionné Git) ;
+- `docs/e2/figures/` (courbes PNG via `scripts/plot_e2_results.py`) ;
+- `<OUT_DIR>/runs/` côté Colab (events TensorBoard, inclus dans le zip téléchargé).
+
+**MLflow** : explicitement désactivé. `scripts/finetune_sentiment.py` documente le choix (lignes 530-531). Justification : projet mono-poste, pas de besoin de Model Registry centralisé, JSON Git plus traçable et réviewable que `mlruns/` gitignored. Voir `RUNBOOK.md` § 11.5 pour les déclencheurs futurs (>1 entraîneur, registry, comparaison >10 runs).
 
 ---
 
