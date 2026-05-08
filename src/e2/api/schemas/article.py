@@ -14,7 +14,7 @@ class ArticleBase(BaseModel):
 
     title: str = Field(..., min_length=1, max_length=500)
     content: str = Field(..., min_length=1)
-    url: str | None = Field(None, max_length=500)
+    url: str | None = Field(None, max_length=2048)
     published_at: datetime | None = None
 
 
@@ -30,7 +30,7 @@ class ArticleUpdate(BaseModel):
 
     title: str | None = Field(None, min_length=1, max_length=500)
     content: str | None = Field(None, min_length=1)
-    url: str | None = Field(None, max_length=500)
+    url: str | None = Field(None, max_length=2048)
     quality_score: float | None = Field(None, ge=0.0, le=1.0)
 
 
