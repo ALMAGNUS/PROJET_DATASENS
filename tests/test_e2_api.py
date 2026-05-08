@@ -342,7 +342,7 @@ class TestAuditTrail:
         assert log[0] == "read", "Action type devrait être 'read'"
         assert log[1] == "gold_data", "Resource type devrait être 'gold_data'"
 
-    def test_audit_trail_no_log_for_health_check(self, client):
+    def test_audit_trail_no_log_for_health_check(self, client, require_e2_tables):
         """Test que /health n'est pas loggé (exclu de l'audit)"""
         db_path = settings.db_path
         if not db_path.startswith("/") and not db_path.startswith("C:"):
