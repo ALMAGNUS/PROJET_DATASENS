@@ -15,7 +15,7 @@ def test_build_gold_ia_labelled_creates_sentiment_label() -> None:
     )
     out = build_gold_ia_labelled(df)
     assert "sentiment_label" in out.columns
-    assert out["sentiment_label"].tolist() == ["positif", "négatif"]
+    assert out["sentiment_label"].tolist() == ["positif", "negatif"]
 
 
 def test_build_gold_app_input_removes_target_columns() -> None:
