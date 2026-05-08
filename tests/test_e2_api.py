@@ -24,6 +24,36 @@ def client():
 
 
 @pytest.fixture
+def require_e2_tables():
+    """Skip si les tables `profils` ou `user_action_log` manquent.
+
+    Permet aux tests qui ne dependent pas de la fixture `test_user` (ex.
+    test_login_invalid_credentials, tests audit trail) de skip proprement
+    en CI sans crash. En local, les tables existent (init_profils_table.py
+    + pipeline E1), donc tout tourne.
+    """
+    db_path = settings.db_path
+    if not db_path.startswith("/") and not db_path.startswith("C:"):
+        db_path = str(get_data_dir().parent / db_path)
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    try:
+        for table in ("profils", "user_action_log"):
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                (table,),
+            )
+            if not cursor.fetchone():
+                pytest.skip(
+                    f"Table `{table}` absente. Executer "
+                    "`python scripts/init_profils_table.py` ou le pipeline E1."
+                )
+    finally:
+        conn.close()
+
+
+@pytest.fixture
 def test_user():
     """Créer un utilisateur de test dans la DB"""
     db_path = settings.db_path
@@ -109,7 +139,7 @@ class TestAuth:
         assert data["email"] == test_user["email"]
         assert data["role"] == test_user["role"]
 
-    def test_login_invalid_credentials(self, client):
+    def test_login_invalid_credentials(self, client, require_e2_tables):
         """Test login avec credentials invalides"""
         response = client.post(
             "/api/v1/auth/login", json={"email": "invalid@test.com", "password": "wrongpassword"}
@@ -338,7 +368,7 @@ class TestAuditTrail:
 
         assert count_after == count_before, "/health ne devrait pas être loggé"
 
-    def test_audit_trail_no_log_for_unauthorized(self, client):
+    def test_audit_trail_no_log_for_unauthorized(self, client, require_e2_tables):
         """Test que les requêtes non authentifiées ne sont pas loggées"""
         db_path = settings.db_path
         if not db_path.startswith("/") and not db_path.startswith("C:"):
