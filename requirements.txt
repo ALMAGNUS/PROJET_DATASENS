@@ -96,7 +96,7 @@ kaleido==0.2.1
 # ============================================================
 # E3: Experiment Tracking & Monitoring
 # ============================================================
-mlflow==3.7.0  # Versioning modèles (finetune_sentiment.py → mlruns/)
+mlflow==3.7.0  # Conservé pour environnements existants (mlruns/) — non utilisé en prod, tracking via JSON Git (cf. RUNBOOK § 11.5)
 prometheus-client==0.20.0
 grafana-api==1.0.3  # Grafana API client (optional)
 

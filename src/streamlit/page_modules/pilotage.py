@@ -26,6 +26,7 @@ from src.streamlit._cockpit_helpers import (
 from src.streamlit.auth_plug import (
     can_admin,
     can_write,
+    get_token,
 )
 from src.streamlit.metrics import (
     load_benchmark_results as _load_benchmark_results,
@@ -111,6 +112,8 @@ def render(ctx: PageContext) -> None:
 
     # Rapport d'exécution (affiché juste après les boutons principaux)
     _render_last_report("pilotage")
+
+    _render_drift_panel(settings)
 
     b4, b5, _ = st.columns(3)
     with b4:
@@ -346,3 +349,106 @@ def render(ctx: PageContext) -> None:
         st.divider()
         st.caption("Après fine-tuning, le chemin du modèle :")
         st.code("SENTIMENT_FINETUNED_MODEL_PATH=models/sentiment_fr-sentiment-finetuned")
+
+
+def _render_drift_panel(settings) -> None:
+    """Panneau drift : appelle /drift-metrics pour alimenter les gauges Prometheus.
+
+    Comportement :
+    - auto-refresh au chargement, avec TTL 60 s (cf. session_state)
+    - bouton "Rafraîchir maintenant" pour forcer immédiatement
+    - affiche les 4 valeurs (drift_score, entropy, dominance, articles_total)
+    - lien vers Grafana
+
+    Cf. RUNBOOK § 11.4 pour la procédure complète et `scripts/refresh_drift_metrics.py`.
+    """
+    import time
+
+    import requests
+
+    api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
+    grafana_url = f"http://localhost:{settings.grafana_port}"
+    drift_url = f"{api_base}/api/v1/analytics/drift-metrics"
+    cache_key = "_drift_cache"
+    ttl_seconds = 60
+
+    with st.expander("Drift modèle (Prometheus + Grafana)", expanded=False):
+        st.caption(
+            "Recalcule la distribution sentiment + topic dominance sur la zone Gold "
+            "et alimente les gauges Prometheus exposées par l'API E2. "
+            "Indispensable pour que Grafana affiche les courbes de drift."
+        )
+
+        col_btn, col_info = st.columns([1, 3])
+        force_refresh = col_btn.button("Rafraîchir maintenant", use_container_width=True)
+
+        cache = st.session_state.get(cache_key)
+        now = time.time()
+        should_call = force_refresh or cache is None or (now - cache["ts"]) > ttl_seconds
+
+        if should_call:
+            token = get_token()
+            if not token:
+                col_info.warning("Pas de token JWT en session. Reconnecte-toi pour pouvoir rafraîchir.")
+                cache = None
+            else:
+                try:
+                    r = requests.get(
+                        drift_url,
+                        headers={"Authorization": f"Bearer {token}"},
+                        timeout=10,
+                    )
+                    if r.ok:
+                        body = r.json()
+                        cache = {"ts": now, "data": body, "error": None}
+                        st.session_state[cache_key] = cache
+                    else:
+                        cache = {
+                            "ts": now,
+                            "data": None,
+                            "error": f"HTTP {r.status_code} : {r.text[:120]}",
+                        }
+                        st.session_state[cache_key] = cache
+                except requests.exceptions.ConnectionError:
+                    cache = {"ts": now, "data": None, "error": f"API E2 injoignable ({api_base})"}
+                    st.session_state[cache_key] = cache
+                except Exception as e:
+                    cache = {"ts": now, "data": None, "error": f"{type(e).__name__}: {e}"}
+                    st.session_state[cache_key] = cache
+
+        if cache is None:
+            col_info.info("Connecte-toi pour activer le rafraîchissement.")
+            return
+
+        if cache.get("error"):
+            col_info.error(f"Refresh KO : {cache['error']}")
+        else:
+            age = int(time.time() - cache["ts"])
+            col_info.caption(f"Dernier refresh : il y a {age} s — TTL cache {ttl_seconds} s")
+
+        if cache.get("data"):
+            data = cache["data"]
+            score = data.get("drift_score", 0.0)
+            entropy = data.get("sentiment_entropy", 0.0)
+            dominance = data.get("topic_dominance", 0.0)
+            total = data.get("articles_total", 0)
+
+            m1, m2, m3, m4 = st.columns(4)
+            score_status = "🔴" if score >= 0.7 else ("🟠" if score >= 0.5 else "🟢")
+            m1.metric(f"{score_status} Drift score", f"{score:.3f}", help="Composite (1−entropy_norm)·0.5 + dominance·0.5. Alerte si > 0.7.")
+            m2.metric("Entropy sentiment", f"{entropy:.3f}", help="Plus haut = distribution équilibrée (idéal).")
+            m3.metric("Topic dominance", f"{dominance:.3f}", help="Fraction du topic le plus fréquent. Plus haut = un sujet écrase les autres.")
+            m4.metric("Articles base", f"{total:,}".replace(",", " "), help="Volume total dans la zone Gold pris pour le calcul.")
+
+            if score >= 0.7:
+                st.error(
+                    "Drift score ≥ 0.7 — l'alerte Prometheus `DriftScoreHigh` se déclenche après 15 min. "
+                    "Envisager un réentraînement (cf. RUNBOOK § 11.4)."
+                )
+            elif score >= 0.5:
+                st.warning("Drift score ≥ 0.5 — à surveiller.")
+
+        st.markdown(
+            f"Voir les courbes dans **Grafana** : [DataSens – Métriques & Drift]({grafana_url}/d/datasens-full) "
+            "(folder *DataSens*)."
+        )

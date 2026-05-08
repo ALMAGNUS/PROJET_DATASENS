@@ -102,7 +102,7 @@ Détail complet : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/dev/FLO
 | ORM | SQLModel · SQLAlchemy | 0.0.21 / ≥ 2.0.36 |
 | Distribué | PySpark · delta-spark | 3.5.1 / 3.0.0 |
 | ML | HuggingFace Transformers · CamemBERT · Mistral AI | — |
-| Tracking | MLflow | — |
+| Tracking ML | JSON versionnés Git (`docs/e2/TRAINING_RESULTS.json`, `AI_BENCHMARK_RESULTS.json`) + HF `trainer_state.json` + TensorBoard côté Colab. Pas de MLflow (mono-poste). Détails : [`RUNBOOK.md` § 11.5](RUNBOOK.md#115-tracking-des-entra%C3%AEnements-ml). | — |
 | Cockpit | Streamlit | — |
 | Scraping | `feedparser` · `requests` · `beautifulsoup4` · `botasaurus` | — |
 | Datasets externes | `kagglehub` · GDELT · INSEE · OpenWeather · datagouv | — |
@@ -156,16 +156,21 @@ start_full.bat
 ```
 
 Démarre l'API E2 (port 8001) et le cockpit Streamlit (port 8501) dans deux terminaux dédiés.
-Pour la stack monitoring + MongoDB + MLflow, voir [`RUNBOOK.md`](RUNBOOK.md).
+Pour la stack monitoring (Prometheus, Grafana, Uptime Kuma) et MongoDB, voir [`RUNBOOK.md`](RUNBOOK.md).
 
 ### 5. Fine-tuning CamemBERT
 
 ```bat
 scripts\run_training_loop_e2.bat --full
-mlflow ui
 ```
 
-Notebook Colab (GPU gratuit) en option : `notebooks/colab_finetune_sentiment.ipynb`.
+Sorties :
+- modèle : `models/sentiment_fr-sentiment-finetuned/`
+- métriques : `docs/e2/TRAINING_RESULTS.json` + `AI_BENCHMARK_RESULTS.json` (versionnés Git)
+- courbes : `docs/e2/figures/e2_training_*.png`
+
+Notebook Colab (GPU gratuit) en option : `notebooks/colab_finetune_sentiment.ipynb` —
+courbes loss / F1 inline via TensorBoard.
 Ré-injection locale du modèle entraîné : `python scripts/install_colab_model.py <archive.zip>`.
 
 ---
@@ -256,8 +261,7 @@ src/                    # 17 600 lignes Python
 
 data/                   # RAW · SILVER · GOLD · goldai · datasens.db (gitignored)
 reports/                # db_state · run_summary · pipeline_proof (versionnés)
-mlruns/                 # tracking MLflow
-models/                 # checkpoints fine-tunés (gitignored)
+models/                 # checkpoints fine-tunés + trainer_state (gitignored)
 notebooks/              # E1 pédagogique + Colab fine-tuning
 scripts/                # 46 utilitaires actifs (post-audit) + scripts/_archive/
 tests/                  # 16 fichiers, 52 tests verts

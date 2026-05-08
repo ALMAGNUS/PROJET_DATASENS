@@ -60,6 +60,10 @@ README.pdf
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
+# Whitelist : notebooks officiels du projet (versionnés)
+!notebooks/colab_finetune_sentiment.ipynb
+!notebooks/datasens_E1/*.ipynb
+!notebooks/datasens_E1_v1/*.ipynb
 # Brouillon local racine (copier-coller vers annexes E2–E4) — à supprimer quand tu veux ; ne pas commit
 /preuves.ipynb
 
