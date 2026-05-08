@@ -5,9 +5,8 @@ Extrait depuis src/streamlit/app.py (phase C, audit 2026-04).
 
 from __future__ import annotations
 
-import json
 import os
-import subprocess
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -15,44 +14,42 @@ import pandas as pd
 import requests
 import streamlit as st
 
-from src.observability.lineage_service import LineageService
 from src.streamlit._cockpit_helpers import (
     PageContext,
-    activate_model as _activate_model,
-    csv_row_count_cached as _csv_row_count_cached,
-    get_active_model as _get_active_model,
     get_telemetry_snapshot,
-    ia_history as _ia_history,
-    inject_css as _inject_css,
-    inject_demo_css as _inject_demo_css,
-    inject_readability_css as _inject_readability_css,
-    latest_db_state_reports as _latest_db_state_reports,
-    launch_api_in_new_window as _launch_api_in_new_window,
-    mongo_status as _mongo_status,
-    parquet_row_count_cached as _parquet_row_count_cached,
-    read_parquet_cached as _read_parquet_cached,
-    render_last_report as _render_last_report,
     reset_telemetry,
+)
+from src.streamlit._cockpit_helpers import (
+    mongo_get_file_bytes as _mongo_get_file_bytes,
+)
+from src.streamlit._cockpit_helpers import (
+    mongo_read_parquet_preview as _mongo_read_parquet_preview,
+)
+from src.streamlit._cockpit_helpers import (
+    mongo_status as _mongo_status,
+)
+from src.streamlit._cockpit_helpers import (
+    parquet_row_count_cached as _parquet_row_count_cached,
+)
+from src.streamlit._cockpit_helpers import (
+    read_parquet_cached as _read_parquet_cached,
+)
+from src.streamlit._cockpit_helpers import (
     run_command as _run_command,
 )
-from src.streamlit.auth_plug import (
-    get_token,
-    init_session_auth,
-    is_logged_in,
-    render_login_form,
-    render_user_and_logout,
+from src.streamlit.metrics import (
+    chrono_data as _chrono_data,
 )
 from src.streamlit.metrics import (
-    build_enrichment_table as _build_enrichment_table,
-    chrono_data as _chrono_data,
-    enrich_profile as _enrich_profile,
     fmt_size as _fmt_size,
-    go_no_go_snapshot as _go_no_go_snapshot,
+)
+from src.streamlit.metrics import (
     ia_metrics_from_parquet as _ia_metrics_from_parquet,
-    load_benchmark_results as _load_benchmark_results,
+)
+from src.streamlit.metrics import (
     scan_stage as _scan_stage,
-    scan_trained_models as _scan_trained_models,
-    sentiment_benchmark_diagnosis as _sentiment_benchmark_diagnosis,
+)
+from src.streamlit.metrics import (
     stage_time_range as _stage_time_range,
 )
 
@@ -60,23 +57,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 def render(ctx: PageContext) -> None:
-    project_root = ctx.project_root
     PROJECT_ROOT = ctx.project_root
     settings = ctx.settings
     api_base = ctx.api_base
-    backend_ok = ctx.backend_ok
-    ux_mode = ctx.ux_mode
     show_advanced = ctx.show_advanced
-    history_mode = ctx.history_mode
-    raw_dir = ctx.raw_dir
-    silver_dir = ctx.silver_dir
-    gold_dir = ctx.gold_dir
-    goldai_dir = ctx.goldai_dir
-    ia_dir = ctx.ia_dir
 
     st.markdown("### Pilotage du modèle & insights")
     api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
-    api_v1 = f"{api_base}{settings.api_v1_prefix}"
     prometheus_url = f"http://localhost:{settings.prometheus_port}"
     grafana_url = f"http://localhost:{settings.grafana_port}"
     uptime_kuma_url = os.getenv("UPTIME_KUMA_URL", "http://localhost:3001")
@@ -149,34 +136,43 @@ def render(ctx: PageContext) -> None:
     st.dataframe(pd.DataFrame(status_rows), use_container_width=True, hide_index=True)
     up_count = sum(1 for row in status_rows if row["Statut"] == "UP")
     if up_count == len(status_rows):
-        st.success(f"MLOps branché: {up_count}/{len(status_rows)} services UP.")
+        st.success(f"MLOps opérationnel : {up_count}/{len(status_rows)} services UP.")
     else:
-        st.warning(f"MLOps partiel: {up_count}/{len(status_rows)} services UP.")
+        st.warning(f"MLOps partiel : {up_count}/{len(status_rows)} services UP.")
 
-    with st.expander("Contrôle scrape Prometheus (targets)", expanded=False):
-        try:
-            r = requests.get(f"{prometheus_url}/api/v1/targets", timeout=4)
-            if r.status_code == 200:
-                payload = r.json().get("data", {}).get("activeTargets", [])
-                rows = []
-                for t in payload:
-                    labels = t.get("labels", {}) or {}
-                    rows.append(
-                        {
-                            "job": labels.get("job", "n/a"),
-                            "instance": labels.get("instance", "n/a"),
-                            "health": t.get("health", "unknown"),
-                            "last_error": (t.get("lastError") or "")[:120],
-                        }
-                    )
-                if rows:
-                    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    if show_advanced:
+        with st.expander("Administration et diagnostic technique", expanded=False):
+            st.markdown("**Contrôle scrape Prometheus (targets)**")
+            try:
+                r = requests.get(f"{prometheus_url}/api/v1/targets", timeout=4)
+                if r.status_code == 200:
+                    payload = r.json().get("data", {}).get("activeTargets", [])
+                    rows = []
+                    for t in payload:
+                        labels = t.get("labels", {}) or {}
+                        rows.append(
+                            {
+                                "job": labels.get("job", "n/a"),
+                                "instance": labels.get("instance", "n/a"),
+                                "health": t.get("health", "unknown"),
+                                "last_error": (t.get("lastError") or "")[:120],
+                            }
+                        )
+                    if rows:
+                        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                    else:
+                        st.caption("Aucune target active remontée par Prometheus.")
                 else:
-                    st.caption("Aucune target active remontée par Prometheus.")
-            else:
-                st.warning(f"Prometheus targets indisponible: HTTP {r.status_code}")
-        except Exception as exc:
-            st.warning(f"Prometheus targets indisponible: {str(exc)[:150]}")
+                    st.warning(f"Prometheus targets indisponibles: HTTP {r.status_code}")
+            except Exception as exc:
+                st.warning(f"Prometheus targets indisponibles: {str(exc)[:150]}")
+
+            st.markdown("**Liens techniques Prometheus / Grafana**")
+            st.caption(
+                f"API metrics : {api_base}/metrics · Prometheus : {prometheus_url} · Grafana : {grafana_url}"
+            )
+    else:
+        st.caption("Détails techniques masqués (mode Expert requis).")
 
     st.subheader("Métriques IA")
     st.caption("Déséquilibres, confiance, volume – pour piloter le modèle.")
@@ -214,95 +210,98 @@ def render(ctx: PageContext) -> None:
                 elif n_lex > 0:
                     st.caption("Origine : règles lexicales uniquement.")
 
-        with st.expander("Détails du reclassement des sentiments (administrateurs)", expanded=False):
-            alias_rows = int(ia.get("sentiment_alias_rows", 0) or 0)
-            if alias_rows > 0:
-                st.caption(
-                    f"**{alias_rows:,}** lignes issues de sources multilingues "
-                    "(labels `neutral` / `positive` / `negative`, notations 1-5…) "
-                    "ont été normalisées vers les 3 classes de référence : "
-                    "négatif, neutre, positif."
-                )
-            map_rows = ia.get("sentiment_mapping_table", [])
-            if map_rows:
-                st.dataframe(pd.DataFrame(map_rows), use_container_width=True, hide_index=True)
-            raw_dist = ia.get("sentiment_distribution_raw", {})
-            if raw_dist:
-                st.caption("Labels bruts observés avant normalisation :")
-                for lbl, n in list(raw_dist.items())[:10]:
-                    st.caption(f"  • {lbl} : {n:,}")
-            st.caption(
-                "Cette table retrace la correspondance entre les libellés bruts "
-                "des sources et les 3 classes métier (négatif / neutre / positif)."
-            )
-
-        with st.expander("Qualité du dataset d'entraînement", expanded=False):
-            reco = ia.get("mistral_dataset_reco", "")
-            if reco:
-                st.caption(reco)
-            splits = ia.get("ia_splits", {})
-            if splits:
-                st.dataframe(
-                    pd.DataFrame(
-                        [{"Jeu": k, "Lignes": v} for k, v in splits.items()]
-                    ),
-                    use_container_width=True,
-                    hide_index=True,
-                )
-            id_missing = int(ia.get("id_missing", 0))
-            id_duplicates = int(ia.get("id_duplicates", 0))
-            if id_missing or id_duplicates:
-                st.caption(
-                    f"Identifiants manquants : {id_missing:,} · "
-                    f"Identifiants en doublon : {id_duplicates:,}."
-                )
-
-        with st.expander("Distribution des topics", expanded=False):
-            full_topics = ia.get("topic_distribution_full") or ia.get("topic_distribution")
-            if full_topics:
-                total_topics = int(ia.get("topic_total_rows", sum(full_topics.values())))
-                distinct = int(ia.get("topic_distinct_count", len(full_topics)))
-                other_rows = int(ia.get("topic_other_rows", 0))
-                topic_rows = [
-                    {
-                        "Topic": topic,
-                        "Articles": count,
-                        "%": round(count / total_topics * 100, 1) if total_topics else 0.0,
-                    }
-                    for topic, count in full_topics.items()
-                ]
-                st.caption(
-                    f"{distinct} topics distincts · {total_topics:,} articles classés."
-                )
-                if other_rows:
-                    pct_other = other_rows / total_topics * 100 if total_topics else 0.0
+        if show_advanced:
+            with st.expander("Détails du reclassement des sentiments (administrateurs)", expanded=False):
+                alias_rows = int(ia.get("sentiment_alias_rows", 0) or 0)
+                if alias_rows > 0:
                     st.caption(
-                        f"Le bucket **« autre »** regroupe {other_rows:,} articles "
-                        f"({pct_other:.1f}%) — articles pour lesquels aucun mot-clé "
-                        "métier n'a été reconnu lors du tagging."
+                        f"**{alias_rows:,}** lignes issues de sources multilingues "
+                        "(labels `neutral` / `positive` / `negative`, notations 1-5…) "
+                        "ont été normalisées vers les 3 classes de référence : "
+                        "négatif, neutre, positif."
                     )
-                st.dataframe(
-                    pd.DataFrame(topic_rows),
-                    use_container_width=True,
-                    hide_index=True,
-                    height=min(420, 40 + 35 * len(topic_rows)),
+                map_rows = ia.get("sentiment_mapping_table", [])
+                if map_rows:
+                    st.dataframe(pd.DataFrame(map_rows), use_container_width=True, hide_index=True)
+                raw_dist = ia.get("sentiment_distribution_raw", {})
+                if raw_dist:
+                    st.caption("Labels bruts observés avant normalisation :")
+                    for lbl, n in list(raw_dist.items())[:10]:
+                        st.caption(f"  • {lbl} : {n:,}")
+                st.caption(
+                    "Cette table retrace la correspondance entre les libellés bruts "
+                    "des sources et les 3 classes métier (négatif / neutre / positif)."
                 )
-            else:
-                st.caption("Aucune donnée topic disponible.")
 
-        with st.expander("Principales sources de données (volume)", expanded=False):
-            if "top_sources" in ia:
-                src_rows = [
-                    {"Source": src, "Articles": count}
-                    for src, count in list(ia["top_sources"].items())[:10]
-                ]
-                st.dataframe(
-                    pd.DataFrame(src_rows),
-                    use_container_width=True,
-                    hide_index=True,
-                )
-            else:
-                st.caption("Aucune donnée source disponible.")
+            with st.expander("Qualité du jeu de données d'entraînement", expanded=False):
+                reco = ia.get("mistral_dataset_reco", "")
+                if reco:
+                    st.caption(reco)
+                splits = ia.get("ia_splits", {})
+                if splits:
+                    st.dataframe(
+                        pd.DataFrame(
+                            [{"Jeu": k, "Lignes": v} for k, v in splits.items()]
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                id_missing = int(ia.get("id_missing", 0))
+                id_duplicates = int(ia.get("id_duplicates", 0))
+                if id_missing or id_duplicates:
+                    st.caption(
+                        f"Identifiants manquants : {id_missing:,} · "
+                        f"Identifiants en doublon : {id_duplicates:,}."
+                    )
+
+            with st.expander("Distribution des topics", expanded=False):
+                full_topics = ia.get("topic_distribution_full") or ia.get("topic_distribution")
+                if full_topics:
+                    total_topics = int(ia.get("topic_total_rows", sum(full_topics.values())))
+                    distinct = int(ia.get("topic_distinct_count", len(full_topics)))
+                    other_rows = int(ia.get("topic_other_rows", 0))
+                    topic_rows = [
+                        {
+                            "Topic": topic,
+                            "Articles": count,
+                            "%": round(count / total_topics * 100, 1) if total_topics else 0.0,
+                        }
+                        for topic, count in full_topics.items()
+                    ]
+                    st.caption(
+                        f"{distinct} topics distincts · {total_topics:,} articles classés."
+                    )
+                    if other_rows:
+                        pct_other = other_rows / total_topics * 100 if total_topics else 0.0
+                        st.caption(
+                            f"Le bucket **« autre »** regroupe {other_rows:,} articles "
+                            f"({pct_other:.1f}%) — articles pour lesquels aucun mot-clé "
+                            "métier n'a été reconnu lors du tagging."
+                        )
+                    st.dataframe(
+                        pd.DataFrame(topic_rows),
+                        use_container_width=True,
+                        hide_index=True,
+                        height=min(420, 40 + 35 * len(topic_rows)),
+                    )
+                else:
+                    st.caption("Aucune donnée topic disponible.")
+
+            with st.expander("Principales sources de données (volume)", expanded=False):
+                if "top_sources" in ia:
+                    src_rows = [
+                        {"Source": src, "Articles": count}
+                        for src, count in list(ia["top_sources"].items())[:10]
+                    ]
+                    st.dataframe(
+                        pd.DataFrame(src_rows),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                else:
+                    st.caption("Aucune donnée source disponible.")
+        else:
+            st.caption("Analyses détaillées (topics, mapping labels, qualité dataset) disponibles en mode Expert.")
 
         st.caption(
             "Indicateurs de surveillance : équilibre des classes, "
@@ -389,13 +388,183 @@ def render(ctx: PageContext) -> None:
                     )
                     if has_legacy_gold:
                         st.caption("Note: entrée legacy `gold_articles` détectée (ancien format, remplacé par `gold_articles_YYYY-MM-DD`).")
+
+                    st.markdown("#### Lineage de la donnée")
+                    st.caption(
+                        "Chaîne de persistance en 4 étapes, de la collecte temps réel au stockage long terme."
+                    )
+
+                    def _resolve_db_path_lineage() -> Path:
+                        db_candidate = os.getenv("DB_PATH")
+                        if db_candidate and Path(db_candidate).exists():
+                            return Path(db_candidate)
+                        default_db = Path.home() / "datasens_project" / "datasens.db"
+                        return default_db if default_db.exists() else PROJECT_ROOT / "datasens.db"
+
+                    def _count_raw_sqlite_lineage(db_path: Path) -> int:
+                        if not db_path.exists():
+                            return 0
+                        try:
+                            conn = sqlite3.connect(str(db_path))
+                            try:
+                                row = conn.execute("SELECT COUNT(*) FROM raw_data").fetchone()
+                                return int(row[0]) if row else 0
+                            finally:
+                                conn.close()
+                        except Exception:
+                            return 0
+
+                    db_path_j = _resolve_db_path_lineage()
+                    raw_total_j = _count_raw_sqlite_lineage(db_path_j)
+                    latest_gold_date_j = (
+                        gold_daily_dates.max().date().isoformat()
+                        if not gold_daily_dates.empty
+                        else "—"
+                    )
+                    latest_gold_path_j = (
+                        PROJECT_ROOT / "data" / "gold" / f"date={latest_gold_date_j}" / "articles.parquet"
+                        if latest_gold_date_j != "—"
+                        else None
+                    )
+                    latest_gold_rows_j = (
+                        _parquet_row_count_cached(str(latest_gold_path_j))
+                        if latest_gold_path_j and latest_gold_path_j.exists()
+                        else 0
+                    )
+                    goldai_merged_path_j = PROJECT_ROOT / "data" / "goldai" / "merged_all_dates.parquet"
+                    goldai_merged_rows_j = (
+                        _parquet_row_count_cached(str(goldai_merged_path_j))
+                        if goldai_merged_path_j.exists()
+                        else 0
+                    )
+                    mongo_logicals_j = set(df_mongo["Nom logique"].astype("string").fillna("").tolist())
+                    has_gold_daily_j = (
+                        f"gold_articles_{latest_gold_date_j}" in mongo_logicals_j
+                        if latest_gold_date_j != "—"
+                        else False
+                    )
+                    has_goldai_merged_j = "goldai_merged" in mongo_logicals_j
+                    mongo_total_files_j = len(mongo.get("files", []))
+                    mongo_total_size_j = _fmt_size(mongo.get("total_size", 0))
+
+                    step_1, step_2 = st.columns(2)
+                    with step_1, st.container(border=True):
+                        st.markdown("**1. Extraction temps réel → SQLite**")
+                        st.caption("15 connecteurs E1 (RSS, API, scraping). Buffer opérationnel.")
+                        st.metric(
+                            "Lignes en base SQLite",
+                            f"{raw_total_j:,}",
+                            help=f"Source: `{db_path_j}` (table `raw_data`).",
+                        )
+                    with step_2, st.container(border=True):
+                        st.markdown("**2. SQLite → Parquet GOLD du jour**")
+                        st.caption("Snapshot quotidien immuable, partitionné par date.")
+                        st.metric(
+                            f"GOLD {latest_gold_date_j}",
+                            f"{latest_gold_rows_j:,} lignes" if latest_gold_rows_j else "0",
+                            help=f"Local: `data/gold/date={latest_gold_date_j}/articles.parquet`.",
+                        )
+
+                    step_3, step_4 = st.columns(2)
+                    with step_3, st.container(border=True):
+                        st.markdown("**3. Parquet → GoldAI consolidé**")
+                        st.caption("Fusion incrémentale dédupliquée, base ML.")
+                        st.metric(
+                            "GoldAI total (lignes)",
+                            f"{goldai_merged_rows_j:,}" if goldai_merged_rows_j else "0",
+                            help="Local: `data/goldai/merged_all_dates.parquet`.",
+                        )
+                    with step_4, st.container(border=True):
+                        st.markdown("**4. Sauvegarde MongoDB GridFS**")
+                        st.caption("Stockage long terme. Contrôle de cohérence end-to-end.")
+                        st.metric(
+                            "Fichiers stockés",
+                            f"{mongo_total_files_j:,}",
+                            help=f"Volume total: {mongo_total_size_j}",
+                        )
+
+                    integrity_ok = (
+                        raw_total_j > 0
+                        and latest_gold_rows_j > 0
+                        and goldai_merged_rows_j > 0
+                        and has_gold_daily_j
+                        and has_goldai_merged_j
+                    )
+                    if integrity_ok:
+                        st.success(
+                            f"Chaîne de persistance cohérente : SQLite ({raw_total_j:,}) → "
+                            f"GOLD {latest_gold_date_j} ({latest_gold_rows_j:,}) → "
+                            f"GoldAI ({goldai_merged_rows_j:,}) → GridFS (snapshot + consolidé archivés)."
+                        )
+                    else:
+                        missing = []
+                        if raw_total_j == 0:
+                            missing.append("SQLite vide")
+                        if latest_gold_rows_j == 0:
+                            missing.append(f"GOLD {latest_gold_date_j} absent")
+                        if goldai_merged_rows_j == 0:
+                            missing.append("GoldAI consolidé absent")
+                        if not has_gold_daily_j:
+                            missing.append(f"backup GridFS `gold_articles_{latest_gold_date_j}` manquant")
+                        if not has_goldai_merged_j:
+                            missing.append("backup GridFS `goldai_merged` manquant")
+                        st.warning(
+                            "Chaîne de persistance incomplète. Étapes à corriger : "
+                            + " · ".join(missing)
+                        )
+
                     df_latest = (
                         df_dataset.sort_values("_upload_ts", ascending=False)
                         .drop_duplicates(subset=["Nom logique"], keep="first")
                         .drop(columns=["_upload_ts"])
                     )
-                    st.caption("Vue compacte datasets: dernier état par nom logique (GOLD/GoldAI/IA).")
+                    st.caption("Vue compacte datasets : dernier état par nom logique (GOLD/GoldAI/IA).")
                     st.dataframe(df_latest, use_container_width=True, hide_index=True)
+                    st.markdown("**Inspection GridFS (lecture directe d'un fichier archivé)**")
+                    preview_choices = (
+                        df_dataset[["file_id", "Nom logique", "Fichier", "Taille"]]
+                        .fillna("—")
+                        .to_dict(orient="records")
+                    )
+                    if preview_choices:
+                        labels = [
+                            f"{row['Nom logique']} ({row['Fichier']}, {row['Taille']})"
+                            for row in preview_choices
+                        ]
+                        selected_label = st.selectbox(
+                            "Choisir un fichier Mongo à ouvrir",
+                            labels,
+                            key="mongo_preview_select",
+                        )
+                        selected_idx = labels.index(selected_label)
+                        selected_row = preview_choices[selected_idx]
+                        selected_file_id = str(selected_row.get("file_id", "") or "")
+                        if selected_file_id:
+                            col_prev, col_dl = st.columns([1, 1])
+                            with col_prev:
+                                if st.button("Afficher aperçu (100 lignes)", use_container_width=True, key="mongo_preview_btn"):
+                                    with st.spinner("Lecture GridFS..."):
+                                        df_preview = _mongo_read_parquet_preview(PROJECT_ROOT, selected_file_id, limit=100)
+                                    if df_preview.empty:
+                                        st.warning("Aperçu indisponible (fichier non parquet ou lecture impossible).")
+                                    else:
+                                        st.success(f"Aperçu chargé: {len(df_preview):,} lignes affichées.")
+                                        st.dataframe(df_preview, use_container_width=True, hide_index=True)
+                            with col_dl:
+                                payload, meta, filename = _mongo_get_file_bytes(PROJECT_ROOT, selected_file_id)
+                                if payload:
+                                    logical = (meta or {}).get("logical_name", "mongo_file")
+                                    download_name = f"{logical}.parquet"
+                                    st.download_button(
+                                        "Télécharger ce fichier",
+                                        data=payload,
+                                        file_name=download_name if logical else (filename or "mongo_file.parquet"),
+                                        mime="application/octet-stream",
+                                        use_container_width=True,
+                                        key="mongo_download_btn",
+                                    )
+                                else:
+                                    st.button("Télécharger ce fichier", disabled=True, use_container_width=True, key="mongo_download_btn_disabled")
                     with st.expander("Historique complet datasets", expanded=False):
                         st.dataframe(
                             df_dataset.drop(columns=["_upload_ts"]),
@@ -418,6 +587,141 @@ def render(ctx: PageContext) -> None:
                             use_container_width=True,
                             hide_index=True,
                         )
+                    st.markdown("**Trace de persistance SQLite -> Parquet -> GridFS**")
+                    def _resolve_db_path_local() -> Path:
+                        db_candidate = os.getenv("DB_PATH")
+                        if db_candidate and Path(db_candidate).exists():
+                            return Path(db_candidate)
+                        default_db = Path.home() / "datasens_project" / "datasens.db"
+                        return default_db if default_db.exists() else PROJECT_ROOT / "datasens.db"
+
+                    def _count_raw_sqlite_local(db_path: Path) -> int:
+                        if not db_path.exists():
+                            return 0
+                        try:
+                            conn = sqlite3.connect(str(db_path))
+                            try:
+                                row = conn.execute("SELECT COUNT(*) FROM raw_data").fetchone()
+                                return int(row[0]) if row else 0
+                            finally:
+                                conn.close()
+                        except Exception:
+                            return 0
+
+                    db_path = _resolve_db_path_local()
+                    raw_total = _count_raw_sqlite_local(db_path)
+                    latest_gold_date = (
+                        gold_daily_dates.max().date().isoformat()
+                        if not gold_daily_dates.empty
+                        else "—"
+                    )
+                    latest_gold_path = (
+                        PROJECT_ROOT / "data" / "gold" / f"date={latest_gold_date}" / "articles.parquet"
+                        if latest_gold_date != "—"
+                        else None
+                    )
+                    latest_gold_rows = (
+                        _parquet_row_count_cached(str(latest_gold_path))
+                        if latest_gold_path and latest_gold_path.exists()
+                        else 0
+                    )
+                    goldai_merged_path = PROJECT_ROOT / "data" / "goldai" / "merged_all_dates.parquet"
+                    goldai_merged_rows = (
+                        _parquet_row_count_cached(str(goldai_merged_path))
+                        if goldai_merged_path.exists()
+                        else 0
+                    )
+                    mongo_logicals = set(df_mongo["Nom logique"].astype("string").fillna("").tolist())
+                    has_gold_daily_mongo = (
+                        f"gold_articles_{latest_gold_date}" in mongo_logicals
+                        if latest_gold_date != "—"
+                        else False
+                    )
+                    has_goldai_merged_mongo = "goldai_merged" in mongo_logicals
+                    transfer_rows = [
+                        {
+                            "Étape": "SQLite buffer",
+                            "Preuve locale": str(db_path),
+                            "Volume (lignes)": f"{raw_total:,}",
+                            "État": "OK" if raw_total > 0 else "VIDE",
+                        },
+                        {
+                            "Étape": "Parquet GOLD du jour",
+                            "Preuve locale": f"data/gold/date={latest_gold_date}/articles.parquet"
+                            if latest_gold_date != "—"
+                            else "Aucune partition GOLD",
+                            "Volume (lignes)": f"{latest_gold_rows:,}" if latest_gold_rows else "0",
+                            "État": "OK" if latest_gold_rows > 0 else "ABSENT",
+                        },
+                        {
+                            "Étape": "Mongo backup GOLD du jour",
+                            "Preuve Mongo": f"gold_articles_{latest_gold_date}" if latest_gold_date != "—" else "—",
+                            "Volume (lignes)": "n/a",
+                            "État": "OK" if has_gold_daily_mongo else "NON SAUVEGARDÉ",
+                        },
+                        {
+                            "Étape": "Parquet GoldAI consolidé",
+                            "Preuve locale": "data/goldai/merged_all_dates.parquet",
+                            "Volume (lignes)": f"{goldai_merged_rows:,}" if goldai_merged_rows else "0",
+                            "État": "OK" if goldai_merged_rows > 0 else "ABSENT",
+                        },
+                        {
+                            "Étape": "Mongo backup GoldAI",
+                            "Preuve Mongo": "goldai_merged",
+                            "Volume (lignes)": "n/a",
+                            "État": "OK" if has_goldai_merged_mongo else "NON SAUVEGARDÉ",
+                        },
+                    ]
+                    st.dataframe(pd.DataFrame(transfer_rows), use_container_width=True, hide_index=True)
+                    st.caption(
+                        "Chaîne de persistance complète: stockage opérationnel SQLite -> "
+                        "Parquet métiers -> sauvegarde GridFS MongoDB."
+                    )
+                    st.markdown("**Comparaison Parquet local vs sauvegarde GridFS**")
+                    if latest_gold_date != "—" and latest_gold_path and latest_gold_path.exists():
+                        mongo_gold_logical = f"gold_articles_{latest_gold_date}"
+                        mongo_gold_row = (
+                            df_dataset[df_dataset["Nom logique"] == mongo_gold_logical].head(1)
+                            if "Nom logique" in df_dataset.columns
+                            else pd.DataFrame()
+                        )
+                        if not mongo_gold_row.empty:
+                            mongo_gold_file_id = str(mongo_gold_row.iloc[0].get("file_id", "") or "")
+                            local_preview = _read_parquet_cached(
+                                str(latest_gold_path),
+                                ("id", "title", "source", "collected_at", "sentiment"),
+                            ).head(20)
+                            mongo_preview = (
+                                _mongo_read_parquet_preview(PROJECT_ROOT, mongo_gold_file_id, limit=20)
+                                if mongo_gold_file_id
+                                else pd.DataFrame()
+                            )
+                            if not mongo_preview.empty:
+                                keep_cols = [c for c in ["id", "title", "source", "collected_at", "sentiment"] if c in mongo_preview.columns]
+                                if keep_cols:
+                                    mongo_preview = mongo_preview[keep_cols].copy()
+                            st.caption(f"GOLD local (`data/gold/date={latest_gold_date}/articles.parquet`) — 20 lignes")
+                            st.dataframe(local_preview, use_container_width=True, hide_index=True, height=320)
+                            st.caption(f"MongoDB GridFS (`{mongo_gold_logical}`) — 20 lignes")
+                            if mongo_preview.empty:
+                                st.warning("Impossible de lire l'aperçu Mongo pour ce fichier.")
+                            else:
+                                st.dataframe(mongo_preview, use_container_width=True, hide_index=True, height=320)
+                            if not local_preview.empty and not mongo_preview.empty and "id" in local_preview.columns and "id" in mongo_preview.columns:
+                                local_ids = set(local_preview["id"].astype("string").fillna("").tolist())
+                                mongo_ids = set(mongo_preview["id"].astype("string").fillna("").tolist())
+                                overlap = len(local_ids.intersection(mongo_ids))
+                                st.caption(
+                                    f"Contrôle rapide (échantillon 20 lignes): {overlap}/"
+                                    f"{max(len(local_ids), 1)} IDs communs entre local et Mongo."
+                                )
+                        else:
+                            st.info(
+                                f"Aucune sauvegarde Mongo trouvée pour `{mongo_gold_logical}`. "
+                                "Lancez d'abord le backup Parquet -> MongoDB."
+                            )
+                    else:
+                        st.info("Aucune partition GOLD du jour détectée pour la comparaison côte à côte.")
                 else:
                     st.dataframe(df_mongo, use_container_width=True, hide_index=True)
             else:
@@ -431,11 +735,6 @@ def render(ctx: PageContext) -> None:
         st.caption("Cliquez sur **Vérifier MongoDB** pour tester la connexion.")
 
     st.divider()
-    with st.expander("Prometheus & Grafana"):
-        st.caption(
-            f"API metrics : {api_base}/metrics · Prometheus : {prometheus_url} · Grafana : {grafana_url}"
-        )
-
     with st.expander("Détail technique — activité de session (télémétrie)", expanded=False):
         st.caption(
             "Comptage interne des clics et des commandes lancées depuis ce navigateur. "

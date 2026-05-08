@@ -5,79 +5,48 @@ Extrait depuis src/streamlit/app.py (phase C, audit 2026-04).
 
 from __future__ import annotations
 
-import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 
-import pandas as pd
-import requests
 import streamlit as st
 
 from src.streamlit._cockpit_helpers import (
     PageContext,
-    activate_model as _activate_model,
-    csv_row_count_cached as _csv_row_count_cached,
-    get_active_model as _get_active_model,
-    ia_history as _ia_history,
-    inject_css as _inject_css,
-    inject_demo_css as _inject_demo_css,
-    inject_readability_css as _inject_readability_css,
+)
+from src.streamlit._cockpit_helpers import (
     launch_api_in_new_window as _launch_api_in_new_window,
-    mongo_status as _mongo_status,
-    parquet_row_count_cached as _parquet_row_count_cached,
-    read_parquet_cached as _read_parquet_cached,
+)
+from src.streamlit._cockpit_helpers import (
     render_last_report as _render_last_report,
+)
+from src.streamlit._cockpit_helpers import (
     run_command as _run_command,
 )
 from src.streamlit.auth_plug import (
     can_admin,
     can_write,
-    get_token,
-    init_session_auth,
-    is_logged_in,
-    render_login_form,
-    render_user_and_logout,
 )
 from src.streamlit.metrics import (
-    build_enrichment_table as _build_enrichment_table,
-    chrono_data as _chrono_data,
-    enrich_profile as _enrich_profile,
-    go_no_go_snapshot as _go_no_go_snapshot,
-    ia_metrics_from_parquet as _ia_metrics_from_parquet,
     load_benchmark_results as _load_benchmark_results,
-    scan_stage as _scan_stage,
-    scan_trained_models as _scan_trained_models,
-    stage_time_range as _stage_time_range,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 def render(ctx: PageContext) -> None:
-    project_root = ctx.project_root
     PROJECT_ROOT = ctx.project_root
     settings = ctx.settings
-    api_base = ctx.api_base
-    backend_ok = ctx.backend_ok
-    ux_mode = ctx.ux_mode
     show_advanced = ctx.show_advanced
-    history_mode = ctx.history_mode
-    raw_dir = ctx.raw_dir
-    silver_dir = ctx.silver_dir
-    gold_dir = ctx.gold_dir
-    goldai_dir = ctx.goldai_dir
-    ia_dir = ctx.ia_dir
 
     if show_advanced:
         st.caption(
-            "Mode **Expert** actif (sélecteur *Ergonomie cockpit* dans la barre latérale) : "
+            "Mode **Expert** actif (sélecteur *Profil d’usage* dans la barre latérale) : "
             "les blocs techniques avancés sont affichés."
         )
     else:
         st.caption(
-            "Mode **Focus** (par défaut). Passez sur *Ergonomie cockpit → Expert* "
+            "Mode **Standard** (par défaut). Passez sur *Profil d’usage → Expert* "
             "dans la barre latérale pour afficher les blocs techniques avancés."
         )
 
@@ -106,8 +75,8 @@ def render(ctx: PageContext) -> None:
     may_admin = can_admin()
     if not may_run:
         st.warning(
-            "Role `reader` : les actions d'execution sont verrouillees. "
-            "Seuls les roles `writer`, `deleter` ou `admin` peuvent lancer les pipelines, backups et copies IA."
+            "Rôle `reader` : les actions d'exécution sont verrouillées. "
+            "Seuls les rôles `writer`, `deleter` ou `admin` peuvent lancer les pipelines, backups et copies IA."
         )
     b1, b2, b3 = st.columns(3)
     with b1:
@@ -123,14 +92,14 @@ def render(ctx: PageContext) -> None:
             _run_command("goldai", [sys.executable, "scripts/merge_parquet_goldai.py"])
     with b3:
         copie_ia_topics = st.checkbox(
-            "Copie IA (experimental): filtrer finance+politique+météo (peut biaiser l'entrainement)",
+            "Copie IA (expérimental) : filtrer finance+politique+météo (peut biaiser l'entraînement)",
             value=False,
             key="copie_ia_topics",
         )
         if copie_ia_topics:
             st.warning(
-                "Mode slice metier active: utile pour test rapide, mais a eviter pour le modele principal. "
-                "Bonne pratique: entrainer global, puis filtrer au niveau des insights."
+                "Mode slice métier activé : utile pour test rapide, mais à éviter pour le modèle principal. "
+                "Bonne pratique : entraîner global, puis filtrer au niveau des insights."
             )
         if st.button(
             "Copie IA", type="primary", use_container_width=True, disabled=not may_run
@@ -149,7 +118,7 @@ def render(ctx: PageContext) -> None:
             "Lancer API E2",
             use_container_width=True,
             disabled=not may_admin,
-            help=("Role admin requis." if not may_admin else None),
+            help=("Rôle admin requis." if not may_admin else None),
         ):
             _launch_api_in_new_window()
     with b5:
@@ -158,7 +127,7 @@ def render(ctx: PageContext) -> None:
             use_container_width=True,
             disabled=not may_admin,
             help=(
-                "Role admin requis."
+                "Rôle admin requis."
                 if not may_admin
                 else "Parquet vers MongoDB GridFS. Lancer start_mongo.bat avant (Docker)."
             ),
@@ -179,7 +148,7 @@ def render(ctx: PageContext) -> None:
         if st.button(
             "Injecter dans le pipeline E1",
             disabled=not may_run,
-            help=("Role writer/admin requis." if not may_run else None),
+            help=("Rôle writer/admin requis." if not may_run else None),
         ):
             if csv_file:
                 import tempfile
@@ -300,7 +269,7 @@ def render(ctx: PageContext) -> None:
             use_container_width=True,
             disabled=not may_admin,
             help=(
-                "Role admin requis."
+                "Rôle admin requis."
                 if not may_admin
                 else "Entraîne le backbone choisi sur train.parquet (Copie IA)."
             ),

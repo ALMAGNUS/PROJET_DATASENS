@@ -21,7 +21,7 @@ import json
 import os
 import sqlite3
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -32,7 +32,6 @@ from src.streamlit._cockpit_helpers import (
     PageContext,
     parquet_row_count_cached,
 )
-
 
 # ---------------------------------------------------------------------------
 # Chargement et parsing des rapports db_state
@@ -337,7 +336,7 @@ def build_growth_timeline(root: Path) -> pd.DataFrame:
 
 def build_export_bytes(proof: LastRunProof) -> tuple[bytes, bytes, str]:
     """Construit (md_bytes, csv_bytes, stem) à partir d'une LastRunProof."""
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
+    ts = datetime.now(UTC).strftime("%Y-%m-%dT%H%M%SZ")
     stem = f"pipeline_proof_{ts}"
 
     # CSV (lignes tabulaires par étape)
@@ -428,7 +427,7 @@ def render_last_run_proof_compact(ctx: PageContext) -> None:
             "Relancez le pipeline pour obtenir une comparaison."
         )
     cols = st.columns(len(proof.stages))
-    for col, s in zip(cols, proof.stages):
+    for col, s in zip(cols, proof.stages, strict=False):
         label = s.stage.split(". ", 1)[-1]
         col.metric(label, f"{s.after:,}", delta=_format_delta(s.delta))
     st.caption(
@@ -475,7 +474,7 @@ def render_last_run_proof_full(ctx: PageContext) -> None:
 
     # Metrics (5 étapes)
     cols = st.columns(len(proof.stages))
-    for col, s in zip(cols, proof.stages):
+    for col, s in zip(cols, proof.stages, strict=False):
         label = s.stage.split(". ", 1)[-1]
         col.metric(label, f"{s.after:,}", delta=_format_delta(s.delta))
 
@@ -1008,6 +1007,68 @@ def render_article_journey(ctx: PageContext) -> None:
     )
     goldai_footer = "Alimente les splits IA (train / val / test)"
 
+    # MongoDB card body — preuve de stockage long terme (GridFS).
+    accents["mongo"] = "#1565c0"  # bleu profond
+    mongo_cache = st.session_state.get("mongo_status_cache")
+    mongo_was_checked = isinstance(mongo_cache, dict)
+    mongo_connected = mongo_was_checked and bool(mongo_cache.get("connected"))
+    date.today().isoformat()
+    gold_logical_for_pick = f"gold_articles_{used_date}" if used_date else None
+    if mongo_connected:
+        files_list_m = mongo_cache.get("files", []) or []
+        logicals_m = {str(f.get("logical_name", "")) for f in files_list_m}
+        has_pick_gold = bool(gold_logical_for_pick and gold_logical_for_pick in logicals_m)
+        has_goldai_merged = "goldai_merged" in logicals_m
+        gold_status_html = (
+            "<span class='ds-badge' style='background:#dcfce7;color:#166534;border-color:#16a34a'>"
+            "présent</span>" if has_pick_gold
+            else "<span class='ds-badge ds-empty'>non sauvegardé</span>"
+        )
+        goldai_status_html = (
+            "<span class='ds-badge' style='background:#dcfce7;color:#166534;border-color:#16a34a'>"
+            "présent</span>" if has_goldai_merged
+            else "<span class='ds-badge ds-empty'>non sauvegardé</span>"
+        )
+        mongo_body = (
+            "<div class='ds-label'>Snapshot du jour de l'article</div>"
+            f"<div><code>{_html_escape(gold_logical_for_pick or '—')}</code> {gold_status_html}</div>"
+            "<div class='ds-label'>Stock GoldAI consolidé</div>"
+            f"<div><code>goldai_merged</code> {goldai_status_html}</div>"
+            "<div class='ds-meta' style='margin-top:10px'>"
+            f"DB : <code>{_html_escape(str(mongo_cache.get('db_name','')))}</code> · "
+            f"Bucket : <code>{_html_escape(str(mongo_cache.get('bucket','')))}</code><br>"
+            "Le fichier Parquet contenant cette ligne est consultable depuis "
+            "<b>Pilotage &amp; Ops → Santé &amp; MongoDB</b>."
+            "</div>"
+        )
+        mongo_footer = (
+            "Backup permanent immuable" if (has_pick_gold and has_goldai_merged)
+            else "Backup partiel : relancer `scripts/backup_parquet_to_mongo.py`"
+        )
+        mongo_footer_muted = not (has_pick_gold and has_goldai_merged)
+    elif mongo_was_checked:
+        err_short = str(mongo_cache.get("error", "")).split(":")[0][:60]
+        mongo_body = (
+            "<div class='ds-label'>État</div>"
+            "<div class='ds-headline' style='color:#fca5a5'>MongoDB hors ligne</div>"
+            f"<div class='ds-meta'>{_html_escape(err_short)}…</div>"
+            "<div class='ds-meta' style='margin-top:10px'>"
+            "Démarrer Docker puis : <code>docker compose up -d mongodb</code>"
+            "</div>"
+        )
+        mongo_footer = "Cliquez 'Vérifier MongoDB' dans Vue d'ensemble pour réessayer"
+        mongo_footer_muted = True
+    else:
+        mongo_body = (
+            "<div class='ds-label'>État</div>"
+            "<div class='ds-headline ds-empty'>non vérifié</div>"
+            "<div class='ds-meta' style='margin-top:10px'>"
+            "Cliquez <b>Vérifier MongoDB</b> dans la Vue d'ensemble pour activer cette carte."
+            "</div>"
+        )
+        mongo_footer = "Sauvegarde long terme via GridFS"
+        mongo_footer_muted = True
+
     # Assemblage
     def _card(step: str, name: str, accent: str, subhead: str, body: str,
               footer: str, muted: bool = False) -> str:
@@ -1067,11 +1128,22 @@ def render_article_journey(ctx: PageContext) -> None:
             goldai_body,
             goldai_footer,
         )
+        + arrow
+        + _card(
+            "Étape 5",
+            "MongoDB",
+            accents["mongo"],
+            "Sauvegarde long terme (GridFS)",
+            mongo_body,
+            mongo_footer,
+            muted=mongo_footer_muted,
+        )
         + "</div>"
     )
 
     st.markdown(html, unsafe_allow_html=True)
     st.caption(
-        "La même ligne traverse les 4 étapes. À chaque étape, on **ajoute** "
-        "des colonnes ; aucune donnée n'est perdue."
+        "Une même ligne traverse les 5 étapes. À chaque étape, le schéma s'enrichit "
+        "(RAW → SILVER → GOLD → GoldAI), puis le snapshot Parquet est archivé "
+        "dans MongoDB GridFS comme couche de persistance immuable."
     )

@@ -13,6 +13,7 @@ Ce module centralise :
 from __future__ import annotations
 
 import csv
+import io
 import json
 import os
 import subprocess
@@ -71,8 +72,8 @@ def inject_css() -> None:
     }
     [data-testid="stAppViewContainer"] {
       background:
-        radial-gradient(circle at 15% 12%, rgba(76, 110, 245, 0.25), transparent 30%),
-        radial-gradient(circle at 85% 8%, rgba(156, 123, 255, 0.22), transparent 32%),
+        radial-gradient(circle at 15% 12%, rgba(76, 110, 245, 0.16), transparent 34%),
+        radial-gradient(circle at 85% 8%, rgba(156, 123, 255, 0.14), transparent 36%),
         linear-gradient(180deg, var(--ds-bg-0) 0%, var(--ds-bg-1) 100%);
     }
     [data-testid="stSidebar"] {
@@ -85,7 +86,7 @@ def inject_css() -> None:
     .ds-flow { display: flex; align-items: center; flex-wrap: wrap; gap: 0.3rem; margin: 1rem 0; font-size: 0.85rem; }
     .ds-flow span { color: #90caf9; }
     .ds-flow .arrow { color: #64b5f6; }
-    .ds-card { background: var(--ds-card); border: 1px solid var(--ds-border); border-radius: 12px; padding: 1rem; margin-bottom: 0.8rem; backdrop-filter: blur(7px); box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
+    .ds-card { background: var(--ds-card); border: 1px solid var(--ds-border); border-radius: 12px; padding: 1rem; margin-bottom: 0.8rem; backdrop-filter: blur(5px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
     .ds-card-title { color: #9dc0ff; font-weight: 600; font-size: 0.95rem; margin-bottom: 0.3rem; }
     .ds-card-value { color: #fff; font-size: 1.1rem; }
     .ds-card-empty { color: #78909c; }
@@ -97,7 +98,7 @@ def inject_css() -> None:
       border: 1px solid rgba(126, 158, 255, 0.35);
       border-radius: 12px;
       padding: 0.45rem 0.7rem;
-      box-shadow: 0 6px 16px rgba(0,0,0,0.22);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
     }
     [data-testid="stMetricLabel"] p { color: #a9c3ff !important; font-weight: 600; }
     [data-testid="stMetricValue"] { color: #f4f7ff !important; }
@@ -107,7 +108,7 @@ def inject_css() -> None:
       background: linear-gradient(135deg, rgba(55, 86, 189, 0.85) 0%, rgba(91, 68, 198, 0.85) 100%) !important;
       border-radius: 11px !important;
       font-weight: 600 !important;
-      box-shadow: 0 8px 18px rgba(0,0,0,0.25) !important;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.2) !important;
     }
     .stButton > button:hover {
       transform: translateY(-1px);
@@ -290,6 +291,39 @@ def csv_row_count_cached(path_str: str) -> int:
         return 0
 
 
+def _build_mongo_uri_from_env(default_uri: str) -> str:
+    """
+    Construit une URI Mongo prenant en compte les credentials de `.env`.
+
+    Priorité :
+      1. `MONGO_URI` complète si définie (avec ou sans credentials).
+      2. `settings.mongo_uri` si elle contient déjà des credentials (`@`).
+      3. Reconstruction depuis `MONGO_HOST/PORT/USER/PASSWORD/AUTH_SOURCE`
+         si ces variables sont présentes dans `.env`.
+      4. Fallback : la valeur par défaut fournie.
+
+    Évite l'erreur classique "Authentication failed" quand `.env` définit
+    les credentials par variables séparées mais pas `MONGO_URI`.
+    """
+    env_uri = os.getenv("MONGO_URI", "").strip()
+    if env_uri:
+        return env_uri
+    if "@" in default_uri:
+        return default_uri
+    user = os.getenv("MONGO_USER", "").strip()
+    pwd = os.getenv("MONGO_PASSWORD", "").strip()
+    if not (user and pwd):
+        return default_uri
+    host = os.getenv("MONGO_HOST", "localhost").strip() or "localhost"
+    port = os.getenv("MONGO_PORT", "27017").strip() or "27017"
+    auth_source = os.getenv("MONGO_AUTH_SOURCE", "admin").strip() or "admin"
+    from urllib.parse import quote_plus
+    return (
+        f"mongodb://{quote_plus(user)}:{quote_plus(pwd)}"
+        f"@{host}:{port}/?authSource={auth_source}"
+    )
+
+
 def mongo_status(root: Path) -> dict:
     """Teste la connexion MongoDB et retourne le statut + liste des fichiers GridFS."""
     result: dict = {"connected": False, "error": None, "files": [], "total_size": 0, "db_name": "", "bucket": ""}
@@ -301,8 +335,9 @@ def mongo_status(root: Path) -> dict:
         from src.config import get_settings
 
         settings = get_settings()
-        mongo_uri = getattr(settings, "mongo_uri", "mongodb://localhost:27017")
-        mongo_db = getattr(settings, "mongo_db", "datasens")
+        default_uri = getattr(settings, "mongo_uri", "mongodb://localhost:27017")
+        mongo_uri = _build_mongo_uri_from_env(default_uri)
+        mongo_db = os.getenv("MONGO_DB_NAME", getattr(settings, "mongo_db", "datasens"))
         bucket = getattr(settings, "mongo_gridfs_bucket", "parquet_fs")
         result["db_name"] = mongo_db
         result["bucket"] = bucket
@@ -321,6 +356,7 @@ def mongo_status(root: Path) -> dict:
             upload_dt = f.get("uploadDate")
             files.append(
                 {
+                    "file_id": str(f.get("_id", "")),
                     "filename": f.get("filename", "?"),
                     "logical_name": meta.get("logical_name", "—"),
                     "partition_date": meta.get("partition_date", "—"),
@@ -336,6 +372,51 @@ def mongo_status(root: Path) -> dict:
     except Exception as exc:
         result["error"] = str(exc)
     return result
+
+
+def mongo_get_file_bytes(root: Path, file_id: str) -> tuple[bytes | None, dict | None, str | None]:
+    """Retourne (bytes, metadata, filename) d'un fichier GridFS par _id."""
+    try:
+        import sys as _sys
+
+        import gridfs
+        from bson import ObjectId
+        from pymongo import MongoClient
+
+        _sys.path.insert(0, str(root))
+        _sys.path.insert(0, str(root / "src"))
+        from src.config import get_settings
+
+        settings = get_settings()
+        default_uri = getattr(settings, "mongo_uri", "mongodb://localhost:27017")
+        mongo_uri = _build_mongo_uri_from_env(default_uri)
+        mongo_db = os.getenv("MONGO_DB_NAME", getattr(settings, "mongo_db", "datasens"))
+        bucket = getattr(settings, "mongo_gridfs_bucket", "parquet_fs")
+        client = MongoClient(mongo_uri, serverSelectionTimeoutMS=3000)
+        db = client[mongo_db]
+        fs = gridfs.GridFS(db, collection=bucket)
+        gf = fs.get(ObjectId(file_id))
+        payload = gf.read()
+        meta = getattr(gf, "metadata", {}) or {}
+        filename = getattr(gf, "filename", None)
+        client.close()
+        return payload, meta, filename
+    except Exception:
+        return None, None, None
+
+
+def mongo_read_parquet_preview(root: Path, file_id: str, limit: int = 100) -> pd.DataFrame:
+    """Charge un aperçu DataFrame depuis un fichier parquet stocké dans GridFS."""
+    payload, _meta, _filename = mongo_get_file_bytes(root, file_id)
+    if not payload:
+        return pd.DataFrame()
+    try:
+        df = pd.read_parquet(io.BytesIO(payload))
+        if limit > 0:
+            return df.head(limit)
+        return df
+    except Exception:
+        return pd.DataFrame()
 
 
 def ia_history(root: Path) -> pd.DataFrame:
@@ -636,15 +717,22 @@ def sentiment_badge(label: str) -> str:
 
 
 def render_last_report(panel_key: str) -> None:
-    """Affiche le dernier rapport d'execution (persiste apres rerun)."""
+    """Affiche le dernier rapport d'exécution (persisté après rerun)."""
     report = st.session_state.get("last_command_report")
     if not report:
         return
-    with st.expander("📋 Rapport d'exécution (cliquez pour afficher)", expanded=True):
+    status = "OK" if report.get("ok") else "KO"
+    duration_s = float(report.get("duration_s", 0.0) or 0.0)
+    st.caption(
+        f"Dernière exécution: {report.get('label', 'Commande')} "
+        f"({status}, {duration_s:.2f}s)"
+    )
+    with st.expander("📋 Rapport d'exécution détaillé", expanded=False):
+        st.code(report.get("command", "Commande inconnue"), language="bash")
         st.text_area(
             "Sortie",
             value=report.get("out", "OK"),
-            height=350,
+            height=220,
             disabled=True,
             label_visibility="collapsed",
             key=f"last_report_output_{panel_key}",

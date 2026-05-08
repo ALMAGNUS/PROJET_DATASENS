@@ -23,9 +23,17 @@ import streamlit as st
 
 from src.streamlit._cockpit_helpers import (
     PageContext,
+)
+from src.streamlit._cockpit_helpers import (
     csv_row_count_cached as _csv_row_count_cached,
+)
+from src.streamlit._cockpit_helpers import (
+    mongo_status as _mongo_status,
+)
+from src.streamlit._cockpit_helpers import (
     parquet_row_count_cached as _parquet_row_count_cached,
 )
+from src.streamlit.metrics import fmt_size as _fmt_size
 from src.streamlit.pipeline_proof import render_last_run_proof_compact
 
 
@@ -64,9 +72,7 @@ def _latest_silver(silver_dir: Path) -> tuple[int, str]:
     sdir = silver_dirs[0]
     label = sdir.name.replace("date=", "").replace("v_", "")
     cands = (
-        [sdir / "silver_articles.csv", sdir / "silver_articles.parquet"]
-        + list(sdir.rglob("*.csv"))
-        + list(sdir.rglob("*.parquet"))
+        [sdir / "silver_articles.csv", sdir / "silver_articles.parquet", *list(sdir.rglob("*.csv")), *list(sdir.rglob("*.parquet"))]
     )
     sfile = next((p for p in cands if p.exists()), None)
     if sfile is None:
@@ -137,7 +143,145 @@ def render(ctx: PageContext) -> None:
     )
     st.divider()
 
-    # --- Section 2 : Activité du dernier run -------------------------------
+    # --- Section 2 : Lineage de la donnée (SQLite -> Parquet -> GoldAI -> Mongo) ---
+    st.markdown("#### Lineage de la donnée")
+    st.caption(
+        "Chaîne de persistance multi-couche, du stockage opérationnel au stockage long terme. "
+        "Quatre étapes, contrôle de cohérence end-to-end."
+    )
+
+    mongo_cache = st.session_state.get("mongo_status_cache")
+    mongo_was_checked = isinstance(mongo_cache, dict)
+    mongo_connected = mongo_was_checked and bool(mongo_cache.get("connected"))
+    mongo_error = (mongo_cache or {}).get("error") if mongo_was_checked else None
+    if mongo_connected:
+        files_list = mongo_cache.get("files", []) or []
+        mongo_logicals = {str(f.get("logical_name", "")) for f in files_list}
+        latest_gold_logical = f"gold_articles_{gold_label}" if gold_label != "—" else None
+        has_gold_daily_mongo = bool(latest_gold_logical and latest_gold_logical in mongo_logicals)
+        has_goldai_merged_mongo = "goldai_merged" in mongo_logicals
+        mongo_files_count = len(files_list)
+        mongo_total_size = _fmt_size(int(mongo_cache.get("total_size", 0) or 0))
+    else:
+        has_gold_daily_mongo = False
+        has_goldai_merged_mongo = False
+        mongo_files_count = 0
+        mongo_total_size = "—"
+
+    j1, j2, j3, j4 = st.columns(4)
+    with j1, st.container(border=True):
+        st.markdown("**1. Extraction → SQLite**")
+        st.caption("Buffer opérationnel des articles bruts.")
+        st.metric(
+            label=" ",
+            value=f"{raw_total:,}",
+            label_visibility="collapsed",
+            help=f"Source : `{db_path}` (table `raw_data`).",
+        )
+    with j2, st.container(border=True):
+        st.markdown("**2. SQLite → Parquet GOLD**")
+        st.caption(f"Snapshot enrichi du jour ({gold_label}).")
+        st.metric(
+            label=" ",
+            value=f"{gold_rows:,}",
+            label_visibility="collapsed",
+            help=f"Local : `data/gold/date={gold_label}/articles.parquet`.",
+        )
+    with j3, st.container(border=True):
+        st.markdown("**3. Parquet → GoldAI consolidé**")
+        st.caption("Stock historique dédupliqué, base ML.")
+        st.metric(
+            label=" ",
+            value=f"{goldai_rows:,}",
+            label_visibility="collapsed",
+            help="Local : `data/goldai/merged_all_dates.parquet`.",
+        )
+    with j4, st.container(border=True):
+        st.markdown("**4. Sauvegarde MongoDB**")
+        st.caption("Stockage long terme (GridFS).")
+        if mongo_connected:
+            st.metric(
+                label=" ",
+                value=f"{mongo_files_count:,} fichiers",
+                label_visibility="collapsed",
+                help=f"Volume total : {mongo_total_size}",
+            )
+        elif mongo_was_checked:
+            st.metric(
+                label=" ",
+                value="hors ligne",
+                label_visibility="collapsed",
+            )
+            if st.button("Réessayer", key="overview_check_mongo_retry", use_container_width=True):
+                with st.spinner("Connexion MongoDB..."):
+                    st.session_state.mongo_status_cache = _mongo_status(project_root)
+                st.rerun()
+        else:
+            st.metric(
+                label=" ",
+                value="non vérifié",
+                label_visibility="collapsed",
+            )
+            if st.button("Vérifier MongoDB", key="overview_check_mongo", use_container_width=True):
+                with st.spinner("Connexion MongoDB..."):
+                    st.session_state.mongo_status_cache = _mongo_status(project_root)
+                st.rerun()
+
+    if mongo_connected:
+        chain_ok = (
+            raw_total > 0
+            and gold_rows > 0
+            and goldai_rows > 0
+            and has_gold_daily_mongo
+            and has_goldai_merged_mongo
+        )
+        if chain_ok:
+            st.success(
+                f"Chaîne de persistance cohérente : SQLite ({raw_total:,}) → "
+                f"GOLD {gold_label} ({gold_rows:,}) → "
+                f"GoldAI ({goldai_rows:,}) → GridFS (snapshot + consolidé archivés)."
+            )
+        else:
+            missing = []
+            if raw_total == 0:
+                missing.append("SQLite vide")
+            if gold_rows == 0:
+                missing.append(f"GOLD {gold_label} absent")
+            if goldai_rows == 0:
+                missing.append("GoldAI consolidé absent")
+            if not has_gold_daily_mongo:
+                missing.append(f"backup GridFS `gold_articles_{gold_label}` manquant")
+            if not has_goldai_merged_mongo:
+                missing.append("backup GridFS `goldai_merged` manquant")
+            st.warning("Chaîne de persistance incomplète : " + " · ".join(missing))
+    elif mongo_was_checked:
+        st.error(
+            "MongoDB hors ligne — la sauvegarde long terme ne peut pas être validée pour l'instant."
+        )
+        if mongo_error:
+            short_err = str(mongo_error).split(":")[0][:80]
+            st.caption(f"Détail : {short_err}…")
+        with st.expander("Comment relancer MongoDB ?", expanded=True):
+            st.markdown(
+                """
+                MongoDB est déployé via Docker. Si Docker Desktop tourne mais que le conteneur est arrêté :
+
+                ```powershell
+                docker compose up -d mongodb
+                ```
+
+                Si Docker Desktop lui-même est éteint, le démarrer puis relancer la commande ci-dessus.
+                Une fois Mongo en ligne, cliquez **Réessayer** dans la 4e carte.
+                """
+            )
+    else:
+        st.caption(
+            "Étapes 1 à 3 lues en local. Cliquez **Vérifier MongoDB** dans la 4e carte "
+            "pour valider la chaîne complète."
+        )
+    st.divider()
+
+    # --- Section 3 : Activité du dernier run --------------------------------
     render_last_run_proof_compact(ctx)
     st.divider()
 
