@@ -9,7 +9,7 @@ docs/
 ├── PROJECT_STRUCTURE.md (Structure dossiers/fichiers)
 ├── (CHANGELOG.md à la racine du projet)
 ├── CONTRIBUTING.md (Guide contributeurs)
-├── LOGGING.md (Configuration logging)
+├── dev/LOGGING.md (Configuration logging)
 ├── SCHEMA_DESIGN.md (Design base données)
 ├── AGILE_ROADMAP.md (Roadmap produit)
 ├── AUDIT_E1_COMPETENCES.md … AUDIT_E5_COMPETENCES.md (Grilles E1–E5)
@@ -43,7 +43,7 @@ docs/
 
 ### Pour **Maintenir**
 1. Consulter [`SCHEMA_DESIGN.md`](SCHEMA_DESIGN.md ) → BD schema
-2. Consulter [`LOGGING.md`](LOGGING.md ) → Logs
+2. Consulter [`dev/LOGGING.md`](dev/LOGGING.md) → Logs
 3. Consulter [`CHANGELOG.md`](../CHANGELOG.md) → Historique
 4. Consulter [`METRIQUES_SEUILS_ALERTES.md`](METRIQUES_SEUILS_ALERTES.md ) → Monitoring
 5. Consulter [`PROCEDURE_INCIDENTS.md`](PROCEDURE_INCIDENTS.md ) → Incidents
@@ -135,7 +135,7 @@ docs/
 
 ---
 
-### 🔍 [LOGGING.md](LOGGING.md) — Configuration Logging
+### 🔍 [dev/LOGGING.md](dev/LOGGING.md) — Configuration Logging
 
 **Contient :**
 - Setup logging
@@ -236,7 +236,7 @@ docs/
 
 ### ❓ Je veux **déboguer**
 ```
-1. Lire LOGGING.md
+1. Lire dev/LOGGING.md
 2. Consulter logs
 3. Lire SCHEMA_DESIGN.md pour BD
 ```
@@ -265,7 +265,7 @@ docs/
 | [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) | Voir organisation | Organisation |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribuer | Avant modification |
 | [SCHEMA_DESIGN.md](SCHEMA_DESIGN.md) | BD schema | Debug DB |
-| [LOGGING.md](LOGGING.md) | Logs | Troubleshooting |
+| [dev/LOGGING.md](dev/LOGGING.md) | Logs | Troubleshooting |
 | [CHANGELOG.md](../CHANGELOG.md) | Versions | Suivi projet |
 | [AGILE_ROADMAP.md](AGILE_ROADMAP.md) | Future | Planification |
 | [AUDIT_E1_COMPETENCES.md](AUDIT_E1_COMPETENCES.md) | Conformité E1 | Audit |
@@ -334,7 +334,7 @@ python main.py
 Pour questions :
 1. Lire la doc appropriée
 2. Consulter SCHEMA_DESIGN.md (BD)
-3. Consulter LOGGING.md (Logs)
+3. Consulter dev/LOGGING.md (Logs)
 4. Consulter CONTRIBUTING.md (Code)
 
 ---

@@ -56,7 +56,7 @@ def load_and_filter(path: Path, min_confidence: float, topic: str | None) -> pd.
             df_app["id"]  = df_app["id"].astype(str).str.strip()
             # Garde les colonnes de gold_app_input qui n'existent pas déjà dans predictions
             extra_cols = [c for c in df_app.columns if c not in df_pred.columns]
-            df = df_pred.merge(df_app[["id"] + extra_cols], on="id", how="left")
+            df = df_pred.merge(df_app[["id", *extra_cols]], on="id", how="left")
             print(f"[OK] Jointure predictions ({total_pred}) + gold_app_input ({len(df_app)}) → {len(df)} lignes")
         else:
             df = df_pred
@@ -171,7 +171,7 @@ def main() -> None:
 
     if args.export_only:
         print("\nFichier prêt. Pour appeler Mistral, relance sans --export-only.")
-        print(f"  Ajoute MISTRAL_API_KEY dans ton .env puis : python scripts/export_mistral_dataset.py")
+        print("  Ajoute MISTRAL_API_KEY dans ton .env puis : python scripts/export_mistral_dataset.py")
         return
 
     # Étape 2 — Appeler Mistral

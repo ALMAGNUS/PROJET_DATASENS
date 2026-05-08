@@ -8,11 +8,12 @@ Modèle: cmarkea/distilcamembert-base-sentiment (5★ → pos/neu/neg).
 import os
 import time
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
 import pandas as pd
+
 from src.config import get_settings
 from src.data_contracts import assert_no_target_leakage
 
@@ -216,7 +217,6 @@ def run_sentiment_inference(
 
     total = len(texts)
     results: list[dict] = []
-    last_checkpoint_at = 0
     t_global = time.perf_counter()
     last_checkpoint_n = 0
 
@@ -359,7 +359,7 @@ def build_prediction_frame(
     """
     Build normalized inference output frame for GOLD_APP_PREDICTIONS.
     """
-    ts = prediction_timestamp or datetime.now(timezone.utc).isoformat()
+    ts = prediction_timestamp or datetime.now(UTC).isoformat()
     rows = []
     for r in results:
         rows.append(
@@ -399,9 +399,9 @@ def write_predictions_parquet(
     if not root.is_absolute():
         root = Path(__file__).resolve().parents[3] / root
 
-    run_id = inference_run_id or f"infer_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}"
+    run_id = inference_run_id or f"infer_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}"
     model_ver = model_version or settings.sentiment_finetuned_model_path or settings.camembert_model_path
-    ts = datetime.now(timezone.utc)
+    ts = datetime.now(UTC)
     date_part = ts.strftime("%Y-%m-%d")
 
     out_dir = root / "predictions" / f"date={date_part}" / f"run={run_id}"

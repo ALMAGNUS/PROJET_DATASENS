@@ -32,7 +32,7 @@
 
 ## Séquence 3 : C20 Suite — journalisation et alertes (5:00 - 8:00)
 
-- **Journalisation** : src/logging_config.py (Loguru), logs/datasens.log, LOGGING.md
+- **Journalisation** : src/logging_config.py (Loguru), logs/datasens.log, docs/dev/LOGGING.md
 - **Alertes** : Règles Prometheus (PipelineHighErrorRate, NoArticlesCollected, etc.)
 - **Documentation** : MONITORING_E2_API.md, PROCEDURE_INSTALLATION_MONITORING.md
 

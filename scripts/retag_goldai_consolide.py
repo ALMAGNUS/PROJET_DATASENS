@@ -36,8 +36,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.config import get_settings  # noqa: E402
-from src.e1.tagger import (  # noqa: E402
+from src.config import get_settings
+from src.e1.tagger import (
     MIN_TOPIC2_SCORE,
     SOURCE_RULES,
     TOPIC_KEYWORDS,

@@ -17,7 +17,8 @@ Les sentiments sont **bien présents** dans vos données:
 ### 1️⃣ **Test et Vérification** (Recommandé en premier)
 
 ```bash
-python scripts/test_pipeline.py
+pytest tests/ -k pipeline   # tests pytest principaux
+# ou (legacy) : python scripts/_archive/test_pipeline.py
 ```
 
 **Affiche:**
@@ -189,7 +190,7 @@ Contient 4 graphiques:
 
 ```bash
 # 1. Tester que tout fonctionne
-python scripts/test_pipeline.py
+pytest tests/
 
 # 2. Créer les graphiques
 python scripts/visualize_sentiment.py

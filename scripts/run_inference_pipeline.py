@@ -15,9 +15,8 @@ import argparse
 import json
 import signal
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from uuid import uuid4
 
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
@@ -31,7 +30,7 @@ if sys.platform == "win32":
         pass
 
 from src.config import get_settings
-from src.ml.inference import (  # noqa: E402
+from src.ml.inference import (
     run_sentiment_inference,
     write_inference_to_model_output,
     write_predictions_parquet,
@@ -119,7 +118,7 @@ def main() -> int:
     limit = args.limit if args.limit > 0 else None
     effective_limit = limit or 99_999_999
 
-    run_id = args.run_id or datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    run_id = args.run_id or datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     print(f"\n{'='*60}")
     print(f"INFERENCE PIPELINE  run_id={run_id}")
     print(f"{'='*60}")
@@ -155,7 +154,7 @@ def main() -> int:
     def _checkpoint_cb(partial: list[dict]) -> None:
         _save_checkpoint(run_id, partial)
 
-    print(f"\nInference sur GOLD_APP_INPUT...")
+    print("\nInference sur GOLD_APP_INPUT...")
     if skip_n > 0:
         print(f"  {skip_n:,} articles deja traites (checkpoint), inférence depuis l'article {skip_n+1}.")
 
@@ -193,7 +192,7 @@ def main() -> int:
 
     # Nettoyage checkpoint si succès complet
     _delete_checkpoint(run_id)
-    print(f"\n  Run termine avec succes. Checkpoint supprime.")
+    print("\n  Run termine avec succes. Checkpoint supprime.")
     print(f"{'='*60}\n")
     return 0
 

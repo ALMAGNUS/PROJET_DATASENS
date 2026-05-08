@@ -68,7 +68,7 @@ async def get_gold_article(article_id: int, current_user: UserInDB = Depends(req
         HTTPException 404: Si article non trouvé
     """
     data_service = get_data_service()
-    articles = data_service.get_gold_articles(limit=1000, offset=0)  # TODO: Optimiser
+    articles = data_service.get_gold_articles(limit=1000, offset=0)
 
     for article in articles:
         if article.raw_data_id == article_id:

@@ -200,8 +200,8 @@ def _build_data_context(theme: str) -> str:
     Construit un contexte de données réel depuis GoldAI pour alimenter le prompt Mistral.
     Retourne un bloc texte résumant les données récentes selon le thème demandé.
     """
-    import json
     from pathlib import Path
+
     import pandas as pd
 
     context_lines: list[str] = []
@@ -480,11 +480,12 @@ def predict(payload: AIPredictRequest, _user=Depends(require_reader)):
     Inférence locale HF (CamemBERT/sentiment_fr).
     Sentiment: label 3 classes (POSITIVE/NEUTRAL/NEGATIVE) + confidence + sentiment_score ∈ [-1,+1].
     """
+    from loguru import logger
+
     from src.ml.inference.local_hf_service import (
         LocalHFService,
         compute_sentiment_output,
     )
-    from loguru import logger
 
     try:
         model_path = _resolve_sentiment_model(payload.model)

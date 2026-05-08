@@ -86,20 +86,18 @@ class GoldAIDeduplicator:
     def harmonize_id(self, df: DataFrame) -> DataFrame:
         """
         Harmonise l'identifiant métier:
-        - priorité à id
-        - fallback fingerprint, puis url, puis title
+        - priorité à fingerprint (clé métier de dédup),
+        - fallback url, puis title,
+        - id en dernier recours (évite les collisions de namespaces historiques).
         """
         cols = df.columns
         id_candidate = self._non_empty_str("id", cols)
         fp_candidate = self._non_empty_str("fingerprint", cols)
         url_candidate = self._non_empty_str("url", cols)
         title_candidate = self._non_empty_str("title", cols)
-        stable_id = coalesce(id_candidate, fp_candidate, url_candidate, title_candidate)
+        stable_id = coalesce(fp_candidate, url_candidate, title_candidate, id_candidate)
 
-        if "id" in cols:
-            out = df.withColumn("id", coalesce(id_candidate, stable_id))
-        else:
-            out = df.withColumn("id", stable_id)
+        out = df.withColumn("id", stable_id)
 
         null_after = out.filter(col("id").isNull()).count()
         if null_after > 0:

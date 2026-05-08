@@ -15,8 +15,7 @@ from __future__ import annotations
 
 import sqlite3
 import unicodedata
-from typing import Iterable
-
+from collections.abc import Iterable
 
 # ---------------------------------------------------------------------------
 # Dictionnaire bilingue FR + EN
@@ -373,7 +372,7 @@ class TopicTagger:
     def _ensure_topics(self) -> None:
         """Assure la présence de tous les topics (incl. 'autre') en base."""
         c = self.conn.cursor()
-        names = list(self.keywords.keys()) + ["autre"]
+        names = [*list(self.keywords.keys()), "autre"]
         for name in names:
             c.execute("SELECT topic_id FROM topic WHERE name = ?", (name,))
             if c.fetchone():

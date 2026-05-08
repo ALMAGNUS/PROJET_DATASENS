@@ -172,8 +172,8 @@ PROJET_DATASENS/
 ├── CHANGELOG.md                    # Historique versions
 ├── CONTRIBUTING.md                 # Ce fichier
 ├── LICENSE.md                      # MIT License
-├── LOGGING.md                      # Documentation logs
-└── BACKLOG.md                      # Dette technique identifiée
+├── RUNBOOK.md                      # Procédures de lancement (consolidé)
+└── docs/dev/LOGGING.md             # Documentation logs
 ```
 
 ---

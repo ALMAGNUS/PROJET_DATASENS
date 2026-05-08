@@ -12,7 +12,7 @@
 | Critère | Statut | Justification |
 |---------|--------|---------------|
 | Identification des contraintes techniques propres aux sources | ✅ TRUE | `sources_config.json` décrit url, type (rss/api/scraping), fréquence, partition_path pour chaque source |
-| Rédaction des spécifications techniques pour l'extraction | ✅ TRUE | `FLOW_DONNEES.md` (Étape 1 EXTRACT), `sources_config.json` |
+| Rédaction des spécifications techniques pour l'extraction | ✅ TRUE | `docs/dev/FLOW_DONNEES.md` (Étape 1 EXTRACT), `sources_config.json` |
 | Construction des requêtes HTTP pour la récupération depuis un service web (REST) | ✅ TRUE | `src/e1/core.py` : `requests.get()` pour Reddit, OpenWeather, GDELT, Trustpilot, etc. |
 | Lecture d'un fichier de données dans un script | ✅ TRUE | `CSVExtractor` (zzdb_csv), `KaggleExtractor` (CSV/JSON locaux), `_collect_local_files()` |
 | Téléchargement de l'HTML d'une ou plusieurs pages web (scraping) | ✅ TRUE | `BeautifulSoup` + `requests.get` dans core.py (Trustpilot, Reddit, IFOP, MonAvisCitoyen, etc.) |
@@ -25,14 +25,14 @@
 
 | Critère | Statut | Justification |
 |---------|--------|---------------|
-| Ecriture des requêtes SQL de récupération (BDD et big data) | ✅ TRUE | `aggregator.aggregate_raw/silver/gold()`, requêtes dans FLOW_DONNEES.md, `QUERIES_SQL.md` |
-| Documentation des requêtes d'extraction | ✅ TRUE | `scripts/QUERIES_SQL.md` (requêtes SQL documentées), `FLOW_DONNEES.md` (exemples) |
+| Ecriture des requêtes SQL de récupération (BDD et big data) | ✅ TRUE | `aggregator.aggregate_raw/silver/gold()`, requêtes dans `docs/dev/FLOW_DONNEES.md`, `QUERIES_SQL.md` |
+| Documentation des requêtes d'extraction | ✅ TRUE | `scripts/QUERIES_SQL.md` (requêtes SQL documentées), `docs/dev/FLOW_DONNEES.md` (exemples) |
 
 ### C3. Règles d'agrégation
 
 | Critère | Statut | Justification |
 |---------|--------|---------------|
-| Rédaction des spécifications techniques pour l'agrégation | ✅ TRUE | `FLOW_DONNEES.md` Étape 4 (RAW/SILVER/GOLD), flux décrit |
+| Rédaction des spécifications techniques pour l'agrégation | ✅ TRUE | `docs/dev/FLOW_DONNEES.md` Étape 4 (RAW/SILVER/GOLD), flux décrit |
 | Programmation des règles d'agrégation (sources → jeu unique) | ✅ TRUE | `DataAggregator` : `aggregate_raw()`, `aggregate_silver()`, `aggregate_gold()` |
 | Programmation de l'identification des entrées corrompues | ✅ TRUE | `article.is_valid()`, `ContentTransformer`, validation len(title)>3, len(content)>10 |
 | Programmation de la suppression des entrées corrompues | ✅ TRUE | Articles non valides exclus avant load, fingerprint pour doublons |
@@ -57,7 +57,7 @@
 | Registre des traitements de données personnelles (RGPD) | ✅ TRUE | `docs/REGISTRE_TRAITEMENTS_RGPD.md` (T1 profils, T2 audit, T3 contenu) |
 | Procédures de tri des données personnelles (RGPD) | ✅ TRUE | `docs/PROCEDURE_TRI_DONNEES_PERSONNELLES.md` (détection, suppression, anonymisation) |
 | Programmation du script d'import des données | ✅ TRUE | Pipeline E1 (`main.py`, `load()`), `load_article_with_id()` |
-| Documentation du script d'import | ✅ TRUE | `FLOW_DONNEES.md` (LOAD), docstrings |
+| Documentation du script d'import | ✅ TRUE | `docs/dev/FLOW_DONNEES.md` (LOAD), docstrings |
 
 ### C5. Développer une API REST
 

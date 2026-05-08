@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-
 TARGET_LABEL_COLUMNS = {
     "sentiment_label",
     "label",

@@ -14,7 +14,7 @@ import json
 import os
 import sqlite3
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Encodage console Windows
@@ -172,7 +172,7 @@ def _compute_sentiment_drift(curr: dict, prev: dict | None) -> dict:
 
 
 def collect_state(db_file: Path) -> dict:
-    generated = datetime.now(timezone.utc).isoformat()
+    generated = datetime.now(UTC).isoformat()
     if not db_file.exists():
         return {
             "meta": {
@@ -359,7 +359,7 @@ def collect_state(db_file: Path) -> dict:
         }
 
         # Compare with previous report
-        base = REPORTS_DIR / f"db_state_{datetime.now(timezone.utc).strftime('%Y-%m-%dT%H%M%SZ')}"
+        base = REPORTS_DIR / f"db_state_{datetime.now(UTC).strftime('%Y-%m-%dT%H%M%SZ')}"
         prev = _latest_previous_report(base)
         if prev:
             prev_path, prev_state = prev
@@ -648,7 +648,7 @@ def main() -> int:
     state = collect_state(db_file)
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H%M%SZ")
     base = REPORTS_DIR / f"db_state_{stamp}"
     json_path = base.with_suffix(".json")
     md_path = base.with_suffix(".md")

@@ -67,6 +67,18 @@ def main() -> int:
         default=False,
         help="Désactive le split temporel (utilise un shuffle aléatoire, déconseillé en production).",
     )
+    parser.add_argument(
+        "--min-chars",
+        type=int,
+        default=30,
+        help="Longueur minimale (caractères) pour content. Filtre le bruit (titres tronqués). Défaut 30.",
+    )
+    parser.add_argument(
+        "--no-dedup",
+        action="store_true",
+        default=False,
+        help="Désactive la déduplication avant split (déconseillé : risque de fuite train/test).",
+    )
     args = parser.parse_args()
 
     tot = args.train + args.val + args.test
@@ -82,10 +94,7 @@ def main() -> int:
     labelled_path = goldai_base / "ia" / "gold_ia_labelled.parquet"
     ia_dir = goldai_base / "ia"
 
-    if labelled_path.exists():
-        source_path = labelled_path
-    else:
-        source_path = merged_path
+    source_path = labelled_path if labelled_path.exists() else merged_path
 
     if not source_path.exists():
         print(
@@ -117,6 +126,35 @@ def main() -> int:
     dist = df["sentiment"].value_counts().to_dict()
     print(f"  Distribution sentiment normalisee: {_display_sentiment_distribution(dist)}")
 
+    # Filtre lignes trop courtes (titres tronques, entrees automatiques) AVANT split.
+    # Sans ce filtre: ~17% de bruit <30 chars, le modele apprend des fragments.
+    text_col = "content" if "content" in df.columns else ("text" if "text" in df.columns else None)
+    if text_col and args.min_chars > 0:
+        n_before = len(df)
+        lens = df[text_col].fillna("").astype(str).str.len()
+        df = df[lens >= args.min_chars].reset_index(drop=True)
+        n_drop = n_before - len(df)
+        print(f"  Filtre min_chars>={args.min_chars} ({text_col}): {n_drop:,} lignes retirees ({n_drop/max(1,n_before)*100:.1f}%)")
+
+    # Deduplication AVANT split: empeche la fuite train<->test (mesuree a 7.6%).
+    # Cle prioritaire: fingerprint (hash metier stable), fallback url, fallback content.
+    if not args.no_dedup:
+        n_before = len(df)
+        if "fingerprint" in df.columns:
+            mask_fp = df["fingerprint"].fillna("").astype(str).str.strip() != ""
+            df_fp = df[mask_fp].drop_duplicates(subset=["fingerprint"], keep="first")
+            df_rest = df[~mask_fp]
+            df = pd.concat([df_fp, df_rest], ignore_index=True)
+        if "url" in df.columns:
+            mask_url = df["url"].fillna("").astype(str).str.strip() != ""
+            df_url = df[mask_url].drop_duplicates(subset=["url"], keep="first")
+            df_rest = df[~mask_url]
+            df = pd.concat([df_url, df_rest], ignore_index=True)
+        if text_col:
+            df = df.drop_duplicates(subset=[text_col], keep="first").reset_index(drop=True)
+        n_drop = n_before - len(df)
+        print(f"  Deduplication (fingerprint > url > {text_col}): {n_drop:,} doublons supprimes ({n_drop/max(1,n_before)*100:.1f}%)")
+
     # Filtre par topics (finance, politique) pour veille ciblee
     if args.topics:
         print(
@@ -146,7 +184,18 @@ def main() -> int:
     # Split temporel par défaut — trie par date pour éviter la fuite de données futures vers le train.
     # --no-temporal : shuffle aléatoire (utile pour debug / tests de surapprentissage).
     date_col = next(
-        (c for c in ("published_at", "publication_date", "date", "created_at") if c in df.columns),
+        (
+            c
+            for c in (
+                "published_at",
+                "publication_date",
+                "date",
+                "created_at",
+                "collected_at",
+                "processed_at",
+            )
+            if c in df.columns
+        ),
         None,
     )
     if not args.no_temporal and date_col is not None:

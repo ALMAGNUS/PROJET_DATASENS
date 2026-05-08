@@ -82,7 +82,7 @@ def main() -> int:
     gold_base = project_root / "data" / "gold"
     goldai_base = project_root / "data" / "goldai"
     goldai_merged = goldai_base / "merged_all_dates.parquet"
-    goldai_ia = goldai_base / "ia" / "merged_all_dates_annotated.parquet"
+    goldai_base / "ia" / "merged_all_dates_annotated.parquet"
 
     store = MongoGridFSStore(
         mongo_uri=settings.mongo_uri,

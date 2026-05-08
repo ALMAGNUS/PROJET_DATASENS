@@ -13,9 +13,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 import numpy as np
 import pandas as pd
 
@@ -71,7 +71,7 @@ def _plot_sentiment_distribution(df: pd.DataFrame) -> None:
     # Gauche : bar chart
     ax0 = axes[0]
     bars = ax0.bar(order, counts.values, color=colors, alpha=0.88, edgecolor="black", linewidth=0.5, width=0.5)
-    for bar, cnt, pct in zip(bars, counts.values, pcts.values):
+    for bar, cnt, pct in zip(bars, counts.values, pcts.values, strict=False):
         ax0.text(
             bar.get_x() + bar.get_width() / 2, bar.get_height() + total * 0.005,
             f"{cnt:,}\n({pct}%)", ha="center", fontsize=10, fontweight="bold",
@@ -107,7 +107,7 @@ def _plot_sentiment_distribution(df: pd.DataFrame) -> None:
             xytext=(0.65, 0.85), xycoords=("data", "axes fraction"),
             textcoords="axes fraction",
             fontsize=8, color="#7c3aed", fontweight="bold",
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="#f3e8ff", edgecolor="#7c3aed", alpha=0.9),
+            bbox={"boxstyle": "round,pad=0.3", "facecolor": "#f3e8ff", "edgecolor": "#7c3aed", "alpha": 0.9},
         )
 
     fig.tight_layout()
@@ -137,10 +137,10 @@ def _plot_confidence_by_class(df: pd.DataFrame) -> None:
         data_by_class, tick_labels=order, patch_artist=True,
         medianprops={"color": "black", "linewidth": 2},
     )
-    for patch, color in zip(bp["boxes"], colors):
+    for patch, color in zip(bp["boxes"], colors, strict=False):
         patch.set_facecolor(color)
         patch.set_alpha(0.75)
-    for mean_val, x_pos, c in zip([d.mean() for d in data_by_class], range(1, len(order) + 1), order):
+    for mean_val, x_pos, _ in zip([d.mean() for d in data_by_class], range(1, len(order) + 1), order, strict=False):
         ax0.scatter(x_pos, mean_val, color="black", zorder=5, s=60, marker="D")
         ax0.text(x_pos + 0.07, mean_val, f"moy={mean_val:.3f}", fontsize=8, va="center")
     ax0.set_ylabel("Score de confiance (0 → 1)")
@@ -152,7 +152,7 @@ def _plot_confidence_by_class(df: pd.DataFrame) -> None:
     # Droite : histogramme superposé
     ax1 = axes[1]
     bins = np.linspace(0, 1, 30)
-    for c, color in zip(order, colors):
+    for c, color in zip(order, colors, strict=False):
         subset = df[df["sentiment_label"] == c]["confidence"].dropna()
         ax1.hist(subset, bins=bins, alpha=0.55, color=color, label=f"{c} (n={len(subset):,})", edgecolor="none")
     ax1.set_xlabel("Score de confiance")
@@ -272,7 +272,7 @@ def _plot_latency(df: pd.DataFrame) -> None:
                     cellLoc="center", loc="center", bbox=[0.05, 0.0, 0.9, 1.0])
     tbl.auto_set_font_size(False)
     tbl.set_fontsize(9.5)
-    for (row, col), cell in tbl.get_celld().items():
+    for (row, _col), cell in tbl.get_celld().items():
         if row == 0:
             cell.set_facecolor("#1e3a5f")
             cell.set_text_props(color="white", fontweight="bold")

@@ -3,7 +3,7 @@
 target-version = "py312"
 line-length = 100
 # Exemples à copier-coller (pas du code exécutable)
-exclude = ["scripts/dossier_e1_examples.py"]
+exclude = ["scripts/_archive"]
 
 [tool.ruff.lint]
 select = [
@@ -36,6 +36,7 @@ ignore = [
     "SIM105", # Use contextlib.suppress (acceptable for try-except-pass)
     "B904",   # Raise from err (acceptable for FastAPI error handling)
     "RUF001", # Typographic quotes in French UI strings (l'API, d'un, etc.)
+    "RUF002", # Typographic chars in docstrings (× multiplication, ’ apostrophe) — French docs
     "RUF003", # Typographic quotes in comments
 ]
 

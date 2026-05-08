@@ -262,7 +262,7 @@ def main() -> int:
     val_texts, val_labels = prepare_text(val_df)
 
     if args.max_train_samples and args.max_train_samples > 0 and len(train_texts) > args.max_train_samples:
-        train_pairs = list(zip(train_texts, train_labels))
+        train_pairs = list(zip(train_texts, train_labels, strict=False))
         train_pairs = pd.DataFrame(train_pairs, columns=["text", "label"]).sample(
             n=args.max_train_samples, random_state=42
         )
@@ -270,7 +270,7 @@ def main() -> int:
         train_labels = train_pairs["label"].tolist()
 
     if args.max_val_samples and args.max_val_samples > 0 and len(val_texts) > args.max_val_samples:
-        val_pairs = list(zip(val_texts, val_labels))
+        val_pairs = list(zip(val_texts, val_labels, strict=False))
         val_pairs = pd.DataFrame(val_pairs, columns=["text", "label"]).sample(
             n=args.max_val_samples, random_state=42
         )
@@ -387,7 +387,7 @@ def main() -> int:
                     eval_path = fb
                     break
         if not (eval_path / "config.json").exists():
-            print(f"Modèle fine-tuné introuvable. Vérifiez SENTIMENT_FINETUNED_MODEL_PATH ou lancez le fine-tuning.")
+            print("Modèle fine-tuné introuvable. Vérifiez SENTIMENT_FINETUNED_MODEL_PATH ou lancez le fine-tuning.")
             return 1
         output_path = eval_path
         from transformers import pipeline
@@ -530,7 +530,7 @@ def main() -> int:
     # MLflow explicitement désactivé sur ce projet (trop lourd pour le run quotidien).
     print("MLflow: désactivé (versioning local via fichiers JSON + artefacts modèles).")
 
-    print(f"\nPour utiliser ce modèle, ajoutez dans .env :")
+    print("\nPour utiliser ce modèle, ajoutez dans .env :")
     print(f"  SENTIMENT_FINETUNED_MODEL_PATH=models/{args.model}-sentiment-finetuned")
     return 0
 

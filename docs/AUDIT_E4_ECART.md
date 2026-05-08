@@ -25,7 +25,7 @@
 |---------|--------|------------------|----------------|
 | Spécifications techniques (architecture, dépendances, environnement) | ✅ TRUE | `docs/ARCHITECTURE.md`, `docs/ARCHITECTURE_DB.md`, `docs/README_E2_API.md`, `requirements.txt` | Conforme |
 | Services éco-responsables favorisés | ❌ FALSE | Pas de mention éco-responsabilité dans les choix | **À ajouter** : court paragraphe dans `docs/ARCHITECTURE.md` ou `README.md` (ex. hébergement, choix tech, Mistral/Local HF) |
-| Diagramme de flux de données | ✅ TRUE | `docs/DATA_FLOW.md`, `FLOW_DONNEES.md`, `docs/CHEMIN_DONNEE.md` | Conforme |
+| Diagramme de flux de données | ✅ TRUE | `docs/DATA_FLOW.md`, `docs/dev/FLOW_DONNEES.md`, `docs/CHEMIN_DONNEE.md` | Conforme |
 | POC accessible et fonctionnelle en pré-production | ⚠️ PARTIEL | Docker, CI/CD, API/cockpit déployables | Manque une doc explicite type "POC en pré-production : URL, conditions" |
 | Conclusion POC avec avis pour décision | ❌ FALSE | Pas de doc "conclusion POC" | **À créer** : `docs/CONCLUSION_POC.md` (avis, recommandations, décision de poursuite) |
 

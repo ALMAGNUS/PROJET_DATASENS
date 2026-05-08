@@ -43,7 +43,7 @@ Grafana est configuré par provisioning : la datasource Prometheus est définie 
 
 La journalisation est centralisée via Loguru dans `src/logging_config.py`. La fonction `setup_logging()` configure un handler console (niveau configurable via `log_level`) et un handler fichier (`logs/datasens.log`) avec rotation à 10 Mo et rétention de 7 jours. Le format est uniforme : `{time} | {level} | {name}:{function} | {message}`. La configuration est appelée au démarrage de l'API E2 (`run_e2_api.py`) et du pipeline E1 (`main.py`).
 
-Les modules applicatifs (API, pipeline, services) utilisent `loguru` pour tracer les erreurs, les opérations critiques et les événements de sécurité. Les tables SQLite `sync_log`, `cleaning_audit` et `data_quality_metrics` complètent la traçabilité métier pour les opérations de collecte et de nettoyage. Cette intégration assure une cohérence des logs sur l'ensemble de l'application et facilite le diagnostic en cas d'incident. La documentation détaillée figure dans `LOGGING.md`.
+Les modules applicatifs (API, pipeline, services) utilisent `loguru` pour tracer les erreurs, les opérations critiques et les événements de sécurité. Les tables SQLite `sync_log`, `cleaning_audit` et `data_quality_metrics` complètent la traçabilité métier pour les opérations de collecte et de nettoyage. Cette intégration assure une cohérence des logs sur l'ensemble de l'application et facilite le diagnostic en cas d'incident. La documentation détaillée figure dans `docs/dev/LOGGING.md`.
 
 #### Intégrer des alertes en fonction des indicateurs.
 
@@ -53,7 +53,7 @@ En production, un Alertmanager peut être configuré pour router les alertes ver
 
 #### Documenter le monitorage et les procédures d'installation et de configuration.
 
-La documentation du monitorage couvre plusieurs niveaux. Le fichier `docs/METRIQUES_SEUILS_ALERTES.md` décrit les métriques, les seuils et les actions recommandées. Le fichier `docs/MONITORING_E2_API.md` présente l'architecture du monitoring de l'API E2 et l'endpoint `/metrics`. Le fichier `monitoring/README_GRAFANA.md` explique le démarrage de Prometheus et Grafana et la structure des dashboards. Le fichier `docs/e5/PROCEDURE_INSTALLATION_MONITORING.md` fournit une procédure pas à pas : prérequis, installation de Prometheus (script batch, ligne de commande, Docker), installation de Grafana, installation d'Uptime Kuma, ordre de démarrage recommandé, et liste des fichiers de configuration. Le fichier `docs/DEPLOYMENT.md` et `LANCER_TOUT.md` complètent la documentation pour le déploiement et le lancement complet. Les captures à produire sont listées dans `docs/E1_CAPTURES_MONITORING.md`.
+La documentation du monitorage couvre plusieurs niveaux. Le fichier `docs/METRIQUES_SEUILS_ALERTES.md` décrit les métriques, les seuils et les actions recommandées. Le fichier `docs/MONITORING_E2_API.md` présente l'architecture du monitoring de l'API E2 et l'endpoint `/metrics`. Le fichier `monitoring/README_GRAFANA.md` explique le démarrage de Prometheus et Grafana et la structure des dashboards. Le fichier `docs/e5/PROCEDURE_INSTALLATION_MONITORING.md` fournit une procédure pas à pas : prérequis, installation de Prometheus (script batch, ligne de commande, Docker), installation de Grafana, installation d'Uptime Kuma, ordre de démarrage recommandé, et liste des fichiers de configuration. Le fichier `DEPLOY.md` et `RUNBOOK.md` complètent la documentation pour le déploiement et le lancement complet. Les captures à produire sont listées dans `docs/E1_CAPTURES_MONITORING.md`.
 
 ---
 

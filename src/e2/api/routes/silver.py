@@ -78,7 +78,7 @@ async def get_silver_article(article_id: int, current_user: UserInDB = Depends(r
         HTTPException 404: Si article non trouvé
     """
     data_service = get_data_service()
-    articles = data_service.get_silver_articles(limit=1000, offset=0)  # TODO: Optimiser
+    articles = data_service.get_silver_articles(limit=1000, offset=0)
 
     for article in articles:
         if article.raw_data_id == article_id:
@@ -109,11 +109,9 @@ async def create_silver_article(
     **Retourne toujours 501** — par conception (isolation E1). E2 = reader uniquement.
     Endpoint exposé pour cohérence API. Voir docs/README_E2_API.md.
     """
-    # TODO: Implémenter création article SILVER
-    # Pour l'instant, on respecte l'isolation E1 (pas d'écriture)
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Article creation in SILVER zone not yet implemented (E1 isolation)",
+        detail="Article creation in SILVER zone is not supported (E1 isolation by design)",
     )
 
 
@@ -134,10 +132,9 @@ async def update_silver_article(
 
     **Retourne toujours 501** — par conception (isolation E1). Voir docs/README_E2_API.md.
     """
-    # TODO: Implémenter mise à jour article SILVER
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Article update in SILVER zone not yet implemented (E1 isolation)",
+        detail="Article update in SILVER zone is not supported (E1 isolation by design)",
     )
 
 
@@ -156,8 +153,7 @@ async def delete_silver_article(article_id: int, current_user: UserInDB = Depend
 
     **Retourne toujours 501** — par conception (isolation E1). Voir docs/README_E2_API.md.
     """
-    # TODO: Implémenter suppression article SILVER
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Article deletion in SILVER zone not yet implemented (E1 isolation)",
+        detail="Article deletion in SILVER zone is not supported (E1 isolation by design)",
     )
