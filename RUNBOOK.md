@@ -174,6 +174,16 @@ scripts\publish_reports_git.bat
 
 Prérequis : `.venv` activable, `git` en PATH, branche `main` suivie par `origin`.
 
+### 3.2 CI GitHub Actions — erreurs fréquentes
+
+| Message | Cause | Action |
+|---------|--------|--------|
+| `could not read Username for 'https://github.com'` | Token / permissions checkout | Corrigé dans les workflows (`permissions: contents: read`, `github.token`). |
+| `Too Many Requests` / `Failed to resolve action download info` | Limite interne GitHub (téléchargement des actions) | Attendre **15–60 min**, **Re-run** le job. Les pushes qui ne touchent que `reports/` ou `docs/` **ne déclenchent plus** la CI (paths-ignore). |
+| CI rouge mais dépôt OK pour le jury | La soutenance ne dépend pas d’Actions vertes | Les liens `src/`, `docs/`, `reports/` sur GitHub restent valides. |
+
+Relancer manuellement : onglet **Actions** → workflow **DataSens E1 CI/CD Pipeline** → **Run workflow**.
+
 ---
 
 ## 4. Scénarios standardisés

@@ -1,8 +1,16 @@
+# Tests E1 manuels / PR — le push sur main est couvert par ci-cd.yml (évite doublons + rate limit).
 name: Test
-on: [push, pull_request]
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main, develop]
 
 permissions:
   contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -13,52 +21,52 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1635a86e563ffaeffaadfec69fc2c948700f057362efa61f8 # v4.2.2
         with:
           token: ${{ github.token }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      
+
       - name: Install dependencies
         run: pip install -r requirements.txt
-      
+
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=${{ github.workspace }}/src:$PYTHONPATH" >> $GITHUB_ENV
-      
+
       - name: Run E1 isolation tests (fast)
         run: pytest tests/test_e1_isolation.py -v -m "not slow"
-      
+
       - name: Validate E1 pipeline structure
         run: |
           python -c "import sys; sys.path.insert(0, 'src'); from e1.pipeline import E1Pipeline; print('✅ E1Pipeline importable')"
           python -c "import sys; sys.path.insert(0, 'src'); from shared.interfaces import E1DataReader; print('✅ E1DataReader importable')"
-      
+
       - name: Check E1 exports structure
         run: |
           mkdir -p exports data/raw data/silver data/gold
           test -d exports && echo "✅ exports/ existe"
           test -d data && echo "✅ data/ existe"
-  
+
   test-e1-complete:
     name: Tests E1 Complet (Slow)
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1635a86e563ffaeffaadfec69fc2c948700f057362efa61f8 # v4.2.2
         with:
           token: ${{ github.token }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      
+
       - name: Install dependencies
         run: pip install -r requirements.txt
-      
+
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=${{ github.workspace }}/src:$PYTHONPATH" >> $GITHUB_ENV
-      
+
       - name: Run E1 complete pipeline test
         run: pytest tests/test_e1_isolation.py::TestE1PipelineComplete -v -m slow
-        continue-on-error: true  # Ne pas bloquer si test lent échoue
+        continue-on-error: true
