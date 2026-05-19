@@ -1,0 +1,88 @@
+{
+  "generated_at_utc": "2026-05-15T07:34:31Z",
+  "status": "WARN",
+  "reasons": [
+    "source GDELT_Last15_English: volume nul (prev=2, now=0)",
+    "source GDELT_Master_List: volume nul (prev=2, now=0)",
+    "source agora_consultations: volume nul (prev=19, now=0)"
+  ],
+  "kpis": {
+    "extracted": 1380.0,
+    "cleaned": 1380.0,
+    "loaded": 124.0,
+    "deduplicated": 1256.0,
+    "clean_ratio": 1.0,
+    "enriched_ratio": 1.0,
+    "run_duration_sec": 154.628003,
+    "min_loaded_threshold": 20.0,
+    "min_clean_ratio": 0.9,
+    "min_enriched_ratio": 0.95
+  },
+  "source_traceability": {
+    "rss_french_news": {
+      "extracted": 22,
+      "duration_sec": 0.745,
+      "status": "OK"
+    },
+    "reddit_france": {
+      "extracted": 40,
+      "duration_sec": 1.531,
+      "status": "OK"
+    },
+    "trustpilot_reviews": {
+      "extracted": 0,
+      "duration_sec": 0.044,
+      "status": "OK"
+    },
+    "openweather_api": {
+      "extracted": 5,
+      "duration_sec": 0.641,
+      "status": "OK"
+    },
+    "insee_indicators": {
+      "extracted": 1,
+      "duration_sec": 0.343,
+      "status": "OK"
+    },
+    "datagouv_datasets": {
+      "extracted": 29,
+      "duration_sec": 0.842,
+      "status": "OK"
+    },
+    "google_news_rss": {
+      "extracted": 38,
+      "duration_sec": 0.326,
+      "status": "OK"
+    },
+    "yahoo_finance": {
+      "extracted": 42,
+      "duration_sec": 0.307,
+      "status": "OK"
+    },
+    "monavis_citoyen": {
+      "extracted": 14,
+      "duration_sec": 26.876,
+      "status": "OK"
+    },
+    "agora_consultations": {
+      "extracted": 0,
+      "duration_sec": 0.126,
+      "status": "OK"
+    },
+    "GDELT_Last15_English": {
+      "extracted": 0,
+      "duration_sec": 2.652,
+      "status": "OK"
+    },
+    "GDELT_Master_List": {
+      "extracted": 0,
+      "duration_sec": 1.214,
+      "status": "OK"
+    },
+    "zzdb_csv": {
+      "extracted": 1189,
+      "duration_sec": 0.145,
+      "status": "OK"
+    }
+  }
+}

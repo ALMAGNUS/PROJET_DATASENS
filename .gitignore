@@ -52,11 +52,6 @@ monitoring/grafana/data/
 .env*
 !.env.example
 
-# PDF generes du guide architecture (binaire derive du .md)
-docs/GUIDE_ARCHITECTURE_MODE_EMPLOI_FICHIERS.pdf
-# README.pdf (exporte au cas par cas, jamais versionne)
-README.pdf
-
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
@@ -135,13 +130,6 @@ celerybeat.pid
 # ============================================================
 mlruns/
 mlflow.db
-
-Veille Techno
-# --- Exceptions E2 : annexes de veille à versionner ---
-!docs/
-!docs/e2/
-!docs/e2/ANNEXE_C6_VEILLE_*.json
-!docs/e2/ANNEXE_C6_VEILLE_*.md
 
 # ============================================================
 # Scraping error artifacts (HTML + screenshots générés par Botasaurus en cas d'échec)

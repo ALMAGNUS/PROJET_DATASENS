@@ -213,12 +213,127 @@ Sorties (cf. § 11.5 « Tracking des entraînements ») :
 
 Alternative GPU gratuite : `notebooks/colab_finetune_sentiment.ipynb`
 (courbes loss / F1 visibles inline via TensorBoard, cf. § 11.5).
+**Chemins des données / zip / réinjection** : sous-section **« Colab (Google) »** juste après ce scénario.
 
 Réinjection du modèle Colab dans le pipeline local :
 
 ```bat
 python scripts/install_colab_model.py <archive_telechargee.zip>
 ```
+
+### Colab (Google) — fichiers d’entrée, artefacts et inférence locale
+
+Notebook : `notebooks/colab_finetune_sentiment.ipynb`. Résumé des chemins pour une réponse orale ou une démo reproductible.
+
+#### Ce qui est **produit en local** avant Colab
+
+Après fusion GoldAI et split IA (`python scripts/create_ia_copy.py`), avec le défaut
+`goldai_base_path=data/goldai` (`src/config.py`) :
+
+| Fichier | Rôle |
+|---|---|
+| `data/goldai/ia/train.parquet` | Jeu d’entraînement |
+| `data/goldai/ia/val.parquet` | Validation pendant le training |
+| `data/goldai/ia/test.parquet` | Évaluation finale (hors training) |
+| `data/goldai/ia/merged_all_dates_annotated.parquet` | Copie annotée après filtres (même run) |
+
+Source du split : `data/goldai/ia/gold_ia_labelled.parquet` si présent, sinon
+`data/goldai/merged_all_dates.parquet` (cf. script).
+
+#### Ce que tu **uploades dans Colab**
+
+Un **zip** contenant **à la racine du zip** les trois Parquet (noms exacts) :
+
+- `train.parquet`
+- `val.parquet`
+- `test.parquet`
+
+Le notebook les extrait sous `./data/` puis lit `data/train.parquet`, etc. Le nom du zip est libre ; la doc du notebook parle de `colab_bundle.zip`. Tu peux fabriquer l’archive à la main ou avec PowerShell depuis la racine du projet :
+
+```powershell
+Compress-Archive -Force -Path `
+  data\goldai\ia\train.parquet, `
+  data\goldai\ia\val.parquet, `
+  data\goldai\ia\test.parquet `
+  -DestinationPath exports\colab_bundle.zip
+```
+
+Le dossier `exports/` est **gitignored** : pratique pour les zip, pas versionné Git.
+
+#### Ce que **génère Colab** (runtime notebook)
+
+| Élément | Chemin côté Colab | Contenu |
+|---|---|---|
+| Modèle fine-tuné | `models/sentiment_fr-finetuned-colab/` | `config.json`, tokenizer, `model.safetensors` ou `pytorch_model.bin`, checkpoints éventuels |
+| TensorBoard | `models/sentiment_fr-finetuned-colab/runs/` | Events HF (`report_to='tensorboard'`) |
+| Métriques test | `models/sentiment_fr-finetuned-colab/test_metrics.json` | JSON écrit en cellule d’évaluation |
+| Archive téléchargée | **`sentiment_fr_finetuned_colab.zip`** (racine Colab) | Zip du dossier `OUT_DIR` (cellule `make_archive` + `files.download`) |
+
+#### Après téléchargement — **réinjection** et **inférence**
+
+```bat
+python scripts\install_colab_model.py chemin\vers\sentiment_fr_finetuned_colab.zip
+```
+
+Comportement par défaut du script :
+
+- extraction vers `models/sentiment_fr-finetuned-colab/`
+- mise à jour de `.env` : `SENTIMENT_FINETUNED_MODEL_PATH=models/sentiment_fr-finetuned-colab`
+
+L’API et le cockpit chargent ce modèle via **`SENTIMENT_FINETUNED_MODEL_PATH`**
+(`src/ml/inference/local_hf_service.py`). Redémarrer l’API après changement de `.env`.
+
+**TensorBoard en local** (après réinjection) : voir § 11.5 ; en pratique
+`tensorboard --logdir models/sentiment_fr-finetuned-colab/runs`.
+
+**Historique run local (sans Colab)** : `docs/e2/TRAINING_RESULTS.json` — distinct du zip Colab.
+
+#### Workflow bout en bout — **modèle HF** vs **Mistral** (clarification des rôles)
+
+**À distinguer absolument** :
+
+| Besoin | Technologie | Où c’est branché |
+|---|---|---|
+| Score de sentiment (ton fine-tune CamemBERT/HF) | **Hugging Face local** (`LocalHFService`) | `.env` → `SENTIMENT_FINETUNED_MODEL_PATH` → dossier sous `models/` |
+| Chat, résumé, assistant insight | **Mistral** (API cloud) | `.env` → `MISTRAL_API_KEY` — **aucun fichier modèle** Mistral dans le dépôt |
+
+Mistral **ne lit pas** `models/sentiment_fr-finetuned-colab/` : c’est un LLM génératif ; il reçoit du **texte de contexte** construit côté API (`src/e2/api/routes/ai.py`, fonction `_build_data_context`).
+
+**Ce qu’on « réinjecte » après Colab** : uniquement l’**archive du modèle HF** (`install_colab_model.py`). Les Parquet `train/val/test` ne sont **pas** réimportés — ils étaient déjà produits localement (`data/goldai/ia/`) avant l’upload vers Colab.
+
+**Inférence en masse** (pour alimenter les stats que Mistral résume) :
+
+1. Après réinjection du modèle et redémarrage API, lancer le batch :
+   ```bat
+   python scripts\run_inference_pipeline.py
+   ```
+2. Sortie typique : `data/goldai/predictions/date=*/run=*/predictions.parquet`
+3. L’endpoint `POST /api/v1/ai/insight` préfère fusionner `data/goldai/app/gold_app_input.parquet` avec le **dernier** `predictions.parquet` ; sinon repli sur `data/goldai/merged_all_dates.parquet`.
+
+Schéma synthétique :
+
+```
+Pipeline E1 → GOLD / GoldAI
+       │
+       ├─ create_ia_copy.py → data/goldai/ia/{train,val,test}.parquet ──zip──► Colab (train)
+       │
+       ◄──────────────── sentiment_fr_finetuned_colab.zip ────────────────
+       │
+       └─ install_colab_model.py → models/sentiment_fr-finetuned-colab/ + .env
+
+run_inference_pipeline.py (batch) → data/goldai/predictions/.../predictions.parquet
+                                              │
+_build_data_context (résumé texte des Parquet) │
+                                              ▼
+                                    prompt ──► Mistral (insight)
+
+POST /ai/predict (texte seul) ──► LocalHF (même SENTIMENT_FINETUNED_MODEL_PATH) — sans Mistral
+```
+
+**Phrases courtes (oral)** :
+
+- *« Le fine-tune produit des poids Hugging Face ; Mistral ne les voit pas — il reçoit un résumé statistique issu des Parquet, enrichi si on a lancé l’inférence batch. »*
+- *« L’inférence « temps réel » sur une phrase passe par `/predict` ; l’insight Mistral s’appuie sur les agrégats construits depuis GoldAI + prédictions batch. »*
 
 ### Scénario E — Cockpit + API uniquement (démo rapide)
 
@@ -653,10 +768,9 @@ existant, mais aucun code applicatif n'y logge. `mlruns/` est gitignored et inut
 
 | Workflow | Déclencheur | Rôle |
 |---|---|---|
-| `.github/workflows/build.yml` | push | Build Docker images |
-| `.github/workflows/test.yml` | push + PR | pytest + coverage |
-| `.github/workflows/ci-cd.yml` | push + PR | Tests + lint + build complet |
-| `.github/workflows/e3-quality-gate.yml` | push + PR | Quality gate E3 |
+| `.github/workflows/test.yml` | push + PR | pytest (E1 isolation / complet selon job) |
+| `.github/workflows/ci-cd.yml` | push + PR | pytest + build/push image Docker `ghcr.io` |
+| `.github/workflows/e3-quality-gate.yml` | push + PR | Quality gate E3 (`test_e3_quality_gate.py`) |
 
 Statut consultable sur https://github.com/ALMAGNUS/PROJET_DATASENS/actions.
 
@@ -855,6 +969,52 @@ recevoir les frappes. Solution : ouvrir un PowerShell séparé (`Win+R` →
 
 ## 15. Références
 
+### Carte des emplacements des fichiers (audit, soutenance)
+
+Pour répondre à une demande du type *« montrez où se trouvent les fichiers du
+projet »* : partir de la **racine** (`main.py`, `docker-compose.yml`), puis
+enchaîner **données → code → preuves → config**. Pas besoin de lister 200
+chemins : montrer **5 dossiers** suffit si chacun a une phrase claire.
+
+#### Vue d’ensemble (phrase d’architecture)
+
+> « Le flux est **RAW → SILVER → GOLD → GoldAI** sur disque, **SQLite** pour
+> l’opérationnel et l’auth, **Parquet** pour l’analytique et le ML, **MongoDB /
+> GridFS** pour l’archive longue durée, **FastAPI** pour l’exposition,
+> **Streamlit** pour le pilotage. »
+
+#### Tableau — où ouvrir l’explorateur / l’IDE
+
+| Emplacement | Rôle (une phrase) |
+|---|---|
+| `data/raw/` | Données brutes par jour de collecte (JSON/CSV issus du pipeline E1). |
+| `data/silver/` | Parquet nettoyé après validation. |
+| `data/gold/date=*/` | Parquet GOLD partitionné par date. |
+| `data/goldai/` | Fusion : `merged_all_dates.parquet`, partitions `date=*`, branches **`app/`** (inférence), **`ia/`** (train/val/test, `gold_ia_labelled`). |
+| `data/goldai/predictions/` | Sorties batch du modèle local (`date=*/run=*/predictions.parquet`) — contexte pour l’insight Mistral. |
+| **SQLite** (`DB_PATH` dans `.env`, ex. `~/datasens_project/datasens.db`) | Métier + auth : `raw_data`, `profils`, `sync_log`, audit — pas le stockage principal des gros Parquet. |
+| `models/` | Poids Hugging Face (fine-tuné ou baseline) ; voir `SENTIMENT_FINETUNED_MODEL_PATH`. |
+| `src/e1/` | Extraction, nettoyage, chargement pipeline. |
+| `src/e2/api/` | FastAPI : routes, middleware Prometheus, audit. |
+| `src/streamlit/` | Cockpit : pilotage, lineage, IA. |
+| `src/ml/inference/` | Inférence locale HF (`LocalHFService`). |
+| `monitoring/` | Prometheus, Grafana, règles d’alerte (MCO). |
+| `reports/` | `run_summary_*.json` (contrat de run E1), `db_state_*` (cohérence). |
+| `docs/` | Dossiers E2–E5, annexes, veille versionnée, schémas (`ARCHITECTURE`, `FLOW_DONNEES`). |
+| `.github/workflows/` | CI : tests, quality gate, build image. |
+| `notebooks/` | Notebook Colab fine-tuning (`colab_finetune_sentiment.ipynb`). |
+| `presentations/` | Supports soutenance au format Marp (sources `.md`). |
+
+#### MongoDB / GridFS (si on te le demande)
+
+> « MongoDB sert d’**archive** : les Parquet volumineux sont envoyés dans **GridFS**
+> via `scripts/backup_parquet_to_mongo.py`. Ce n’est pas la base métier du run
+> quotidien : le pipeline lit surtout **disque + SQLite**. »
+
+#### Astuce le jour J
+
+Préparer dans l’explorateur ou l’IDE trois favoris : **`data/goldai`**, **`reports`**, **`src/e2/api`** — en moins d’une minute on couvre **données + preuves + exposition API**.
+
 ### Runtime — fichiers de configuration
 
 - `docker-compose.yml` — orchestration cible production (7 services).
@@ -894,4 +1054,4 @@ recevoir les frappes. Solution : ouvrir un PowerShell séparé (`Win+R` →
 
 ---
 
-*Dernière mise à jour : 8 mai 2026 — RUNBOOK v2 (refonte niveau jury : 15 sections, ajouts § 2 Premier démarrage, § 6 Comptes cockpit, § 8 Backup étendu, § 9 Update, § 10 Logs/incidents, § 11 Tests/CI, § 12 Sécurité/RGPD, § 13 Tuning, § 14 dépannage par symptôme).*
+*Dernière mise à jour : 8 mai 2026 — RUNBOOK v2 (refonte exploitation : 15 sections ; ajout § 15 « Carte des emplacements des fichiers » pour audit / soutenance).*

@@ -169,16 +169,16 @@ CREATE TABLE model_output (
 
 ---
 
-## 📊 Base 3 : PySpark (E2 - Futur)
+## 📊 Base 3 : PySpark 
 
-### Caractéristiques (Prévu)
+### Caractéristiques
 
 - **Rôle** : Big Data analytics et ML
 - **Type** : PySpark DataFrame / Parquet
 - **Format** : Parquet partitionné par date
 - **Emplacement** : `data/gold/date=YYYY-MM-DD/`
 
-### Schéma Prévisionnel
+### Schéma
 
 ```python
 # DataFrame Spark avec colonnes enrichies
@@ -233,7 +233,7 @@ for article in articles:
 
 ---
 
-### E2 : DataSens → PySpark (Futur)
+### E2 : DataSens → PySpark
 
 **Flux** : Unidirectionnel (DataSens → Spark Transform → Parquet)
 
@@ -285,14 +285,14 @@ def classify_source(source_name: str) -> str:
 
 ## 📈 Évolution Architecture
 
-### E1 (Actuel)
+### E1 
 
 ```
 ZZDB SQLite ──READ──> Pipeline E1 ──WRITE──> DataSens SQLite
                                     └─EXPORT──> CSV/Parquet
 ```
 
-### E2 (Futur)
+### E2 
 
 ```
 ZZDB SQLite ──READ──> Pipeline E1 ──WRITE──> DataSens SQLite
@@ -301,7 +301,7 @@ ZZDB SQLite ──READ──> Pipeline E1 ──WRITE──> DataSens SQLite
                                                          └─ML Models
 ```
 
-### E3 (Vision)
+### E3 
 
 ```
 ZZDB SQLite ──READ──> Pipeline E1 ──WRITE──> DataSens SQLite

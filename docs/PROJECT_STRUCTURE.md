@@ -131,15 +131,6 @@ Fichiers CSV/Parquet générés automatiquement :
 - `pyproject.toml` : Configuration ruff (linter)
 - `.gitignore` : Fichiers ignorés par Git
 
-## 🗑️ Fichiers obsolètes supprimés
-
-- `src/extractors_old.py` : Ancienne version extractors
-- `src/extractors.py` : Non utilisé (logique dans core.py)
-- `src/ingestion.py` : Non utilisé
-- `src/lineage.py` : Non utilisé
-- `dashboard.py` (racine) : Ancien dashboard (remplacé par src/dashboard.py)
-- `viz_raw_silver_gold.py` : Fonctionnalité intégrée dans aggregator.py
-
 ## ✅ Organisation finale
 
 - **Code source** : `src/` (modules organisés par responsabilité)
