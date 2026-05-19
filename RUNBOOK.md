@@ -180,7 +180,8 @@ Prérequis : `.venv` activable, `git` en PATH, branche `main` suivie par `origin
 |---------|--------|--------|
 | `could not read Username for 'https://github.com'` | Token / permissions checkout | Corrigé dans les workflows (`permissions: contents: read`, `github.token`). |
 | `Too Many Requests` / `Failed to resolve action download info` | Limite interne GitHub (téléchargement des actions) | Attendre **15–60 min**, **Re-run** le job. Les pushes qui ne touchent que `reports/` ou `docs/` **ne déclenchent plus** la CI (paths-ignore). |
-| `Node.js 20 is deprecated` sur checkout/setup-python | Anciennes actions v4/v5 forcées en Node 24 | Workflows sur `actions/checkout@v6` et `actions/setup-python@v6` (Node 24 natif). |
+| `Node.js 20 is deprecated` sur checkout/setup-python | Anciennes actions v4/v5 forcées en Node 24 | `actions/checkout@v6`, `actions/setup-python@v6`. |
+| `Node.js 20` sur actions Docker (build job) | Anciennes `docker/*@v3`–`v5` | `setup-buildx@v4`, `login@v4`, `metadata@v6`, `build-push@v7` (Node 24 natif). |
 | CI rouge mais dépôt OK pour le jury | La soutenance ne dépend pas d’Actions vertes | Les liens `src/`, `docs/`, `reports/` sur GitHub restent valides. |
 
 Relancer manuellement : onglet **Actions** → workflow **DataSens E1 CI/CD Pipeline** → **Run workflow**.
