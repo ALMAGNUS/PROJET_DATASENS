@@ -1,9 +1,11 @@
+# Workflow CI/CD E1 — tests, build Docker, deploy (main/develop).
+# Dernière mise à jour : 2026-05-19
 name: DataSens E1 CI/CD Pipeline
 
 on:
   push:
     branches: [ main, develop ]
-    # Ne pas lancer la CI sur les commits docs/reports seuls (publication quotidienne).
+    # Ne pas lancer la CI sur les commits limités à docs/reports/presentations.
     paths-ignore:
       - 'reports/**'
       - 'docs/**'
