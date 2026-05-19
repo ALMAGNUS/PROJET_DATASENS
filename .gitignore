@@ -141,3 +141,4 @@ validation_report.json
 # (snapshots parquet + SQLite, trop volumineux pour git)
 # ============================================================
 backups/
+
