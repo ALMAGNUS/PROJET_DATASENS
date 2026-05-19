@@ -643,6 +643,31 @@ def render_markdown(state: dict) -> str:
     return "\n".join(lines)
 
 
+def _maybe_publish_reports_to_git() -> None:
+    """Optionnel : commit + push reports/ après génération (voir scripts/publish_reports_git.ps1)."""
+    import subprocess
+
+    if "--publish-git" not in sys.argv:
+        return
+    script = PROJECT_ROOT / "scripts" / "publish_reports_git.ps1"
+    if not script.is_file():
+        print(f"[WARN] Script introuvable : {script}")
+        return
+    print("[INFO] Publication reports/ sur GitHub...")
+    subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(script),
+        ],
+        cwd=PROJECT_ROOT,
+        check=False,
+    )
+
+
 def main() -> int:
     db_file = _db_path()
     state = collect_state(db_file)
@@ -664,6 +689,7 @@ def main() -> int:
     checks = state.get("coherence_checks", {})
     if checks:
         print(f"     coherence      : {checks.get('status', 'n/a')}")
+    _maybe_publish_reports_to_git()
     return 0
 
 

@@ -144,6 +144,36 @@ Démarre :
 
 Pour un run pipeline manuel : `python main.py` (sans tout relancer).
 
+### 3.1 Publication quotidienne des rapports sur GitHub
+
+Les fichiers `reports/db_state_*` et `reports/run_summary_*` doivent être **commités et poussés**
+pour que le jury voie les preuves à jour (GitHub trie le dossier par nom de fichier, pas par date :
+le plus récent est en bas de la liste, ex. `db_state_2026-05-18T062650Z.md`).
+
+**Une commande (pipeline + rapport + push)** :
+
+```bat
+scripts\daily_pipeline_and_publish.bat
+```
+
+**Ou après un run déjà fait** :
+
+```bat
+python scripts\db_state_report.py --publish-git
+```
+
+```bat
+scripts\publish_reports_git.bat
+```
+
+**Planificateur de tâches Windows** (ex. tous les jours à 07:00) :
+
+1. Action : `C:\Users\Utilisateur\Desktop\PROJET_DATASENS\scripts\daily_pipeline_and_publish.bat`
+2. Démarrer dans : racine du projet
+3. Compte avec accès Git (credentials GitHub déjà configurés : `git push` sans mot de passe interactif)
+
+Prérequis : `.venv` activable, `git` en PATH, branche `main` suivie par `origin`.
+
 ---
 
 ## 4. Scénarios standardisés
