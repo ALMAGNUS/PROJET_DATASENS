@@ -25,9 +25,6 @@ logs/
 # Botasaurus (scraping MonAvis, etc.) — artefacts locaux du run
 output/
 
-# Documentation (excluded from version control)
-docs/
-
 # IDE
 .vscode/
 .idea/
