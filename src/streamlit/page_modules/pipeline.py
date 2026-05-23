@@ -410,14 +410,18 @@ def render(ctx: PageContext) -> None:
 
     last_run, _prev_run = _latest_run_summary_reports(PROJECT_ROOT)
     if last_run:
-        extracted = int(last_run.get("extracted", 0) or 0)
-        cleaned = int(last_run.get("cleaned", 0) or 0)
-        loaded = int(last_run.get("loaded", 0) or 0)
-        deduped = int(last_run.get("deduplicated", 0) or 0)
+        kpi = last_run.get("kpis", {}) if isinstance(last_run, dict) else {}
+        extracted = int(float(kpi.get("extracted", 0) or 0))
+        cleaned = int(float(kpi.get("cleaned", 0) or 0))
+        loaded = int(float(kpi.get("loaded", 0) or 0))
+        deduped = int(float(kpi.get("deduplicated", 0) or 0))
         run_status = str(last_run.get("status", "—") or "—")
+        source_trace = last_run.get("source_traceability", {}) if isinstance(last_run, dict) else {}
+        n_sources = len(source_trace) if isinstance(source_trace, dict) else 0
     else:
         extracted = cleaned = loaded = deduped = 0
         run_status = "—"
+        n_sources = 0
 
     goldai_total_after = (
         _parquet_row_count_cached(str(merged_path)) if merged_path.exists() else 0
@@ -433,7 +437,11 @@ def render(ctx: PageContext) -> None:
         {
             "etape": "1. Extraits (sources)",
             "lignes": extracted,
-            "lecture": "articles bruts collectés sur les 15 sources actives",
+            "lecture": (
+                f"articles bruts collectés sur {n_sources} sources actives"
+                if n_sources
+                else "articles bruts collectés sur les sources actives"
+            ),
         },
         {
             "etape": "2. Validés (cleaned)",
@@ -501,7 +509,13 @@ def render(ctx: PageContext) -> None:
         )
         st.altair_chart(chart_journey + labels_journey, use_container_width=True)
     else:
-        st.info("Aucun run récent détecté. Lancez `python main.py` pour produire le run du jour.")
+        if last_run:
+            st.info(
+                "Run détecté mais aucune ligne incrémentale ce jour "
+                f"(statut {run_status}). Relancez `python main.py` si vous attendez de nouvelles données."
+            )
+        else:
+            st.info("Aucun run récent détecté. Lancez `python main.py` pour produire le run du jour.")
 
     if not show_advanced:
         return

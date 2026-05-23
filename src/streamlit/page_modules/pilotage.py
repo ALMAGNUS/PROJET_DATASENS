@@ -42,13 +42,7 @@ def render(ctx: PageContext) -> None:
 
     if show_advanced:
         st.caption(
-            "Mode **Expert** actif (sélecteur *Profil d’usage* dans la barre latérale) : "
-            "les blocs techniques avancés sont affichés."
-        )
-    else:
-        st.caption(
-            "Mode **Standard** (par défaut). Passez sur *Profil d’usage → Expert* "
-            "dans la barre latérale pour afficher les blocs techniques avancés."
+            "Actions opérationnelles : run pipeline, fusion, copie IA, API et backups."
         )
 
     def _resolve_db_path() -> str:

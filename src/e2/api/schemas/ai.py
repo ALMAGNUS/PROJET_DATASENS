@@ -2,7 +2,7 @@
 Schemas IA - Inference locale.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AIPredictRequest(BaseModel):
@@ -15,6 +15,7 @@ class AIPredictResponse(BaseModel):
     model: str
     task: str
     result: list[dict]
+    resolved_model: str | None = None
 
 
 class InsightRequest(BaseModel):
@@ -23,7 +24,18 @@ class InsightRequest(BaseModel):
     message: str
 
 
+class InsightCard(BaseModel):
+    """Carte insight métier (croisement GoldAI)."""
+    id: str
+    type: str
+    title: str
+    summary: str
+    facts: dict = Field(default_factory=dict)
+
+
 class InsightResponse(BaseModel):
-    """Reponse texte du assistant insights."""
+    """Réponse insights : synthèse + cartes multiples."""
     reply: str
     theme: str
+    insights: list[InsightCard] = Field(default_factory=list)
+    engine: str = "goldai_mistral_v3"

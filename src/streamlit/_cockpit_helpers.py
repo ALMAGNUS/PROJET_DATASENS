@@ -12,6 +12,7 @@ Ce module centralise :
 
 from __future__ import annotations
 
+import base64
 import csv
 import io
 import json
@@ -80,6 +81,32 @@ def inject_css() -> None:
       background: linear-gradient(180deg, rgba(10, 16, 33, 0.95) 0%, rgba(16, 25, 49, 0.92) 100%);
       border-right: 1px solid rgba(116, 149, 255, 0.2);
     }
+    .ds-logo-shell {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+    }
+    .ds-logo-shell--login {
+      margin: 1.75rem auto 1.1rem;
+      max-width: 380px;
+    }
+    .ds-logo-shell--sidebar {
+      margin: 0.15rem 0 0.85rem;
+      padding: 0 0.15rem;
+    }
+    .ds-logo-shell--header-main {
+      margin: 0.15rem 0 0.85rem;
+      max-width: 320px;
+    }
+    .ds-logo-img {
+      display: block;
+      margin: 0 auto;
+      height: auto;
+      object-fit: contain;
+      object-position: center;
+      background: transparent;
+    }
     .ds-hero { background: linear-gradient(135deg, #1f2f63 0%, #2b3f89 55%, #4a3ea5 100%); padding: 1.5rem; border-radius: 14px; margin-bottom: 1.2rem; border: 1px solid rgba(143, 168, 255, 0.35); box-shadow: 0 12px 35px rgba(0, 0, 0, 0.35); }
     .ds-hero h3 { color: #e8eaf6; margin: 0 0 0.5rem 0; font-size: 1.1rem; }
     .ds-hero p { color: #c5cae9; margin: 0; font-size: 0.9rem; }
@@ -92,6 +119,31 @@ def inject_css() -> None:
     .ds-card-empty { color: #78909c; }
     .ds-panel-title { margin: 0.2rem 0 0.6rem 0; padding: 0.9rem 1rem; border-radius: 12px; border: 1px solid var(--ds-border); background: linear-gradient(135deg, rgba(26, 39, 76, 0.9) 0%, rgba(41, 52, 99, 0.9) 100%); color: #d6e1ff; font-weight: 700; letter-spacing: 0.2px; }
     .ds-panel-sub { color: var(--ds-text-soft); font-size: 0.88rem; margin-top: 0.2rem; font-weight: 400; }
+    .ds-mode-intro {
+      color: #a8bdf6;
+      font-size: 0.92rem;
+      margin: -0.35rem 0 1rem 0;
+      line-height: 1.45;
+    }
+    .ds-mode-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      margin: -0.25rem 0 1rem 0;
+    }
+    .ds-mode-chip {
+      display: inline-block;
+      padding: 0.22rem 0.65rem;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      border: 1px solid rgba(126, 158, 255, 0.35);
+      background: rgba(31, 47, 99, 0.45);
+      color: #dce6ff;
+    }
+    .ds-mode-chip-ok { border-color: rgba(102, 187, 106, 0.55); color: #a5d6a7; }
+    .ds-mode-chip-warn { border-color: rgba(255, 183, 77, 0.55); color: #ffcc80; }
+    .ds-mode-chip-ko { border-color: rgba(239, 83, 80, 0.55); color: #ef9a9a; }
     .ds-chip { display: inline-block; border: 1px solid rgba(138, 166, 255, 0.45); color: #c7d7ff; border-radius: 999px; padding: 0.24rem 0.7rem; margin: 0.15rem 0.3rem 0.15rem 0; font-size: 0.76rem; background: rgba(65, 84, 150, 0.28); }
     [data-testid="stMetric"] {
       background: linear-gradient(160deg, rgba(27, 37, 72, 0.78) 0%, rgba(19, 27, 56, 0.78) 100%);
@@ -116,15 +168,29 @@ def inject_css() -> None:
       border-color: rgba(170, 192, 255, 0.8) !important;
     }
     [data-baseweb="tab-list"] {
-      gap: 0.35rem;
+      gap: 0.45rem;
       background: rgba(23, 32, 64, 0.68);
       border: 1px solid rgba(109, 139, 237, 0.28);
       border-radius: 12px;
-      padding: 0.3rem;
+      padding: 0.45rem;
+      overflow-x: auto;
+      flex-wrap: nowrap;
     }
     [data-baseweb="tab"] {
-      border-radius: 9px !important;
+      border-radius: 10px !important;
       font-weight: 600;
+      flex-shrink: 0;
+      min-width: max-content;
+      white-space: nowrap;
+      overflow: visible;
+      font-size: 1rem !important;
+      padding: 0.62rem 1.35rem !important;
+      line-height: 1.35 !important;
+      height: auto !important;
+    }
+    [data-baseweb="tab"] p {
+      font-size: 1rem !important;
+      line-height: 1.35 !important;
     }
     [data-baseweb="tab"][aria-selected="true"] {
       background: linear-gradient(135deg, rgba(65, 94, 201, 0.85), rgba(126, 84, 220, 0.85)) !important;
@@ -134,9 +200,9 @@ def inject_css() -> None:
       background: rgba(13, 20, 39, 0.72);
       border: 1px solid rgba(106, 138, 238, 0.24);
       border-radius: 12px;
-      padding: 1rem 1rem 1.15rem 1rem;
-      margin-top: 0.65rem;
-      overflow: clip;
+      padding: 0.85rem 1rem 1rem 1rem;
+      margin-top: 0.55rem;
+      overflow: visible;
       isolation: isolate;
     }
     [data-testid="stTabs"] [role="tabpanel"] > div {
@@ -199,6 +265,217 @@ def inject_css() -> None:
     )
 
 
+def inject_ia_css() -> None:
+    """Styles dédiés à l'onglet IA — layout épuré, panneau résultat stable."""
+    st.markdown(
+        """
+    <style>
+    .ds-ia-section {
+      color: #9eb8ff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin: 0 0 0.65rem 0;
+    }
+    .ds-ia-panel {
+      background: rgba(15, 22, 44, 0.55);
+      border: 1px solid rgba(116, 149, 255, 0.22);
+      border-radius: 14px;
+      padding: 1.15rem 1.2rem;
+      min-height: 320px;
+    }
+    .ds-ia-result {
+      background: linear-gradient(160deg, rgba(22, 32, 62, 0.92) 0%, rgba(16, 24, 48, 0.88) 100%);
+      border: 1px solid rgba(116, 149, 255, 0.28);
+      border-radius: 14px;
+      padding: 1.25rem 1.3rem;
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .ds-ia-result--empty { align-items: center; text-align: center; }
+    .ds-ia-result-label {
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #8ea2d8;
+      margin-bottom: 0.5rem;
+    }
+    .ds-ia-result-placeholder {
+      color: #6b7fa8;
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+    .ds-ia-result-value {
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1.1;
+      margin: 0.15rem 0 0.85rem 0;
+    }
+    .ds-ia-bar {
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
+      margin-bottom: 0.75rem;
+    }
+    .ds-ia-bar > span {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.35s ease;
+    }
+    .ds-ia-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: #a8bdf6;
+    }
+    .ds-ia-chat {
+      background: rgba(12, 18, 36, 0.65);
+      border: 1px solid rgba(106, 138, 238, 0.2);
+      border-radius: 12px;
+      padding: 0.85rem 1rem;
+      max-height: 340px;
+      overflow-y: auto;
+      margin-bottom: 0.85rem;
+    }
+    .ds-ia-bubble {
+      border-radius: 12px;
+      padding: 0.65rem 0.85rem;
+      margin-bottom: 0.55rem;
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+    .ds-ia-bubble-user {
+      background: rgba(65, 94, 201, 0.35);
+      border: 1px solid rgba(122, 161, 255, 0.35);
+      color: #e8eeff;
+      margin-left: 1.5rem;
+    }
+    .ds-ia-bubble-assistant {
+      background: rgba(26, 36, 68, 0.85);
+      border: 1px solid rgba(106, 138, 238, 0.22);
+      color: #c5d4ff;
+      margin-right: 1.5rem;
+    }
+    .ds-ia-bubble-role {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      opacity: 0.75;
+      margin-bottom: 0.25rem;
+    }
+    div[data-testid="stVerticalBlock"] div:has(> div > .ds-ia-panel) {
+      gap: 0.5rem;
+    }
+    [data-testid="stVerticalBlockBorderWrapper"] {
+      background: rgba(15, 22, 44, 0.55) !important;
+      border-color: rgba(116, 149, 255, 0.22) !important;
+      border-radius: 14px !important;
+      padding: 0.85rem 1rem !important;
+    }
+    .ds-ia-examples .stButton > button {
+      white-space: normal !important;
+      line-height: 1.3 !important;
+      min-height: 2.75rem !important;
+      font-size: 0.84rem !important;
+      padding: 0.45rem 0.65rem !important;
+    }
+    .ds-insight-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 0.65rem;
+      margin: 0.5rem 0 0.85rem 0;
+    }
+    .ds-insight-card {
+      background: rgba(18, 28, 54, 0.88);
+      border: 1px solid rgba(106, 138, 238, 0.28);
+      border-radius: 12px;
+      padding: 0.75rem 0.85rem;
+      min-height: 88px;
+    }
+    .ds-insight-card-type {
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #7fa0e8;
+      margin-bottom: 0.25rem;
+    }
+    .ds-insight-card-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #dce6ff;
+      margin-bottom: 0.35rem;
+      line-height: 1.25;
+    }
+    .ds-insight-card-summary {
+      font-size: 0.8rem;
+      color: #a8bdf6;
+      line-height: 1.4;
+    }
+    .ds-insight-card-cross {
+      border-color: rgba(156, 123, 255, 0.55) !important;
+      background: linear-gradient(145deg, rgba(40, 32, 72, 0.95) 0%, rgba(22, 28, 54, 0.92) 100%);
+      grid-column: 1 / -1;
+    }
+    .ds-insight-card-cross .ds-insight-card-summary {
+      color: #d4c8ff;
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+    .ds-insight-loading {
+      min-height: 320px;
+      margin: 0.5rem 0 0.85rem 0;
+      padding: 1.25rem 1rem;
+      border-radius: 12px;
+      border: 1px dashed rgba(106, 138, 238, 0.35);
+      background: rgba(18, 28, 54, 0.55);
+      color: #9eb8f5;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.88rem;
+    }
+    .ds-ia-busy .stButton > button,
+    .ds-ia-busy [data-baseweb="radio"] label {
+      opacity: 0.55;
+      pointer-events: none;
+    }
+    /* Navigation Sentiment / Insights — radio horizontal (évite onglets Streamlit 1/2) */
+    [data-testid="stRadio"] > div[role="radiogroup"] {
+      gap: 0.35rem;
+      background: rgba(23, 32, 64, 0.68);
+      border: 1px solid rgba(109, 139, 237, 0.28);
+      border-radius: 12px;
+      padding: 0.35rem;
+      width: fit-content;
+      margin-bottom: 0.75rem;
+    }
+    [data-testid="stRadio"] label {
+      background: transparent !important;
+      border-radius: 10px !important;
+      padding: 0.5rem 1.25rem !important;
+      margin: 0 !important;
+      font-weight: 600 !important;
+      color: #b8c9f5 !important;
+    }
+    [data-testid="stRadio"] label:has(input:checked) {
+      background: linear-gradient(135deg, rgba(65, 94, 201, 0.85), rgba(126, 84, 220, 0.85)) !important;
+      color: #f4f6ff !important;
+    }
+    [data-testid="stRadio"] label > div:first-child {
+      display: none !important;
+    }
+    </style>
+    """,
+        unsafe_allow_html=True,
+    )
+
+
 def inject_readability_css(enabled: bool) -> None:
     """Mode accessibilite: contraste et lisibilite renforces."""
     if not enabled:
@@ -230,19 +507,385 @@ def inject_readability_css(enabled: bool) -> None:
 
 
 def inject_demo_css(enabled: bool) -> None:
-    """Mode demo: interface allegee et focus narration."""
+    """Mode démo : typographie, contrastes, espacements, graphiques."""
     if not enabled:
         return
     st.markdown(
         """
     <style>
-    .stExpander { margin-bottom: 0.6rem !important; }
-    [data-testid="stMetric"] { min-height: 105px; }
-    [data-testid="stCaptionContainer"] p { opacity: 0.92; }
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
+
+    [data-testid="stAppViewContainer"],
+    [data-testid="stSidebar"] {
+      font-family: "DM Sans", "Segoe UI", system-ui, sans-serif !important;
+    }
+    [data-testid="stHeader"] { background: transparent; }
+    h1, h2, h3, h4, h5, h6,
+    [data-testid="stMarkdownContainer"] h1,
+    [data-testid="stMarkdownContainer"] h2,
+    [data-testid="stMarkdownContainer"] h3 {
+      font-family: "DM Sans", "Segoe UI", system-ui, sans-serif !important;
+      letter-spacing: -0.02em;
+    }
+    [data-testid="stMarkdownContainer"] p,
+    [data-testid="stCaptionContainer"] p,
+    label, .stMetric label {
+      line-height: 1.5 !important;
+    }
+
+    .ds-demo-lead {
+      color: #a8bdf6;
+      font-size: 0.92rem;
+      margin: -0.5rem 0 1rem 0;
+    }
+    .ds-section {
+      color: #dce6ff;
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin: 1.25rem 0 0.65rem 0;
+      padding-bottom: 0.35rem;
+      border-bottom: 1px solid rgba(116, 149, 255, 0.22);
+    }
+    .ds-hero {
+      padding: 1.1rem 1.25rem !important;
+      margin-bottom: 1rem !important;
+    }
+    .ds-hero h3 { font-size: 1.15rem !important; }
+    .ds-hero p { font-size: 0.88rem !important; opacity: 0.92; }
+
+    [data-testid="stMetric"] {
+      min-height: 96px;
+      padding: 0.65rem 0.85rem !important;
+      border-radius: 14px !important;
+    }
+    [data-testid="stMetricLabel"] p {
+      font-size: 0.78rem !important;
+      text-transform: none !important;
+    }
+    [data-testid="stMetricValue"] {
+      font-size: 1.45rem !important;
+      font-weight: 700 !important;
+    }
+
+    [data-baseweb="tab-list"] {
+      gap: 0.5rem !important;
+      padding: 0.5rem !important;
+      border-radius: 14px !important;
+    }
+    [data-baseweb="tab"] {
+      font-size: 1.02rem !important;
+      padding: 0.7rem 1.5rem !important;
+    }
+    [data-testid="stTabs"] [role="tabpanel"] {
+      padding: 1.1rem 1.15rem 1.25rem !important;
+      border-radius: 14px !important;
+    }
+
+    div[data-testid="stAlert"] {
+      border-radius: 12px !important;
+      border-width: 1px !important;
+    }
+    [data-testid="stAlertContainer"] div[data-baseweb="notification"] {
+      background: rgba(22, 32, 62, 0.92) !important;
+    }
+
+    .stExpander { margin-bottom: 0.75rem !important; }
+    div[data-testid="stTextArea"] textarea,
+    div[data-testid="stTextInput"] input {
+      border-radius: 12px !important;
+      font-size: 0.95rem !important;
+    }
+    [data-testid="stCaptionContainer"] p {
+      color: #9eb0d9 !important;
+      font-size: 0.84rem !important;
+    }
+    [data-testid="stVerticalBlock"] > div { row-gap: 0.75rem; }
+
+    /* Graphiques Altair — fond sombre cohérent */
+    [data-testid="stArrowVegaLiteChart"] {
+      background: rgba(14, 20, 40, 0.65);
+      border: 1px solid rgba(106, 138, 238, 0.2);
+      border-radius: 14px;
+      padding: 0.5rem 0.35rem;
+    }
+
+    /* Sidebar démo : plus aérée */
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+      font-size: 0.88rem;
+    }
+    .ds-sidebar-compact .backend-ok { color: #66bb6a; font-weight: 600; }
+    .ds-sidebar-compact .backend-ko { color: #ffb74d; font-weight: 600; }
     </style>
     """,
         unsafe_allow_html=True,
     )
+
+
+def inject_presentation_css(enabled: bool) -> None:
+    """Mode présentation jury : masque le chrome Streamlit (menu, header, footer)."""
+    if not enabled:
+        return
+    st.markdown(
+        """
+    <style>
+    header[data-testid="stHeader"] { display: none !important; }
+    footer { visibility: hidden !important; height: 0 !important; }
+    #MainMenu { visibility: hidden !important; }
+    [data-testid="stToolbar"] { display: none !important; }
+    [data-testid="stDecoration"] { display: none !important; }
+    [data-testid="stStatusWidget"] { display: none !important; }
+    .stAppDeployButton { display: none !important; }
+    div[data-testid="stToolbarActions"] { display: none !important; }
+
+    [data-testid="stAppViewContainer"] > section.main {
+      padding-top: 0.75rem !important;
+    }
+    [data-testid="stAppViewContainer"] .block-container {
+      padding-top: 1rem !important;
+      max-width: 100% !important;
+    }
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="collapsedControl"] {
+      top: 0.35rem !important;
+    }
+    </style>
+    """,
+        unsafe_allow_html=True,
+    )
+
+
+_LOGO_PREFERRED = (
+    "datasens_logo_vintage_exact.svg",
+    "datasens_logo_vintage_transparent.png",
+    "datasens_logo.png",
+    "datasens_logo.jpg",
+    "logo.png",
+)
+
+_LOGO_RASTER_PREFERRED = (
+    "datasens_logo_vintage_transparent.png",
+    "datasens_logo.png",
+    "datasens_logo.jpg",
+    "logo.png",
+)
+
+
+def brand_logo_path(project_root: Path) -> Path | None:
+    """Logo principal (SVG prioritaire) — en-tête, sidebar, login."""
+    branding = project_root / "assets" / "branding"
+    if not branding.is_dir():
+        return None
+    for name in _LOGO_PREFERRED:
+        candidate = branding / name
+        if candidate.is_file():
+            return candidate
+    for pattern in ("*.svg", "*.png", "*.jpg", "*.jpeg"):
+        files = sorted(
+            branding.glob(pattern),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        if files:
+            return files[0]
+    return None
+
+
+def brand_logo_raster_path(project_root: Path) -> Path | None:
+    """Logo raster (PNG/JPG) — favicon et export PDF (fpdf2 ne lit pas le SVG)."""
+    branding = project_root / "assets" / "branding"
+    if not branding.is_dir():
+        return None
+    for name in _LOGO_RASTER_PREFERRED:
+        candidate = branding / name
+        if candidate.is_file():
+            return candidate
+    for pattern in ("*.png", "*.jpg", "*.jpeg"):
+        files = sorted(
+            branding.glob(pattern),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        if files:
+            return files[0]
+    return None
+
+
+_LOGO_PLACEMENTS: dict[str, dict[str, Any]] = {
+    "login": {
+        "prefer_raster": True,
+        "width_px": 340,
+        "max_height_px": 92,
+        "shell_class": "ds-logo-shell ds-logo-shell--login",
+    },
+    "sidebar": {
+        "prefer_raster": True,
+        "width_px": 118,
+        "max_height_px": 42,
+        "shell_class": "ds-logo-shell ds-logo-shell--sidebar",
+    },
+    "header_main": {
+        "prefer_raster": True,
+        "width_px": 272,
+        "max_height_px": 74,
+        "shell_class": "ds-logo-shell ds-logo-shell--header-main",
+    },
+}
+
+
+def _resolve_logo_path(project_root: Path, *, prefer_raster: bool) -> Path | None:
+    if prefer_raster:
+        return brand_logo_raster_path(project_root) or brand_logo_path(project_root)
+    return brand_logo_path(project_root) or brand_logo_raster_path(project_root)
+
+
+@st.cache_data(show_spinner=False)
+def _logo_data_uri(path_str: str, mtime_ns: int) -> str:
+    """Data-URI cache (invalidé si le fichier logo change)."""
+    _ = mtime_ns
+    raw = Path(path_str).read_bytes()
+    suffix = Path(path_str).suffix.lower()
+    if suffix == ".svg":
+        encoded = base64.b64encode(raw).decode("ascii")
+        return f"data:image/svg+xml;base64,{encoded}"
+    mime = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+    }.get(suffix, "image/png")
+    encoded = base64.b64encode(raw).decode("ascii")
+    return f"data:{mime};base64,{encoded}"
+
+
+def _render_logo_image(
+    logo: Path,
+    *,
+    shell_class: str = "ds-logo-shell",
+    width_px: int | None = None,
+    width_pct: int | None = None,
+    max_height_px: int | None = None,
+) -> None:
+    uri = _logo_data_uri(str(logo), logo.stat().st_mtime_ns)
+    img_styles = [
+        "display:block",
+        "margin:0 auto",
+        "height:auto",
+        "object-fit:contain",
+        "object-position:center",
+        "background:transparent",
+    ]
+    if width_px is not None:
+        img_styles.append(f"width:{width_px}px")
+        img_styles.append("max-width:100%")
+    elif width_pct is not None:
+        img_styles.append(f"width:{width_pct}%")
+        img_styles.append("max-width:100%")
+    if max_height_px is not None:
+        img_styles.append(f"max-height:{max_height_px}px")
+    style = ";".join(img_styles)
+    st.markdown(
+        f'<div class="{shell_class}">'
+        f'<img class="ds-logo-img" src="{uri}" alt="DataSens" style="{style}" />'
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def render_brand_logo(
+    project_root: Path,
+    *,
+    placement: str = "sidebar",
+    width: int | None = None,
+) -> bool:
+    """Affiche le logo avec dimensions adaptées au contexte (login, sidebar, en-têtes)."""
+    spec = _LOGO_PLACEMENTS.get(placement, _LOGO_PLACEMENTS["sidebar"])
+    logo = _resolve_logo_path(project_root, prefer_raster=bool(spec.get("prefer_raster")))
+    if not logo:
+        return False
+    _render_logo_image(
+        logo,
+        shell_class=str(spec.get("shell_class", "ds-logo-shell")),
+        width_px=width if width is not None else spec.get("width_px"),
+        width_pct=None if width is not None else spec.get("width_pct"),
+        max_height_px=spec.get("max_height_px"),
+    )
+    return True
+
+
+def render_demo_header(project_root: Path) -> None:
+    """En-tête mode démo — même présentation que Standard/Expert (logo seul)."""
+    if not render_brand_logo(project_root, placement="header_main"):
+        st.title("DataSens Cockpit")
+    st.markdown(
+        '<p class="ds-demo-lead">Analyse de sentiment et pipeline de données — démonstration</p>',
+        unsafe_allow_html=True,
+    )
+
+
+@st.cache_data(show_spinner=False, ttl=20)
+def check_api_health(api_base: str) -> bool:
+    """Health check API avec cache court (évite plusieurs appels par rerun)."""
+    try:
+        import requests
+
+        return requests.get(f"{api_base}/health", timeout=2).ok
+    except Exception:
+        return False
+
+
+def _run_status_chip_class(status: str) -> str:
+    s = str(status or "").upper()
+    if s == "PASS":
+        return "ds-mode-chip-ok"
+    if s == "WARN":
+        return "ds-mode-chip-warn"
+    if s in ("FAIL", "ABSENT", "KO"):
+        return "ds-mode-chip-ko"
+    return ""
+
+
+def _render_status_strip(ctx: PageContext) -> None:
+    """Pastilles API + dernier run (partagées Standard / Expert / Démo)."""
+    api_cls = "ds-mode-chip-ok" if ctx.backend_ok else "ds-mode-chip-ko"
+    api_label = "API connectée" if ctx.backend_ok else "API hors ligne"
+
+    latest, _ = latest_run_summary_reports(ctx.project_root)
+    run_chip = ""
+    run_label = "Aucun run enregistré"
+    if latest:
+        status = str(latest.get("status", "—"))
+        kpi = latest.get("kpis", {}) if isinstance(latest, dict) else {}
+        loaded = int(float(kpi.get("loaded", 0) or 0))
+        day = str(latest.get("generated_at_utc", ""))[:10]
+        run_label = f"Dernier run · {day or '?'} · {status} · {loaded:,} lignes"
+        run_chip = _run_status_chip_class(status)
+
+    st.markdown(
+        f"""
+        <div class="ds-mode-strip">
+          <span class="ds-mode-chip {api_cls}">{api_label}</span>
+          <span class="ds-mode-chip {run_chip}">{run_label}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_mode_intro(ctx: PageContext) -> None:
+    """Bandeau unifié Standard / Expert : profil, API et dernier run."""
+    if ctx.ux_mode == "Standard":
+        intro = "Lecture seule — analyse de sentiment et insights métier."
+    elif ctx.ux_mode == "Expert":
+        intro = "Cockpit complet — pipeline, modèles, pilotage et monitoring."
+    else:
+        return
+
+    st.markdown(f'<p class="ds-mode-intro">{intro}</p>', unsafe_allow_html=True)
+    _render_status_strip(ctx)
+
+
+def render_demo_status_strip(ctx: PageContext) -> None:
+    """Pastilles de statut en mode démo (aligné Standard/Expert)."""
+    _render_status_strip(ctx)
 
 
 @st.cache_data(show_spinner=False, ttl=60)

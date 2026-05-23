@@ -52,6 +52,12 @@ from src.streamlit.metrics import (
 from src.streamlit.metrics import (
     stage_time_range as _stage_time_range,
 )
+from src.streamlit.cockpit_ux import (
+    lazy_panel,
+    render_monitoring_date_filter,
+    render_section_title,
+    run_summary_history_cached,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
@@ -62,13 +68,36 @@ def render(ctx: PageContext) -> None:
     api_base = ctx.api_base
     show_advanced = ctx.show_advanced
 
-    st.markdown("### Pilotage du modèle & insights")
-    api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
-    prometheus_url = f"http://localhost:{settings.prometheus_port}"
-    grafana_url = f"http://localhost:{settings.grafana_port}"
-    uptime_kuma_url = os.getenv("UPTIME_KUMA_URL", "http://localhost:3001")
+    st.caption("Monitoring MongoDB, traçabilité datasets et observabilité MLOps.")
+    filter_date = render_monitoring_date_filter()
 
-    st.subheader("Traçabilité historique datasets")
+    if filter_date:
+        render_section_title(f"Quality gate — {filter_date}")
+        hist = run_summary_history_cached(str(PROJECT_ROOT), limit=40)
+        day_runs = [
+            h
+            for h in hist
+            if str(h.get("generated_at_utc", ""))[:10] == filter_date
+        ]
+        if day_runs:
+            rows_qg = []
+            for item in day_runs:
+                kpi = item.get("kpis", {}) if isinstance(item, dict) else {}
+                status = str(item.get("status", "—"))
+                rows_qg.append(
+                    {
+                        "Heure UTC": str(item.get("generated_at_utc", ""))[11:19],
+                        "Statut": status,
+                        "Lignes chargées": int(float(kpi.get("loaded", 0) or 0)),
+                        "Alertes": " · ".join(item.get("reasons", []) or []) or "—",
+                    }
+                )
+            st.dataframe(pd.DataFrame(rows_qg), use_container_width=True, hide_index=True)
+        else:
+            st.warning(f"Aucun run_summary trouvé pour la date {filter_date}.")
+        st.divider()
+
+    render_section_title("Traçabilité historique datasets")
     monitor_stages = [
         ("RAW", PROJECT_ROOT / "data" / "raw", ["*.json", "*.csv"], "raw"),
         ("SILVER", PROJECT_ROOT / "data" / "silver", ["*.parquet", "*.csv"], "silver"),
@@ -99,7 +128,12 @@ def render(ctx: PageContext) -> None:
     st.dataframe(pd.DataFrame(trace_rows), use_container_width=True, hide_index=True)
     st.caption("Preuve de couverture temporelle + variation 24h sur l'ensemble des couches.")
 
-    st.subheader("État MLOps live")
+    api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
+    prometheus_url = f"http://localhost:{settings.prometheus_port}"
+    grafana_url = f"http://localhost:{settings.grafana_port}"
+    uptime_kuma_url = os.getenv("UPTIME_KUMA_URL", "http://localhost:3001")
+
+    render_section_title("État MLOps live")
     st.caption("Vérification en direct des briques observabilité (API, Prometheus, Grafana, Uptime Kuma).")
 
     def _check_url(url: str, timeout: int = 3) -> tuple[str, str]:
@@ -174,7 +208,7 @@ def render(ctx: PageContext) -> None:
     else:
         st.caption("Détails techniques masqués (mode Expert requis).")
 
-    st.subheader("Métriques IA")
+    render_section_title("Métriques IA")
     st.caption("Déséquilibres, confiance, volume – pour piloter le modèle.")
     ia = _ia_metrics_from_parquet(PROJECT_ROOT)
     if ia is None:
@@ -309,7 +343,7 @@ def render(ctx: PageContext) -> None:
         )
 
     st.divider()
-    st.subheader("Chronologie")
+    render_section_title("Chronologie")
     df_chrono = _chrono_data(PROJECT_ROOT)
     if not df_chrono.empty:
         df_chrono = df_chrono.sort_values("date")
@@ -320,7 +354,7 @@ def render(ctx: PageContext) -> None:
         st.caption("Aucune donnée par date")
 
     st.divider()
-    st.subheader("Stockage long terme — MongoDB GridFS")
+    render_section_title("Stockage long terme — MongoDB GridFS")
     st.caption(
         "MongoDB stocke les Parquet GOLD et GoldAI en sauvegarde permanente. "
         "Vérifiez ici que les backups sont bien effectués."
@@ -389,7 +423,7 @@ def render(ctx: PageContext) -> None:
                     if has_legacy_gold:
                         st.caption("Note: entrée legacy `gold_articles` détectée (ancien format, remplacé par `gold_articles_YYYY-MM-DD`).")
 
-                    st.markdown("#### Lineage de la donnée")
+                    st.markdown("**Trace de persistance SQLite -> Parquet -> GridFS**")
                     st.caption(
                         "Chaîne de persistance en 4 étapes, de la collecte temps réel au stockage long terme."
                     )
@@ -582,10 +616,17 @@ def render(ctx: PageContext) -> None:
                                 hide_index=True,
                             )
                     with st.expander("Historique complet GridFS (brut)", expanded=False):
-                        st.dataframe(
-                            df_mongo.drop(columns=["_upload_ts"]),
-                            use_container_width=True,
-                            hide_index=True,
+                        def _load_gridfs_full() -> None:
+                            st.dataframe(
+                                df_mongo.drop(columns=["_upload_ts"]),
+                                use_container_width=True,
+                                hide_index=True,
+                            )
+
+                        lazy_panel(
+                            "mongo_gridfs_full",
+                            _load_gridfs_full,
+                            label="Charger l'historique GridFS complet",
                         )
                     st.markdown("**Trace de persistance SQLite -> Parquet -> GridFS**")
                     def _resolve_db_path_local() -> Path:

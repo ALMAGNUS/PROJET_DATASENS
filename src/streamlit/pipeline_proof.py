@@ -6,7 +6,7 @@ GoldAI, splits IA, prédictions, Mongo (sync_log).
 
 Fournit aussi :
 - une timeline de croissance (raw_data + goldai) lue dans tous les reports,
-- un bouton d'export MD+CSV horodaté dans `reports/` pour archive d'audit.
+- un bouton d'export MD+CSV+PDF horodaté (téléchargement ou archive dans `reports/`).
 
 Deux rendus :
 - `render_last_run_proof_full(ctx)`   : bloc complet (onglet Pipeline).
@@ -19,7 +19,9 @@ import csv
 import io
 import json
 import os
+import re
 import sqlite3
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -30,8 +32,11 @@ import streamlit as st
 
 from src.streamlit._cockpit_helpers import (
     PageContext,
+    brand_logo_path,
+    brand_logo_raster_path,
     parquet_row_count_cached,
 )
+from src.streamlit.cockpit_ux import demo_tour_expand, lazy_panel, render_section_title
 
 # ---------------------------------------------------------------------------
 # Chargement et parsing des rapports db_state
@@ -386,6 +391,515 @@ def build_export_bytes(proof: LastRunProof) -> tuple[bytes, bytes, str]:
     return md_bytes, csv_bytes, stem
 
 
+# Couleurs PDF (contraste lisible — pas de texte sombre sur fond bleu foncé)
+_PDF_BLUE_DARK = (31, 47, 99)
+_PDF_HEADING_TEXT = (25, 40, 95)
+_PDF_HEADING_FILL = (210, 218, 242)
+_PDF_ROW_FILL = (248, 250, 254)
+_PDF_BODY_TEXT = (28, 32, 40)
+_PDF_BORDER = (170, 182, 210)
+
+
+def _pdf_font_dir() -> Path:
+    import matplotlib
+
+    return Path(matplotlib.get_data_path()) / "fonts" / "ttf"
+
+
+def _pdf_setup_fonts(pdf: Any) -> None:
+    """DejaVu (via matplotlib) — accents FR + qualité typographique."""
+    font_dir = _pdf_font_dir()
+    pdf.add_font("DV", "", str(font_dir / "DejaVuSans.ttf"))
+    pdf.add_font("DV", "B", str(font_dir / "DejaVuSans-Bold.ttf"))
+    pdf.add_font("DV", "I", str(font_dir / "DejaVuSans-Oblique.ttf"))
+    pdf.add_font("DVM", "", str(font_dir / "DejaVuSansMono.ttf"))
+    pdf.add_font("DVM", "B", str(font_dir / "DejaVuSansMono-Bold.ttf"))
+
+
+def _pdf_text(text: str) -> str:
+    """Nettoyage — accents FR OK, emojis / binaire retirés pour DejaVu."""
+    s = str(text).replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
+    s = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]", "", s)
+    out: list[str] = []
+    for ch in s:
+        o = ord(ch)
+        if o < 32:
+            continue
+        cat = unicodedata.category(ch)
+        if cat == "Cs" or 0xE000 <= o <= 0xF8FF or o > 0xFFFF:
+            continue
+        if cat.startswith("L") and o > 0x024F and "LATIN" not in unicodedata.name(ch, "X"):
+            continue
+        out.append(ch)
+    return re.sub(r"\s+", " ", "".join(out)).strip()
+
+
+def _pdf_logo_height_mm(logo_path: Path, width_mm: float) -> float:
+    try:
+        from PIL import Image
+
+        with Image.open(logo_path) as im:
+            w_px, h_px = im.size
+        if w_px <= 0:
+            return width_mm * 0.35
+        return width_mm * (h_px / w_px)
+    except Exception:
+        return width_mm * 0.35
+
+
+def _pdf_draw_logo(
+    pdf: Any,
+    logo_path: Path,
+    *,
+    x: float,
+    y: float,
+    width_mm: float,
+) -> float:
+    height_mm = _pdf_logo_height_mm(logo_path, width_mm)
+    try:
+        pdf.image(str(logo_path), x=x, y=y, w=width_mm, h=height_mm)
+    except Exception:
+        return 0.0
+    return height_mm
+
+
+def _pdf_section_bar(pdf: Any, title: str) -> None:
+    pdf.set_font("DV", "B", 11)
+    pdf.set_fill_color(*_PDF_BLUE_DARK)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_draw_color(*_PDF_BLUE_DARK)
+    pdf.cell(0, 8, _pdf_text(f"  {title}"), border=0, fill=True, new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(*_PDF_BODY_TEXT)
+    pdf.ln(2)
+
+
+def _pdf_meta_grid(pdf: Any, rows: list[tuple[str, str]]) -> None:
+    label_w, value_w = 52, 138
+    pdf.set_draw_color(*_PDF_BORDER)
+    for label, value in rows:
+        if pdf.get_y() > 262:
+            pdf.add_page()
+        pdf.set_font("DV", "B", 9)
+        pdf.set_fill_color(*_PDF_HEADING_FILL)
+        pdf.set_text_color(*_PDF_HEADING_TEXT)
+        pdf.cell(label_w, 7, _pdf_text(label), border=1, fill=True)
+        pdf.set_font("DV", "", 9)
+        pdf.set_fill_color(255, 255, 255)
+        pdf.set_text_color(*_PDF_BODY_TEXT)
+        pdf.cell(value_w, 7, _pdf_text(value), border=1, new_x="LMARGIN", new_y="NEXT")
+
+
+def _pdf_stage_short_label(stage_name: str) -> str:
+    """Libellé court lisible pour la strip KPI (5 colonnes étroites)."""
+    if stage_name.startswith("1."):
+        return "SQLite RAW"
+    if stage_name.startswith("2."):
+        return "GOLD jour"
+    if stage_name.startswith("3."):
+        return "GoldAI"
+    if stage_name.startswith("4."):
+        return "Splits IA"
+    if stage_name.startswith("5."):
+        return "MongoDB"
+    tail = stage_name.split(". ", 1)[-1].strip()
+    if len(tail) <= 14:
+        return tail
+    words = tail.replace("(", " ").replace(")", " ").split()
+    if len(words) >= 2:
+        return f"{words[0]} {words[1]}"[:14]
+    return tail[:14]
+
+
+def _pdf_kpi_strip(pdf: Any, proof: LastRunProof) -> None:
+    if not proof.stages:
+        return
+    n = len(proof.stages)
+    col_w = 190 / n
+    pdf.set_draw_color(*_PDF_BORDER)
+    pdf.set_font("DV", "B", 7.5)
+    pdf.set_fill_color(*_PDF_HEADING_FILL)
+    pdf.set_text_color(*_PDF_HEADING_TEXT)
+    for stage in proof.stages:
+        short = _pdf_stage_short_label(stage.stage)
+        pdf.cell(col_w, 6, _pdf_text(short), border=1, fill=True, align="C")
+    pdf.ln()
+    pdf.set_font("DVM", "B", 8.5)
+    pdf.set_text_color(*_PDF_BODY_TEXT)
+    pdf.set_fill_color(*_PDF_ROW_FILL)
+    for stage in proof.stages:
+        delta_txt = f"{stage.delta:+,}".replace(",", "\u202f")
+        pdf.cell(
+            col_w,
+            8,
+            _pdf_text(f"{stage.after:,}  ({delta_txt})"),
+            border=1,
+            fill=True,
+            align="C",
+        )
+    pdf.ln()
+    pdf.ln(3)
+
+
+def _pdf_render_table(
+    pdf: Any,
+    *,
+    headings: list[str],
+    rows: list[list[str]],
+    col_widths: tuple[float, ...],
+) -> None:
+    from fpdf.enums import TableCellFillMode, TableHeadingsDisplay
+    from fpdf.fonts import FontFace
+    from fpdf.table import Table
+
+    if not rows:
+        return
+    if pdf.get_y() > 240:
+        pdf.add_page()
+
+    head_style = FontFace(
+        family="DV",
+        emphasis="BOLD",
+        size_pt=8,
+        color=_PDF_HEADING_TEXT,
+        fill_color=_PDF_HEADING_FILL,
+    )
+    table = Table(
+        pdf,
+        col_widths=col_widths,
+        headings_style=head_style,
+        cell_fill_mode=TableCellFillMode.ROWS,
+        cell_fill_color=_PDF_ROW_FILL,
+        line_height=5.2,
+        text_align="LEFT",
+        repeat_headings=TableHeadingsDisplay.ON_TOP_OF_EVERY_PAGE,
+        first_row_as_headings=True,
+        padding=1.2,
+    )
+    table.row([_pdf_text(h) for h in headings])
+    body_style = FontFace(
+        family="DV",
+        size_pt=8,
+        color=_PDF_BODY_TEXT,
+        fill_color=(255, 255, 255),
+    )
+    for row in rows:
+        table.row([_pdf_text(str(c)) for c in row], style=body_style)
+    table.render()
+    pdf.set_text_color(*_PDF_BODY_TEXT)
+    pdf.ln(3)
+
+
+def build_proof_pdf_bytes(
+    proof: LastRunProof,
+    *,
+    logo_path: Path | None = None,
+    root: Path | None = None,
+    sqlite_row_limit: int = 500,
+) -> tuple[bytes, str]:
+    """Construit (pdf_bytes, stem) — rapport audit haute qualité (logo + annexes)."""
+    from fpdf import FPDF
+
+    ts = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
+    ts_file = datetime.now(UTC).strftime("%Y-%m-%dT%H%M%SZ")
+    stem = f"pipeline_proof_{ts_file}"
+
+    class DataSensProofPDF(FPDF):
+        def __init__(self) -> None:
+            super().__init__(orientation="P", unit="mm", format="A4")
+            self._gen_label = ts
+
+        def header(self) -> None:
+            if self.page_no() == 1:
+                return
+            self.set_draw_color(31, 47, 99)
+            self.set_line_width(0.4)
+            self.line(15, 10, 195, 10)
+            if logo_path and logo_path.is_file():
+                try:
+                    _pdf_draw_logo(self, logo_path, x=15, y=4, width_mm=24)
+                except Exception:
+                    pass
+            self.set_xy(42, 5)
+            self.set_font("DV", "B", 9)
+            self.set_text_color(31, 47, 99)
+            self.cell(120, 5, "DataSens — Preuve d'enrichissement pipeline", align="L")
+            self.set_font("DV", "I", 8)
+            self.set_text_color(100, 110, 130)
+            self.cell(33, 5, f"Page {self.page_no()}/{{nb}}", align="R")
+            self.ln(8)
+            self.set_text_color(20, 24, 38)
+
+        def footer(self) -> None:
+            self.set_y(-12)
+            self.set_draw_color(210, 218, 235)
+            self.line(15, self.get_y(), 195, self.get_y())
+            self.set_font("DV", "I", 7)
+            self.set_text_color(110, 118, 135)
+            self.cell(
+                0,
+                8,
+                _pdf_text(
+                    f"DataSens Cockpit · généré {self._gen_label} · "
+                    f"rapport {proof.latest_report_file or '—'}"
+                ),
+                align="C",
+            )
+
+    pdf = DataSensProofPDF()
+    _pdf_setup_fonts(pdf)
+    pdf.alias_nb_pages()
+    pdf.set_auto_page_break(auto=True, margin=18)
+    pdf.set_margins(15, 12, 15)
+    pdf.set_title("DataSens — Preuve d'enrichissement pipeline")
+    pdf.set_author("DataSens Cockpit")
+    pdf.set_subject(f"Pipeline proof {proof.latest_report_file}")
+    pdf.add_page()
+
+    # --- Page de garde (logo centré, grand format) ---
+    y = 16.0
+    if logo_path and logo_path.is_file():
+        logo_w = 108.0
+        logo_x = (210.0 - logo_w) / 2.0
+        logo_h = _pdf_draw_logo(pdf, logo_path, x=logo_x, y=y, width_mm=logo_w)
+        y += logo_h + 10.0
+        pdf.set_y(y)
+
+    pdf.set_font("DV", "B", 17)
+    pdf.set_text_color(31, 47, 99)
+    pdf.cell(
+        0,
+        10,
+        _pdf_text("Preuve d'enrichissement pipeline"),
+        align="C",
+        new_x="LMARGIN",
+        new_y="NEXT",
+    )
+    pdf.set_font("DV", "I", 10)
+    pdf.set_text_color(80, 90, 115)
+    pdf.cell(
+        0,
+        6,
+        _pdf_text("Audit de run — comparaison des deux derniers db_state"),
+        align="C",
+        new_x="LMARGIN",
+        new_y="NEXT",
+    )
+    pdf.ln(5)
+
+    status = proof.coherence_status or "—"
+    _pdf_section_bar(pdf, "Métadonnées du run")
+    _pdf_meta_grid(
+        pdf,
+        [
+            ("Généré", ts),
+            ("Rapport courant", f"{proof.latest_report_file}  ·  {proof.latest_generated_at}"),
+            (
+                "Rapport précédent",
+                f"{proof.previous_report_file or 'aucun'}  ·  {proof.previous_generated_at or '—'}",
+            ),
+            ("Cohérence technique", status),
+            ("Partition GOLD", proof.latest_gold_date or "—"),
+            (
+                "Plage SQLite",
+                f"raw_data_id {proof.previous_raw_max_id:,} → {proof.latest_raw_max_id:,}",
+            ),
+        ],
+    )
+    pdf.ln(2)
+
+    _pdf_section_bar(pdf, "Synthèse KPI par étape")
+    _pdf_kpi_strip(pdf, proof)
+
+    _pdf_section_bar(pdf, "Lignes ajoutées par étape")
+    stage_rows = [
+        [
+            stage.stage,
+            f"{stage.before:,}",
+            f"{stage.after:,}",
+            f"{stage.delta:+,}",
+            stage.path_hint or "—",
+            stage.detail or "—",
+        ]
+        for stage in proof.stages
+    ]
+    _pdf_render_table(
+        pdf,
+        headings=["Étape", "Avant", "Après", "Delta", "Chemin / source", "Détail"],
+        rows=stage_rows,
+        col_widths=(36, 20, 20, 18, 46, 50),
+    )
+
+    if proof.source_deltas:
+        _pdf_section_bar(pdf, "Deltas par source (raw_data)")
+        src_rows = [
+            [
+                str(row.get("source", "?")),
+                f"+{int(row.get('delta', 0)):,}",
+                f"{int(row.get('current', 0)):,}",
+            ]
+            for row in proof.source_deltas
+        ]
+        _pdf_render_table(
+            pdf,
+            headings=["Source", "Delta", "Total courant"],
+            rows=src_rows,
+            col_widths=(110, 35, 45),
+        )
+
+    if root is not None:
+        _pdf_append_sqlite_annex(
+            pdf,
+            proof,
+            sqlite_row_limit=sqlite_row_limit,
+        )
+
+    pdf.ln(2)
+    pdf.set_font("DV", "I", 8)
+    pdf.set_text_color(100, 108, 125)
+    pdf.multi_cell(
+        0,
+        4.5,
+        _pdf_text(
+            "Document généré automatiquement par le cockpit DataSens. "
+            "Les chiffres proviennent de la comparaison des deux derniers fichiers "
+            "reports/db_state_*.json et, le cas échéant, d'un échantillon SQLite."
+        ),
+    )
+
+    return bytes(pdf.output()), stem
+
+
+def _pdf_append_sqlite_annex(
+    pdf: Any,
+    proof: LastRunProof,
+    *,
+    sqlite_row_limit: int,
+) -> None:
+    """Annexe SQLite paginée avec tableau professionnel."""
+    db_path = _get_db_path()
+    if db_path is None:
+        return
+    if proof.latest_raw_max_id <= proof.previous_raw_max_id:
+        return
+
+    df, err = fetch_new_raw_rows(
+        db_path,
+        proof.previous_raw_max_id,
+        limit=sqlite_row_limit,
+    )
+    if err or df is None or df.empty:
+        return
+
+    pdf.add_page()
+    _pdf_section_bar(
+        pdf,
+        f"Annexe — Nouvelles lignes SQLite ({len(df):,} lignes, max {sqlite_row_limit})",
+    )
+    pdf.set_font("DV", "", 9)
+    pdf.set_text_color(80, 90, 115)
+    pdf.cell(
+        0,
+        5,
+        _pdf_text(
+            f"Filtre : raw_data_id > {proof.previous_raw_max_id:,} · "
+            f"tri ascendant · titres tronqués si nécessaire"
+        ),
+        new_x="LMARGIN",
+        new_y="NEXT",
+    )
+    pdf.ln(2)
+
+    annex_rows: list[list[str]] = []
+    for _, row in df.iterrows():
+        title = str(row.get("title", "") or "").replace("\n", " ").strip()
+        if len(title) > 140:
+            title = title[:137] + "…"
+        annex_rows.append(
+            [
+                str(row.get("raw_data_id", "")),
+                str(row.get("source", "") or "?"),
+                title,
+                str(row.get("collected_at", ""))[:19],
+            ]
+        )
+
+    _pdf_render_table(
+        pdf,
+        headings=["ID", "Source", "Titre", "Collecté le"],
+        rows=annex_rows,
+        col_widths=(14, 34, 102, 40),
+    )
+
+
+def _render_proof_exports(
+    proof: LastRunProof,
+    root: Path,
+    *,
+    key_prefix: str = "proof",
+    highlight_pdf: bool = False,
+) -> None:
+    """Boutons MD / CSV / PDF + sauvegarde locale."""
+    md_bytes, csv_bytes, stem = build_export_bytes(proof)
+    pdf_bytes, _ = build_proof_pdf_bytes(
+        proof,
+        logo_path=brand_logo_raster_path(root) or brand_logo_path(root),
+        root=root,
+    )
+
+    if highlight_pdf:
+        st.caption(
+            "Export audit — le **PDF** reprend le tableau de preuve, "
+            "les deltas par source et les lignes SQLite paginées "
+            "(ideal soutenance / annexe technique)."
+        )
+    else:
+        st.caption(
+            "Genere un rapport d'audit horodate (Markdown, CSV, PDF) reprenant les deltas "
+            "ci-dessus, pour archivage projet ou annexe de documentation technique."
+        )
+
+    ex1, ex2, ex3, ex4 = st.columns([1.15, 1, 1, 1.85])
+    with ex1:
+        st.download_button(
+            "Télécharger PDF",
+            data=pdf_bytes,
+            file_name=f"{stem}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            type="primary" if highlight_pdf else "secondary",
+            key=f"{key_prefix}_dl_pdf",
+        )
+    with ex2:
+        st.download_button(
+            "Télécharger MD",
+            data=md_bytes,
+            file_name=f"{stem}.md",
+            mime="text/markdown",
+            use_container_width=True,
+            key=f"{key_prefix}_dl_md",
+        )
+    with ex3:
+        st.download_button(
+            "Télécharger CSV",
+            data=csv_bytes,
+            file_name=f"{stem}.csv",
+            mime="text/csv",
+            use_container_width=True,
+            key=f"{key_prefix}_dl_csv",
+        )
+    with ex4:
+        if st.button(
+            "Sauvegarder aussi dans reports/",
+            use_container_width=True,
+            help="Ecrit MD+CSV dans reports/ pour tracer la preuve cote projet.",
+            key=f"{key_prefix}_save_reports",
+        ):
+            md_path, csv_path = write_export_files(root, proof)
+            st.success(
+                f"Ecrit :\n- `{md_path.relative_to(root)}`\n- `{csv_path.relative_to(root)}`"
+            )
+
+
 def write_export_files(root: Path, proof: LastRunProof) -> tuple[Path, Path]:
     """Écrit les fichiers MD/CSV sur disque dans reports/ et retourne les chemins."""
     md_bytes, csv_bytes, stem = build_export_bytes(proof)
@@ -414,7 +928,7 @@ def _format_delta(delta: int) -> str:
 def render_last_run_proof_compact(ctx: PageContext) -> None:
     """Rendu condensé pour l'onglet Vue d'ensemble."""
     proof = compute_last_run_deltas(ctx.project_root)
-    st.markdown("#### Dernier run — enrichissement prouvé")
+    render_section_title("Dernier run — enrichissement prouvé")
     if not proof or not proof.stages:
         st.info(
             "Aucun rapport `db_state` trouvé. Lancez le pipeline E1 "
@@ -438,15 +952,24 @@ def render_last_run_proof_compact(ctx: PageContext) -> None:
     )
 
 
-def render_last_run_proof_full(ctx: PageContext) -> None:
-    """Rendu complet pour l'onglet Pipeline."""
+def render_last_run_proof_full(ctx: PageContext, *, demo_mode: bool = False) -> None:
+    """Rendu complet pour l'onglet Pipeline (ou bloc démo jury)."""
     root = ctx.project_root
-    st.markdown("### Dernier run — enrichissement prouvé par étape")
-    st.caption(
-        "Comparaison entre les deux derniers rapports `reports/db_state_*.json`. "
-        "Chaque étape affiche les lignes **avant**, **après** et le **delta** ajouté "
-        "par l'exécution. Les lignes elles-mêmes sont visibles ci-dessous."
-    )
+    key_prefix = "demo_proof" if demo_mode else "proof"
+
+    if demo_mode:
+        st.markdown('<p class="ds-section">Preuve du run</p>', unsafe_allow_html=True)
+        st.caption(
+            "Comparaison des deux derniers rapports `db_state` — deltas par étape, "
+            "lignes réelles et export PDF."
+        )
+    else:
+        render_section_title("Dernier run — enrichissement prouvé par étape")
+        st.caption(
+            "Comparaison entre les deux derniers rapports `reports/db_state_*.json`. "
+            "Chaque étape affiche les lignes **avant**, **après** et le **delta** ajouté "
+            "par l'exécution. Les lignes elles-mêmes sont visibles ci-dessous."
+        )
     proof = compute_last_run_deltas(root)
     if not proof or not proof.stages:
         st.info(
@@ -508,7 +1031,31 @@ def render_last_run_proof_full(ctx: PageContext) -> None:
                 st.dataframe(src_df, use_container_width=True, hide_index=True)
 
     # Lignes nouvelles réelles — SQLite et GOLD
-    st.markdown("#### Lignes nouvelles réelles")
+    lines_label = "Lignes nouvelles réelles"
+    if demo_mode:
+        with st.expander(lines_label, expanded=demo_tour_expand("proof_run")):
+            _render_proof_line_tabs(proof, root, compact=True)
+    else:
+        render_section_title(lines_label)
+        _render_proof_line_tabs(proof, root)
+
+    if not demo_mode:
+        render_section_title("Export de la preuve d'enrichissement")
+    _render_proof_exports(
+        proof,
+        root,
+        key_prefix=key_prefix,
+        highlight_pdf=demo_mode,
+    )
+
+
+def _render_proof_line_tabs(
+    proof: LastRunProof,
+    root: Path,
+    *,
+    compact: bool = False,
+) -> None:
+    """Onglets SQLite / GOLD / sync / timeline (partagé expert + démo)."""
     tab_sql, tab_gold, tab_sync, tab_timeline = st.tabs(
         [
             "Nouvelles lignes SQLite",
@@ -517,8 +1064,9 @@ def render_last_run_proof_full(ctx: PageContext) -> None:
             "Timeline de croissance",
         ]
     )
+    proof_key = proof.latest_report_file or "default"
 
-    with tab_sql:
+    def _render_sql() -> None:
         db_path = _get_db_path()
         if db_path is None:
             st.info("Base SQLite introuvable (DB_PATH non défini et default absent).")
@@ -545,7 +1093,7 @@ def render_last_run_proof_full(ctx: PageContext) -> None:
                 )
                 st.dataframe(df_new, use_container_width=True, height=320)
 
-    with tab_gold:
+    def _render_gold() -> None:
         df_gold = fetch_gold_partition_rows(
             root, proof.latest_gold_date, limit=200
         )
@@ -561,7 +1109,7 @@ def render_last_run_proof_full(ctx: PageContext) -> None:
             )
             st.dataframe(df_gold, use_container_width=True, height=320)
 
-    with tab_sync:
+    def _render_sync() -> None:
         if proof.sync_log_last_session:
             sync_df = pd.DataFrame(proof.sync_log_last_session)
             st.success(
@@ -572,7 +1120,7 @@ def render_last_run_proof_full(ctx: PageContext) -> None:
         else:
             st.info("Pas de sync_log récent depuis le dernier rapport.")
 
-    with tab_timeline:
+    def _render_timeline() -> None:
         tl = build_growth_timeline(root)
         if tl.empty:
             st.info("Pas d'historique de reports db_state disponible.")
@@ -582,66 +1130,116 @@ def render_last_run_proof_full(ctx: PageContext) -> None:
                 f"(de {tl.index.min()} à {tl.index.max()})."
             )
             st.line_chart(tl, use_container_width=True)
-            with st.expander("Données brutes de la timeline", expanded=False):
-                st.dataframe(tl, use_container_width=True)
+            if compact:
+                st.caption("Données brutes de la timeline")
+                st.dataframe(tl, use_container_width=True, height=220)
+            else:
+                with st.expander("Données brutes de la timeline", expanded=False):
+                    st.dataframe(tl, use_container_width=True)
 
-    # Export MD/CSV
-    st.markdown("#### Export de la preuve d'enrichissement")
-    st.caption(
-        "Génère un rapport d'audit horodaté (Markdown + CSV) reprenant les deltas "
-        "ci-dessus, pour archivage projet ou annexe de documentation technique."
-    )
-    md_bytes, csv_bytes, stem = build_export_bytes(proof)
-    ex1, ex2, ex3 = st.columns([1, 1, 2])
-    with ex1:
-        st.download_button(
-            "Télécharger MD",
-            data=md_bytes,
-            file_name=f"{stem}.md",
-            mime="text/markdown",
-            use_container_width=True,
-            key="dl_proof_md",
+    with tab_sql:
+        lazy_panel(
+            f"proof_sql_{proof_key}",
+            _render_sql,
+            label="Charger échantillon SQLite",
         )
-    with ex2:
-        st.download_button(
-            "Télécharger CSV",
-            data=csv_bytes,
-            file_name=f"{stem}.csv",
-            mime="text/csv",
-            use_container_width=True,
-            key="dl_proof_csv",
+    with tab_gold:
+        lazy_panel(
+            f"proof_gold_{proof_key}",
+            _render_gold,
+            label="Charger partition GOLD",
         )
-    with ex3:
-        if st.button(
-            "Sauvegarder aussi dans reports/",
-            use_container_width=True,
-            help="Écrit le même MD+CSV dans reports/ pour tracer la preuve côté projet.",
-            key="save_proof_to_reports",
-        ):
-            md_path, csv_path = write_export_files(root, proof)
-            st.success(
-                f"Écrit :\n- `{md_path.relative_to(root)}`\n- `{csv_path.relative_to(root)}`"
-            )
+    with tab_sync:
+        lazy_panel(
+            f"proof_sync_{proof_key}",
+            _render_sync,
+            label="Charger sync_log Mongo",
+        )
+    with tab_timeline:
+        lazy_panel(
+            f"proof_timeline_{proof_key}",
+            _render_timeline,
+            label="Charger timeline de croissance",
+        )
 
 
 # ---------------------------------------------------------------------------
 # The Cockpit Show : un article traversant RAW -> SILVER -> GOLD -> GoldAI
 # ---------------------------------------------------------------------------
 
+_DEMO_SOURCE_PRIORITY = (
+    "rss_french_news",
+    "google_news_rss",
+    "reddit_france",
+    "yahoo_finance",
+    "trustpilot_reviews",
+    "kaggle_french_opinions",
+    "monavis_citoyen",
+    "datagouv_datasets",
+    "zzdb_csv",
+)
+_DEMO_SOURCE_AVOID = ("GDELT_Last15_English", "GDELT_Master_List", "gdelt_events")
+
+
+def _is_readable_demo_text(text: str) -> bool:
+    """Filtre titres/contenus illisibles (binaire, encodage cassé) pour la démo jury."""
+    if not text:
+        return False
+    sample = text.strip()[:400]
+    if len(sample) < 12:
+        return False
+    if sample.count("\ufffd") >= 2:
+        return False
+    printable = sum(1 for c in sample if c.isprintable() and ord(c) < 0x10000)
+    if printable / max(len(sample), 1) < 0.88:
+        return False
+    weird = sum(1 for c in sample if ord(c) > 0x024F and not c.isspace())
+    if weird / max(len(sample), 1) > 0.12:
+        return False
+    letters = sum(1 for c in sample if c.isalpha())
+    return letters >= 8
+
+
+def _demo_sample_rank(row: dict) -> tuple[int, int, int, int]:
+    source = str(row.get("source") or "")
+    title = str(row.get("title") or "")
+    content = str(row.get("content") or "")
+    readable = int(_is_readable_demo_text(title) or _is_readable_demo_text(content))
+    if source in _DEMO_SOURCE_AVOID:
+        src_rank = 99
+    elif source in _DEMO_SOURCE_PRIORITY:
+        src_rank = _DEMO_SOURCE_PRIORITY.index(source)
+    else:
+        src_rank = 50
+    enriched = int(bool(row.get("topic_1")) and bool(row.get("sentiment")))
+    length = len(title.strip())
+    return (-readable, src_rank, -enriched, -length)
+
+
+def _filter_demo_samples(samples: list[dict]) -> list[dict]:
+    if not samples:
+        return samples
+    ranked = sorted(samples, key=_demo_sample_rank)
+    readable = [r for r in ranked if _is_readable_demo_text(str(r.get("title") or "")) or _is_readable_demo_text(str(r.get("content") or ""))]
+    return readable or ranked
+
+
+_LINEAGE_UI_SAMPLE_LIMIT = 60
+
 
 def _fetch_article_samples(
-    root: Path, fallback_days: int = 14
-) -> tuple[list[dict[str, Any]], str]:
-    """Récupère un échantillon d'articles avec leurs enrichissements.
+    root: Path, fallback_days: int = 14, demo_mode: bool = False
+) -> tuple[list[dict[str, Any]], str, int | None]:
+    """Récupère un échantillon d'articles avec enrichissements.
 
-    Essaie d'abord aujourd'hui, puis remonte jusqu'à `fallback_days` jours en
-    arrière jusqu'à trouver des données. Retourne (samples, date_utilisée).
+    Retourne (samples, date_utilisée, added_today_total).
+    `len(samples)` ≤ 60 : échantillon UI, pas le volume réel du run.
     """
     from src.observability.lineage_service import LineageService
 
     db_path = _get_db_path()
     if db_path is None or not db_path.exists():
-        return [], ""
+        return [], "", None
 
     service = LineageService(db_path=str(db_path), project_root=root)
     today = date.today()
@@ -653,8 +1251,13 @@ def _fetch_article_samples(
             continue
         samples = payload.get("transformed_samples_today") or []
         if samples:
-            return samples, target.isoformat()
-    return [], ""
+            if demo_mode:
+                samples = _filter_demo_samples(samples)
+            summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+            added_today = summary.get("added_today")
+            added = int(added_today) if added_today is not None else None
+            return samples, target.isoformat(), added
+    return [], "", None
 
 
 def _html_escape(txt: str) -> str:
@@ -856,7 +1459,7 @@ _SHOW_CSS = """
 """
 
 
-def render_article_journey(ctx: PageContext) -> None:
+def render_article_journey(ctx: PageContext, *, demo_mode: bool = False) -> None:
     """THE COCKPIT SHOW — suivi visuel d'un article dans le pipeline.
 
     Quatre cartes visuelles côte à côte (RAW → SILVER → GOLD → GoldAI)
@@ -864,9 +1467,9 @@ def render_article_journey(ctx: PageContext) -> None:
     brut → topics → sentiment → stock long terme.
     """
     root = ctx.project_root
-    samples, used_date = _fetch_article_samples(root)
+    samples, used_date, added_today = _fetch_article_samples(root, demo_mode=demo_mode)
 
-    st.markdown("### Le parcours d'un article — enrichissement visible étape par étape")
+    st.markdown("### Le parcours d'un article")
     if not samples:
         st.info(
             "Aucun article récent dans la base SQLite. Lancez le pipeline E1 "
@@ -875,17 +1478,19 @@ def render_article_journey(ctx: PageContext) -> None:
         )
         return
 
+    total_day = added_today if added_today is not None else len(samples)
+    sample_n = len(samples)
     today_iso = date.today().isoformat()
     if used_date == today_iso:
-        st.caption(
-            f"**{len(samples)}** articles ingérés aujourd'hui ({used_date}). "
-            "Choisissez-en un et suivez son trajet : "
-            "**brut** → **topics** → **sentiment** → **archivé**."
-        )
+        if total_day > sample_n:
+            st.caption(
+                f"**{total_day:,}** articles aujourd'hui · liste de **{sample_n}** exemples ci-dessous."
+            )
+        else:
+            st.caption(f"**{total_day:,}** articles aujourd'hui — choisissez-en un dans la liste.")
     else:
         st.caption(
-            f"Aucune ingestion aujourd'hui. Affichage des **{len(samples)}** "
-            f"articles du dernier jour actif (**{used_date}**)."
+            f"Dernier jour actif **{used_date}** · **{total_day:,}** articles · **{sample_n}** exemples."
         )
 
     labels = []

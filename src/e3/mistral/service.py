@@ -34,13 +34,22 @@ class MistralService:
             _client = Mistral(api_key=self.api_key)
         return _client
 
-    def chat(self, message: str, system_prompt: str | None = None) -> str:
+    def chat(
+        self,
+        message: str,
+        system_prompt: str | None = None,
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
         """
         Envoie un message au chat Mistral et retourne la réponse.
 
         Args:
             message: Message utilisateur
             system_prompt: Prompt système optionnel (contexte/rôle)
+            temperature: Surcharge température (défaut: config)
+            max_tokens: Surcharge max tokens (défaut: config)
 
         Returns:
             Réponse texte du modèle
@@ -57,8 +66,8 @@ class MistralService:
         response = client.chat.complete(
             model=self.model,
             messages=messages,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
+            temperature=self.temperature if temperature is None else temperature,
+            max_tokens=self.max_tokens if max_tokens is None else max_tokens,
         )
         return response.choices[0].message.content or ""
 

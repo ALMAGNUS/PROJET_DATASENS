@@ -1,0 +1,39 @@
+{
+  "corpus": "data\\tests\\sentiment_benchmark_corpus.csv",
+  "total": 60,
+  "correct": 60,
+  "accuracy_pct": 100.0,
+  "by_prefix": {
+    "P": {
+      "ok": 10,
+      "n": 10,
+      "accuracy_pct": 100.0
+    },
+    "N": {
+      "ok": 10,
+      "n": 10,
+      "accuracy_pct": 100.0
+    },
+    "NE": {
+      "ok": 10,
+      "n": 10,
+      "accuracy_pct": 100.0
+    },
+    "A": {
+      "ok": 10,
+      "n": 10,
+      "accuracy_pct": 100.0
+    },
+    "I": {
+      "ok": 10,
+      "n": 10,
+      "accuracy_pct": 100.0
+    },
+    "D": {
+      "ok": 10,
+      "n": 10,
+      "accuracy_pct": 100.0
+    }
+  },
+  "errors": []
+}

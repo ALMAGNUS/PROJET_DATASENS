@@ -5,310 +5,502 @@ Extrait depuis src/streamlit/app.py (phase C, audit 2026-04).
 
 from __future__ import annotations
 
+import html
+import json
 import os
-from pathlib import Path
 
 import requests
 import streamlit as st
 
+from src.ml.inference.sentiment_postprocess import finalize_sentiment
 from src.streamlit._cockpit_helpers import (
     PageContext,
+    inject_ia_css,
 )
-from src.streamlit._cockpit_helpers import (
-    get_active_model as _get_active_model,
-)
+from src.insights.goldai_data import load_enriched_goldai
+from src.insights.builder import build_insight_pack
 from src.streamlit.auth_plug import (
     get_token,
 )
-from src.streamlit.metrics import (
-    scan_trained_models as _scan_trained_models,
-)
+from src.streamlit.cockpit_ux import render_demo_tour_banner
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_DEMO_SENTIMENT_MODEL = "ac0hik/Sentiment_Analysis_French"
+
+_DEMO_EXAMPLES = [
+    ("Hausse marché", "Le marché boursier affiche une forte hausse cette semaine."),
+    ("Inflation / baisse", "L'inflation inquiète les investisseurs et freine la croissance."),
+    ("Politique", "Le gouvernement annonce de nouvelles mesures sociales controversées."),
+]
+
+_INSIGHT_EXAMPLES = {
+    "Politique": "Quel sentiment domine en politique ?",
+    "Financier": "Quel sentiment domine sur les marchés ?",
+    "Utilisateurs": "Quelles sources dominent dans le corpus ?",
+}
+
+_THEME_OPTIONS = {"Politique": "politique", "Financier": "financier", "Utilisateurs": "utilisateurs"}
+
+_TONE_COLORS = {
+    "Positif": "#66bb6a",
+    "Neutre": "#90a4ae",
+    "Négatif": "#ef5350",
+}
 
 
-def render(ctx: PageContext) -> None:
-    PROJECT_ROOT = ctx.project_root
-    settings = ctx.settings
-    api_base = ctx.api_base
+def _label_fr(label_raw: str) -> str:
+    return {
+        "POSITIVE": "Positif",
+        "NEGATIVE": "Négatif",
+        "NEUTRAL": "Neutre",
+    }.get(str(label_raw).upper(), str(label_raw))
 
-    api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
-    api_v1 = f"{api_base}{settings.api_v1_prefix}"
 
-    st.markdown("### IA – Modèles & Assistant")
-    try:
-        api_ok = requests.get(f"{api_base}/health", timeout=2).ok
-    except Exception:
-        api_ok = False
-    api_warning = (
-        "API indisponible. Ouvrez **Pilotage** puis lancez *API E2* avant d'utiliser "
-        "la prédiction ou l'assistant."
-    )
-    if not api_ok:
-        st.warning(api_warning)
-    help_seen = st.session_state.get("ia_help_seen", False)
-    with st.expander("Comment utiliser cet onglet ?", expanded=not help_seen):
-        st.markdown("""
-        **1. Prédiction** : Testez l’analyse de sentiment sur un texte (ex. « Le marché affiche une hausse »).
-        → Saisissez un texte, choisissez un modèle, cliquez sur *Prédire*. Si un modèle fine-tuné est configuré (SENTIMENT_FINETUNED_MODEL_PATH), il est utilisé automatiquement.
-
-        **2. Assistant** : Posez des questions par domaine (Politique, Financier, Utilisateurs).
-        → Sélectionnez un thème, tapez votre question dans le champ en bas. L’assistant répond en fonction des données du projet.
-        """)
-    st.session_state["ia_help_seen"] = True
-
-    st.subheader("1. Classification sentiment (brique ML)")
-    st.caption(
-        "Analysez le sentiment (positif / négatif / neutre) d’un texte avec FlauBERT ou CamemBERT."
-    )
-    pred_text = st.text_area(
-        "Texte à analyser",
-        "Le marché affiche une hausse.",
-        height=70,
-        help="Ex. une phrase ou un paragraphe",
-    )
-    active_model = _get_active_model(PROJECT_ROOT)
-    trained_models = _scan_trained_models(PROJECT_ROOT)
-    trained_by_path = {
-        str(m.get("path", "")).replace("\\", "/"): m for m in trained_models if m.get("path")
-    }
-    (
-        trained_by_path.get(str(active_model or "").replace("\\", "/"))
-        if active_model
-        else None
-    )
-
-    best_local = None
-    if trained_models:
-        ranked = sorted(
-            trained_models,
-            key=lambda m: (
-                float(m.get("eval_f1_macro") or m.get("eval_f1") or 0.0),
-                float(m.get("eval_accuracy") or 0.0),
-            ),
-            reverse=True,
+def _render_sentiment_result(last: dict | None) -> None:
+    if not last:
+        st.markdown(
+            """
+            <div class="ds-ia-result ds-ia-result--empty">
+              <div class="ds-ia-result-label">Résultat</div>
+              <div class="ds-ia-result-placeholder">
+                Saisissez un texte et lancez l'analyse.<br>
+                Le sentiment s'affichera ici.
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
-        best_local = ranked[0]
+        return
 
-    effective_model_path = active_model or (best_local or {}).get("path")
-    effective_meta = (
-        trained_by_path.get(str(effective_model_path).replace("\\", "/"))
-        if effective_model_path
-        else None
+    label_fr = _label_fr(last.get("label", "-"))
+    confidence = float(last.get("confidence", 0.0) or 0.0)
+    intensity = float(last.get("sentiment_score", 0.0) or 0.0)
+    accent = _TONE_COLORS.get(label_fr, "#78909c")
+    pct = int(max(0.0, min(1.0, (intensity + 1.0) / 2.0)) * 100)
+
+    st.markdown(
+        f"""
+        <div class="ds-ia-result">
+          <div class="ds-ia-result-label">Résultat</div>
+          <div class="ds-ia-result-value" style="color:{accent};">{html.escape(label_fr)}</div>
+          <div class="ds-ia-bar"><span style="width:{pct}%;background:{accent};"></span></div>
+          <div class="ds-ia-meta">
+            <span>Intensité {intensity:+.2f}</span>
+            <span>Confiance {confidence:.0%}</span>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    # UX produit: un seul modèle exposé à l'utilisateur (le meilleur courant).
-    # Le backend reste piloté par SENTIMENT_FINETUNED_MODEL_PATH.
-    pred_model = "sentiment_fr"
-    st.markdown("**Modèle utilisé**")
-    if effective_model_path:
-        f1_local = effective_meta.get("eval_f1_macro") if effective_meta else None
-        acc_local = effective_meta.get("eval_accuracy") if effective_meta else None
-        perf = "métriques non lues"
-        if f1_local is not None:
-            perf = f"F1 macro val {float(f1_local):.1%}"
-        elif acc_local is not None:
-            perf = f"accuracy val {float(acc_local):.1%}"
-        st.success(f"Fine-tuné local (meilleur courant) — {effective_model_path} · {perf}")
-        if active_model:
-            st.caption(
-                "Inférence via backend avec modèle fine-tuné actif "
-                "(SENTIMENT_FINETUNED_MODEL_PATH)."
-            )
+
+def _render_model_chip() -> None:
+    st.markdown(
+        '<span class="ds-chip">ac0hik · inférence locale (cockpit)</span>',
+        unsafe_allow_html=True,
+    )
+
+
+def _call_predict(api_v1: str, text: str, model: str = "sentiment_fr") -> tuple[bool, dict | str]:
+    token = get_token()
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        r = requests.post(
+            f"{api_v1}/ai/predict",
+            json={"text": text, "model": model, "task": "sentiment-analysis"},
+            headers=headers,
+            timeout=120,
+        )
+    except requests.exceptions.ConnectionError:
+        return False, "API indisponible — lancez l'API E2."
+    except Exception as e:
+        return False, str(e)[:150]
+
+    if not r.ok:
+        if r.headers.get("content-type", "").startswith("application/json"):
+            detail = r.json().get("detail", r.text)
         else:
-            st.caption(
-                "Fine-tuné local détecté. Pour l'activer côté backend, définissez "
-                "SENTIMENT_FINETUNED_MODEL_PATH sur ce chemin."
-            )
-    else:
-        st.info("Aucun fine-tuné local détecté. Fallback sur sentiment_fr.")
-    if st.button("Prédire le sentiment"):
-        token = get_token()
-        headers = {"Content-Type": "application/json"}
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-        try:
-            r = requests.post(
-                f"{api_v1}/ai/predict",
-                json={"text": pred_text, "model": pred_model, "task": "sentiment-analysis"},
-                headers=headers,
-                timeout=120,
-            )
-            if r.ok:
-                data = r.json()
-                res = data.get("result", data)
-                if res and isinstance(res, list) and res[0].get("sentiment_score") is not None:
-                    r0 = res[0]
-                    label_raw = str(r0.get("label", "-")).upper()
-                    label_fr = {
-                        "POSITIVE": "Positif",
-                        "NEGATIVE": "Négatif",
-                        "NEUTRAL": "Neutre",
-                    }.get(label_raw, str(r0.get("label", "-")))
-                    confidence = float(r0.get("confidence", 0.0) or 0.0)
-                    intensity = float(r0.get("sentiment_score", 0.0) or 0.0)
-                    c1, c2, c3 = st.columns(3)
-                    c1.metric("Sentiment", label_fr)
-                    c2.metric("Confiance du modèle", f"{confidence:.1%}")
-                    c3.metric("Intensité [-1,+1]", f"{intensity:+.2f}")
-                    tone_map = {
-                        "Positif": ("#1b5e20", "#e8f5e9"),
-                        "Neutre": ("#37474f", "#eceff1"),
-                        "Négatif": ("#b71c1c", "#ffebee"),
-                    }
-                    fg, bg = tone_map.get(label_fr, ("#263238", "#eceff1"))
-                    st.markdown(
-                        (
-                            f"<div style='display:inline-block;padding:6px 12px;border-radius:999px;"
-                            f"background:{bg};color:{fg};font-weight:700;'>"
-                            f"Sentiment détecté : {label_fr}"
-                            "</div>"
-                        ),
-                        unsafe_allow_html=True,
-                    )
-                    polarity = (
-                        "très positive"
-                        if intensity >= 0.6
-                        else "positive"
-                        if intensity >= 0.2
-                        else "neutre"
-                        if intensity > -0.2
-                        else "négative"
-                        if intensity > -0.6
-                        else "très négative"
-                    )
-                    st.caption(
-                        f"Lecture : sentiment **{label_fr.lower()}**, confiance "
-                        f"**{confidence:.1%}**, intensité **{intensity:+.2f}** ({polarity})."
-                    )
-                    with st.expander("Détail technique (probabilités brutes)", expanded=False):
-                        st.json(res)
-                else:
-                    st.json(res)
-            else:
-                err_detail = r.json().get("detail", r.text) if r.headers.get("content-type", "").startswith("application/json") else r.text
-                st.error(f"Erreur {r.status_code}: {err_detail[:300]}")
-        except requests.exceptions.ConnectionError:
-            st.warning(api_warning)
-        except Exception as e:
-            st.error(str(e)[:150])
+            detail = r.text
+        return False, f"Erreur {r.status_code}: {str(detail)[:300]}"
+    return True, r.json()
 
-    st.divider()
-    st.subheader("2. Insights métier assistés (Mistral + GoldAI)")
 
-    # Statut Mistral
-    mistral_ok = False
+@st.cache_resource(show_spinner="Chargement du modèle…")
+def _demo_sentiment_service():
+    from src.ml.inference.local_hf_service import LocalHFService
+
+    return LocalHFService(model_name=_DEMO_SENTIMENT_MODEL, task="text-classification")
+
+
+def _predict_demo_local(text: str) -> dict:
+    service = _demo_sentiment_service()
+    raw = service.predict(text, return_all_scores=True)
+    scores = raw[0] if raw and isinstance(raw[0], list) else raw
+    out = finalize_sentiment(text, scores)
+    return {
+        "model": "sentiment_fr",
+        "task": "sentiment-analysis",
+        "result": [out],
+        "resolved_model": _DEMO_SENTIMENT_MODEL,
+    }
+
+
+def _clear_sentiment_result() -> None:
+    st.session_state.pop("ia_last_result", None)
+    st.session_state.pop("ia_last_resolved_model", None)
+
+
+def _run_sentiment(text: str, api_v1: str, *, allow_api_fallback: bool) -> tuple[bool, dict | str]:
+    """Toujours ac0hik en local dans le cockpit (évite le mauvais modèle Hub via API)."""
     try:
-        r_status = requests.get(
-            f"{api_v1}/ai/status",
-            headers={"Authorization": f"Bearer {get_token()}"} if get_token() else {},
-            timeout=3,
-        )
-        mistral_ok = r_status.ok and r_status.json().get("configured", False)
-    except Exception:
-        pass
+        return True, _predict_demo_local(text)
+    except Exception as local_err:
+        if not allow_api_fallback:
+            return False, f"Modèle local indisponible : {local_err!s}"[:200]
+        ok, payload = _call_predict(api_v1, text, "sentiment_fr")
+        if ok and isinstance(payload, dict):
+            payload.setdefault("resolved_model", "API /predict")
+        return ok, payload
 
-    if mistral_ok:
-        st.success(
-            "Mistral connecte — L'assistant s'appuie sur vos donnees GoldAI pour repondre."
-        )
-    elif api_ok:
-        st.warning(
-            "Mistral non configure. Verifiez `MISTRAL_API_KEY` dans `.env`."
-        )
+
+def _store_sentiment_result(payload: dict) -> None:
+    res = payload.get("result", [])
+    resolved = payload.get("resolved_model")
+    if resolved:
+        st.session_state.ia_last_resolved_model = resolved
+    if res and res[0].get("sentiment_score") is not None:
+        st.session_state.ia_last_result = res[0]
     else:
+        st.session_state.ia_last_result = None
+
+
+def _render_sentiment_tab(
+    ctx: PageContext,
+    api_v1: str,
+    api_ok: bool,
+    api_warning: str,
+    demo_mode: bool,
+) -> None:
+    if not demo_mode and not api_ok:
         st.warning(api_warning)
 
-    st.caption(
-        "Posez des questions métier sur vos données. Mistral répond en s'appuyant sur le contexte réel "
-        "(distribution sentiment, topics, sources, tendances) extrait de votre dataset GoldAI."
-    )
+    col_in, col_out = st.columns([1.05, 0.95], gap="large")
 
-    theme_options = {
-        "Politique": "politique",
-        "Financier": "financier",
-        "Utilisateurs": "utilisateurs",
-    }
-    theme_display_to_api = theme_options  # clé affichée -> valeur API
+    with col_in:
+        st.markdown('<p class="ds-ia-section">Texte</p>', unsafe_allow_html=True)
+        with st.container(border=True):
+            if "ia_text" not in st.session_state:
+                st.session_state.ia_text = "" if demo_mode else _DEMO_EXAMPLES[0][1]
 
-    assist_col1, assist_col2 = st.columns([2, 1])
-    with assist_col1:
-        theme_display = st.selectbox(
-            "Theme d'analyse",
-            list(theme_options.keys()),
-            key="ia_theme",
-            help="Politique : veille, tendances | Financier : marche, indicateurs | Utilisateurs : comportement",
+            if demo_mode:
+                example_labels = ["— Saisir votre texte —"] + [
+                    label for label, _ in _DEMO_EXAMPLES
+                ]
+                picked = st.selectbox(
+                    "Exemple (optionnel)",
+                    example_labels,
+                    key="ia_demo_example_pick",
+                    label_visibility="collapsed",
+                )
+                if picked != example_labels[0]:
+                    sample_map = dict(_DEMO_EXAMPLES)
+                    if st.session_state.get("_ia_demo_ex_applied") != picked:
+                        st.session_state.ia_text = sample_map[picked]
+                        st.session_state._ia_demo_ex_applied = picked
+                        _clear_sentiment_result()
+            else:
+                st.caption("Exemples rapides")
+                st.markdown('<div class="ds-ia-examples">', unsafe_allow_html=True)
+                for i, (label, sample) in enumerate(_DEMO_EXAMPLES):
+                    if st.button(label, key=f"ia_ex_{i}", use_container_width=True):
+                        st.session_state.ia_text = sample
+                        _clear_sentiment_result()
+                        st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            pred_text = st.text_area(
+                "Texte à analyser",
+                height=110,
+                key="ia_text",
+                label_visibility="collapsed",
+            )
+            if not demo_mode:
+                _render_model_chip()
+            if st.button("Analyser", type="primary", use_container_width=True, key="ia_run_sentiment"):
+                st.session_state.ia_analyze_pending = True
+
+    with col_out:
+        st.markdown('<p class="ds-ia-section">Sentiment</p>', unsafe_allow_html=True)
+
+        pred_text = st.session_state.get("ia_text", "")
+        if st.session_state.pop("ia_analyze_pending", False) and str(pred_text).strip():
+            _clear_sentiment_result()
+            with st.spinner("Analyse…"):
+                ok, payload = _run_sentiment(
+                    str(pred_text).strip(),
+                    api_v1,
+                    allow_api_fallback=not demo_mode,
+                )
+            if ok:
+                _store_sentiment_result(payload)
+            else:
+                _clear_sentiment_result()
+                st.error(str(payload))
+
+        _render_sentiment_result(st.session_state.get("ia_last_result"))
+
+        if not demo_mode:
+            resolved = st.session_state.get("ia_last_resolved_model")
+            if resolved and st.session_state.get("ia_last_result"):
+                short = resolved if len(resolved) < 56 else "…" + resolved[-53:]
+                st.caption(f"Modèle · `{short}`")
+                if "datasens-sentiment-fr" in short.lower():
+                    st.warning(
+                        "Ancien modèle Hub détecté — rafraîchissez la page (F5) puis relancez l'analyse."
+                    )
+
+            if st.session_state.get("ia_last_result"):
+                with st.expander("Détail technique", expanded=False):
+                    st.json([st.session_state.ia_last_result])
+
+
+def _render_insight_cards(cards: list[dict]) -> None:
+    if not cards:
+        return
+    parts = ['<div class="ds-insight-grid">']
+    for card in cards[:7]:
+        ctype = str(card.get("type", ""))
+        extra_cls = " ds-insight-card-cross" if ctype == "cross_analysis" else ""
+        title = html.escape(str(card.get("title", "")))
+        summary = html.escape(str(card.get("summary", "")))
+        parts.append(
+            f'<div class="ds-insight-card{extra_cls}">'
+            f'<div class="ds-insight-card-title">{title}</div>'
+            f'<div class="ds-insight-card-summary">{summary}</div>'
+            f"</div>"
         )
-        theme = theme_display_to_api[theme_display]
-    with assist_col2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("Effacer la conversation", key="ia_clear", use_container_width=True):
-            st.session_state.ia_chat_messages = []
-            st.rerun()
+    parts.append("</div>")
+    st.markdown("".join(parts), unsafe_allow_html=True)
 
-    # Exemples de questions
-    with st.expander("Exemples de questions clients", expanded=False):
-        ex_cols = st.columns(3)
-        examples = {
-            "Politique": [
-                "Quelles sont les tendances politiques cette semaine ?",
-                "Quel est le sentiment dominant sur le gouvernement ?",
-                "Résume les sujets politiques les plus couverts.",
-            ],
-            "Financier": [
-                "Quelle est la tendance sur l'inflation ?",
-                "Le sentiment sur les marchés est-il positif ou négatif ?",
-                "Quels indicateurs économiques ressortent le plus ?",
-            ],
-            "Utilisateurs": [
-                "Quelles sources génèrent le plus de contenu négatif ?",
-                "Quel est le volume de collecte par source ?",
-                "Y a-t-il un déséquilibre dans les données ?",
-            ],
-        }
-        # Utiliser theme_display (Politique/Financier/Utilisateurs) pour les exemples
-        examples_for_theme = examples.get(theme_display, [])
-        for i, ex in enumerate(examples_for_theme):
-            with ex_cols[i]:
-                if st.button(ex, key=f"ex_{theme_display}_{i}", use_container_width=True):
-                    st.session_state.ia_prefill = ex
+
+def _purge_legacy_insight_chat() -> None:
+    """Supprime les anciennes réponses Mistral (texte long sans cartes ni engine)."""
+    msgs = st.session_state.get("ia_chat_messages", [])
+    if not msgs:
+        return
+    cleaned = []
+    for msg in msgs:
+        if msg.get("role") != "assistant":
+            cleaned.append(msg)
+            continue
+        if msg.get("cards") or "engine" in msg:
+            cleaned.append(msg)
+            continue
+        content = str(msg.get("content", ""))
+        if len(content) > 400:
+            continue
+        cleaned.append(msg)
+    if len(cleaned) != len(msgs):
+        st.session_state.ia_chat_messages = cleaned
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def _warm_goldai_cache() -> bool:
+    load_enriched_goldai()
+    return True
+
+
+@st.cache_data(show_spinner=False, ttl=600)
+def _cached_insight_pack(theme: str, message: str) -> tuple[str, list[dict], str]:
+    """Calcul GoldAI + synthèse Mistral (cache 10 min)."""
+    pack = build_insight_pack(theme, message)
+    cards = json.loads(json.dumps(pack.insights, default=str))
+    return pack.reply, cards, "goldai_mistral_v3_local"
+
+
+def _fetch_insights_cockpit(theme: str, message: str) -> tuple[str, list[dict], str]:
+    try:
+        return _cached_insight_pack(theme, message)
+    except Exception as e:
+        return f"Erreur analyse locale : {e!s}"[:200], [], "error"
+
+
+def _render_insight_messages(messages: list[dict]) -> None:
+    if not messages:
+        return
+
+    parts = ['<div class="ds-ia-chat">']
+    for msg in messages[-6:]:
+        role = msg.get("role", "assistant")
+        if role == "user":
+            content = html.escape(str(msg.get("content", ""))).replace("\n", "<br>")
+            parts.append(
+                f'<div class="ds-ia-bubble ds-ia-bubble-user">{content}</div>'
+            )
+    parts.append("</div>")
+    st.markdown("".join(parts), unsafe_allow_html=True)
+
+    assistant_msg = None
+    for msg in reversed(messages):
+        if msg.get("role") == "assistant":
+            assistant_msg = msg
+            break
+
+    if assistant_msg:
+        cards = assistant_msg.get("cards") or []
+        if cards:
+            _render_insight_cards(cards)
+        elif assistant_msg.get("content"):
+            content = str(assistant_msg.get("content", ""))
+            if content.startswith("Erreur") or content.startswith("Aucune"):
+                st.error(content)
+            else:
+                st.warning(
+                    "Ancienne réponse texte détectée. Cliquez **Effacer**, puis relancez."
+                )
+
+
+def _render_insights_tab(
+    api_v1: str,
+    api_ok: bool,
+    api_warning: str,
+    *,
+    demo_mode: bool = False,
+) -> None:
+    _purge_legacy_insight_chat()
+    _warm_goldai_cache()
 
     if "ia_chat_messages" not in st.session_state:
         st.session_state.ia_chat_messages = []
 
-    for msg in st.session_state.ia_chat_messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-
-    # Prefill depuis les exemples
-    prefill_val = st.session_state.pop("ia_prefill", "")
-    prompt = st.chat_input("Votre question d'analyse client...", key="ia_chat_input")
-    if not prompt and prefill_val:
-        prompt = prefill_val
-
-    if prompt:
-        st.session_state.ia_chat_messages.append({"role": "user", "content": prompt})
-        with st.chat_message("assistant"), st.spinner("Mistral analyse vos donnees..."):
-            token = get_token()
-            headers = {"Content-Type": "application/json"}
-            if token:
-                headers["Authorization"] = f"Bearer {token}"
-            try:
-                r = requests.post(
-                    f"{api_v1}/ai/insight",
-                    json={"theme": theme, "message": prompt},
-                    headers=headers,
-                    timeout=60,
+    compute_payload = st.session_state.pop("ia_insight_compute_payload", None)
+    if compute_payload:
+        reply = "—"
+        cards: list[dict] = []
+        engine = ""
+        try:
+            with st.spinner("Analyse GoldAI + synthèse Mistral…"):
+                reply, cards, engine = _fetch_insights_cockpit(
+                    compute_payload["theme"],
+                    compute_payload["message"],
                 )
-                if r.ok:
-                    reply = r.json().get("reply", "—")
-                else:
-                    detail = r.json().get("detail", r.text) if "application/json" in r.headers.get("content-type", "") else r.text
-                    reply = f"Erreur {r.status_code} : {detail[:200]}"
-            except requests.exceptions.ConnectionError:
-                reply = api_warning
-            except Exception as e:
-                reply = f"Erreur : {e!s}"[:200]
-            st.markdown(reply)
-        st.session_state.ia_chat_messages.append({"role": "assistant", "content": reply})
+            if not cards and not reply.startswith("Erreur"):
+                reply = (
+                    "Aucune carte insight générée. Vérifiez les données GoldAI "
+                    "ou relancez start_full.bat."
+                )
+        except Exception as e:
+            reply = f"Erreur : {e!s}"[:200]
+            engine = "error"
+        st.session_state.ia_chat_messages.append(
+            {"role": "assistant", "content": reply, "cards": cards, "engine": engine}
+        )
+        st.session_state.ia_clear_insight_question = True
+
+    if st.session_state.pop("ia_clear_insight_question", False):
+        st.session_state["ia_insight_question"] = ""
+
+    theme = "politique"
+    with st.container(border=True):
+        theme_display = st.radio(
+            "Domaine",
+            list(_THEME_OPTIONS.keys()),
+            horizontal=True,
+            key="ia_theme",
+            label_visibility="collapsed",
+        )
+        theme = _THEME_OPTIONS[theme_display]
+
+        prev_theme = st.session_state.get("ia_theme_prev")
+        msgs = st.session_state.get("ia_chat_messages", [])
+        awaiting = msgs and msgs[-1].get("role") == "user"
+        if prev_theme is not None and prev_theme != theme_display and not awaiting:
+            st.session_state.ia_chat_messages = []
+            st.session_state["ia_insight_question"] = ""
+        st.session_state.ia_theme_prev = theme_display
+
+        example_q = _INSIGHT_EXAMPLES.get(theme_display, "")
+        if demo_mode:
+            if st.button("Effacer", key="ia_clear_chat", use_container_width=True):
+                st.session_state.ia_chat_messages = []
+                st.session_state.ia_clear_insight_question = True
+                st.rerun()
+        else:
+            c1, c2 = st.columns([3, 1])
+            with c1:
+                if st.button("Question exemple", key="ia_insight_ex", use_container_width=True):
+                    st.session_state["ia_insight_question"] = example_q
+                    st.rerun()
+            with c2:
+                if st.button("Effacer", key="ia_clear_chat", use_container_width=True):
+                    st.session_state.ia_chat_messages = []
+                    st.session_state.ia_clear_insight_question = True
+                    st.rerun()
+
+        _render_insight_messages(st.session_state.ia_chat_messages)
+
+        question = st.text_area(
+            "Votre question",
+            height=72,
+            key="ia_insight_question",
+            label_visibility="collapsed",
+            placeholder=(
+                example_q if demo_mode else "Posez votre question…"
+            ),
+        )
+        send = st.button(
+            "Envoyer",
+            type="primary",
+            use_container_width=True,
+            key="ia_send_insight",
+        )
+
+    if send and question.strip():
+        st.session_state.ia_chat_messages.append({"role": "user", "content": question.strip()})
+        st.session_state.ia_insight_compute_payload = {
+            "theme": theme,
+            "message": question.strip(),
+        }
         st.rerun()
+
+
+def render(ctx: PageContext) -> None:
+    inject_ia_css()
+    settings = ctx.settings
+    api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
+    api_v1 = f"{api_base}{settings.api_v1_prefix}"
+    api_ok = ctx.backend_ok
+    api_warning = (
+        "API indisponible. Lancez l'API E2 (`python run_e2_api.py`) avant l'assistant."
+    )
+    demo_mode = ctx.ux_mode == "Mode démo"
+
+    if demo_mode:
+        render_demo_tour_banner("IA")
+
+    if demo_mode:
+        st.markdown(
+            '<p class="ds-demo-lead">Saisissez un texte, analysez le sentiment, puis explorez les insights.</p>',
+            unsafe_allow_html=True,
+        )
+
+    # Purge d'un ancien résultat API (Hub +0.96) encore en session
+    stale = st.session_state.get("ia_last_result")
+    if stale and float(stale.get("sentiment_score", 0) or 0) > 0.9:
+        resolved = str(st.session_state.get("ia_last_resolved_model", ""))
+        if "ac0hik" not in resolved:
+            _clear_sentiment_result()
+
+    ia_view = st.radio(
+        "Vue IA",
+        ["Sentiment", "Insights"],
+        horizontal=True,
+        key="ia_view",
+        label_visibility="collapsed",
+    )
+
+    if ia_view == "Sentiment":
+        _render_sentiment_tab(ctx, api_v1, api_ok, api_warning, demo_mode)
+    else:
+        _render_insights_tab(api_v1, api_ok, api_warning, demo_mode=demo_mode)

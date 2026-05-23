@@ -35,6 +35,15 @@ from src.streamlit._cockpit_helpers import (
 )
 from src.streamlit.metrics import fmt_size as _fmt_size
 from src.streamlit.pipeline_proof import render_last_run_proof_compact
+from src.streamlit.cockpit_ux import (
+    layer_sparkline_values,
+    render_active_model_card,
+    render_expert_breadcrumb,
+    render_layer_tile,
+    render_section_title,
+    render_warn_monitoring_link,
+    status_color,
+)
 
 
 def _resolve_db_path(project_root: Path) -> Path:
@@ -106,13 +115,24 @@ def render(ctx: PageContext) -> None:
     goldai_dir = ctx.goldai_dir
     ia_dir = ctx.ia_dir
 
-    # --- Bandeau d'identité (1 ligne) --------------------------------------
-    st.markdown("### DataSens — cockpit d'analyse de sentiment multi-source")
-    st.caption(
-        "Collecte multi-sources → normalisation → enrichissement "
-        "(topics + sentiments) → jeu d'entraînement IA."
-    )
+    # --- Bandeau d'identité -------------------------------------------------
+    if ctx.show_advanced:
+        render_expert_breadcrumb("Vue d'ensemble")
+        st.caption(
+            "État consolidé RAW → GoldAI, volumétrie par couche et activité du dernier run."
+        )
+    else:
+        st.markdown("### DataSens — cockpit d'analyse de sentiment multi-source")
+        st.caption(
+            "Collecte multi-sources → normalisation → enrichissement "
+            "(topics + sentiments) → jeu d'entraînement IA."
+        )
     st.divider()
+
+    if ctx.show_advanced:
+        render_active_model_card(project_root)
+        render_warn_monitoring_link(ctx)
+        st.divider()
 
     # --- Section 1 : État du pipeline (4 tuiles, 1 par couche) -------------
     db_path = _resolve_db_path(project_root)
@@ -127,16 +147,45 @@ def render(ctx: PageContext) -> None:
     ia_val = _parquet_row_count_cached(str(ia_dir / "val.parquet")) if (ia_dir / "val.parquet").exists() else 0
     ia_test = _parquet_row_count_cached(str(ia_dir / "test.parquet")) if (ia_dir / "test.parquet").exists() else 0
 
-    st.markdown("#### État du pipeline")
+    render_section_title("État du pipeline")
+    spark_raw = layer_sparkline_values(project_root, "RAW")
+    spark_silver = layer_sparkline_values(project_root, "SILVER")
+    spark_gold = layer_sparkline_values(project_root, "GOLD")
+    spark_goldai = layer_sparkline_values(project_root, "GoldAI")
+
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("RAW (buffer SQLite)", f"{raw_total:,}")
-    c2.metric("SILVER (dernière partition)", f"{silver_rows:,}", delta=silver_label)
-    c3.metric("GOLD (partition du jour)", f"{gold_rows:,}", delta=gold_label)
-    c4.metric(
-        "GoldAI (stock consolidé)",
-        f"{goldai_rows:,}",
-        delta=f"splits : {ia_train + ia_val + ia_test:,}",
-    )
+    with c1:
+        render_layer_tile(
+            "RAW",
+            f"{raw_total:,}",
+            "Buffer SQLite cumulé",
+            spark_raw,
+            color=status_color("PASS"),
+        )
+    with c2:
+        render_layer_tile(
+            "SILVER",
+            f"{silver_rows:,}",
+            f"Partition {silver_label}",
+            spark_silver,
+            color="#60a5fa",
+        )
+    with c3:
+        render_layer_tile(
+            "GOLD",
+            f"{gold_rows:,}",
+            f"Partition {gold_label}",
+            spark_gold,
+            color="#a78bfa",
+        )
+    with c4:
+        render_layer_tile(
+            "GoldAI",
+            f"{goldai_rows:,}",
+            f"splits IA {ia_train + ia_val + ia_test:,}",
+            spark_goldai,
+            color="#34d399",
+        )
     st.caption(
         f"Splits IA : train {ia_train:,} · val {ia_val:,} · test {ia_test:,}. "
         "Lecture : une ligne = un article, une couche = une étape d'enrichissement."
@@ -144,7 +193,7 @@ def render(ctx: PageContext) -> None:
     st.divider()
 
     # --- Section 2 : Lineage de la donnée (SQLite -> Parquet -> GoldAI -> Mongo) ---
-    st.markdown("#### Lineage de la donnée")
+    render_section_title("Lineage de la donnée")
     st.caption(
         "Chaîne de persistance multi-couche, du stockage opérationnel au stockage long terme. "
         "Quatre étapes, contrôle de cohérence end-to-end."
@@ -212,10 +261,15 @@ def render(ctx: PageContext) -> None:
                 value="hors ligne",
                 label_visibility="collapsed",
             )
-            if st.button("Réessayer", key="overview_check_mongo_retry", use_container_width=True):
+            st.code("docker compose up -d mongodb", language="powershell")
+            b1, b2 = st.columns(2)
+            if b1.button("Réessayer", key="overview_check_mongo_retry", use_container_width=True):
                 with st.spinner("Connexion MongoDB..."):
                     st.session_state.mongo_status_cache = _mongo_status(project_root)
                 st.rerun()
+            if b2.button("Copier commande Docker", key="overview_copy_docker", use_container_width=True):
+                st.session_state["clipboard_hint"] = "docker compose up -d mongodb"
+                st.toast("Commande affichée ci-dessus — copiez depuis le bloc code.")
         else:
             st.metric(
                 label=" ",
@@ -287,14 +341,9 @@ def render(ctx: PageContext) -> None:
 
     # --- Expander : Santé technique (fermé par défaut) ---------------------
     with st.expander("Santé technique (API, branches App/IA)", expanded=False):
-        # --- API E2 --------------------------------------------------------
         api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
         api_v1 = f"{api_base}{settings.api_v1_prefix}"
-        try:
-            requests.get(f"{api_base}/health", timeout=2)
-            api_ok = True
-        except Exception:
-            api_ok = False
+        api_ok = ctx.backend_ok
 
         api_col, mongo_col = st.columns(2)
         if api_ok:

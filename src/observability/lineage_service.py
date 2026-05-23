@@ -188,6 +188,7 @@ class LineageService:
                 (d_s,),
             )
             transformed_samples = self._as_dicts(cur.fetchall())
+            # LIMIT 60 = plafond UI (selectbox lineage), pas le total ingéré du jour
             # Dédupliquer l'échantillon sur id (les JOINs topics peuvent créer des ex-aequo)
             seen_ids: set[int] = set()
             uniq_samples: list[dict] = []
