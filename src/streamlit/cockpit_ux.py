@@ -56,34 +56,6 @@ LAYER_ICONS: dict[str, str] = {
     "GoldAI": "🤖",
 }
 
-DEMO_TOUR_STEPS: list[dict[str, str]] = [
-    {
-        "tab": "IA",
-        "title": "1/5 — Sentiment",
-        "body": "Onglet **IA** : saisissez un texte ou choisissez un exemple, puis analysez le sentiment.",
-    },
-    {
-        "tab": "IA",
-        "title": "2/5 — Insights",
-        "body": "Passez sur **Insights** : posez une question métier (API requise).",
-    },
-    {
-        "tab": "Pipeline",
-        "title": "3/5 — Volumes",
-        "body": "Onglet **Pipeline** : volumes RAW → GoldAI et run du jour.",
-    },
-    {
-        "tab": "Pipeline",
-        "title": "4/5 — Preuve de run",
-        "body": "Scrollez jusqu'à **Preuve du run** — deltas, exports PDF/MD.",
-    },
-    {
-        "tab": "Pipeline",
-        "title": "5/5 — Historique",
-        "body": "Ouvrez **Historique des runs** — PASS/WARN et alertes quality gate.",
-    },
-]
-
 
 def status_chip_class(status: str) -> str:
     return STATUS_CHIP_CLASS.get(str(status or "").upper(), "")
@@ -94,12 +66,13 @@ def status_color(status: str) -> str:
 
 
 def altair_status_scale():
+    """Échelle Altair quality gate — sans le statut « — » (placeholder, pas une légende utile)."""
     import altair as alt
 
-    present = [s for s in STATUS_ORDER if s in STATUS_COLORS]
+    domain = ["PASS", "WARN", "FAIL", "ABSENT"]
     return alt.Scale(
-        domain=present,
-        range=[STATUS_COLORS[s] for s in present],
+        domain=domain,
+        range=[STATUS_COLORS[s] for s in domain],
     )
 
 
@@ -161,16 +134,54 @@ def inject_cockpit_ux_css() -> None:
   font-weight: 700;
   margin: 0.85rem 0 0.45rem 0;
 }
-.ds-demo-tour {
-  border: 1px solid rgba(251, 191, 36, 0.45);
-  background: rgba(120, 80, 10, 0.25);
+.ds-sidebar-status {
+  padding: 0.55rem 0.65rem;
+  margin: 0.25rem 0 0.65rem 0;
   border-radius: 10px;
-  padding: 0.65rem 0.85rem;
-  margin-bottom: 0.85rem;
-  color: #fde68a;
-  font-size: 0.9rem;
+  border: 1px solid rgba(116, 149, 255, 0.22);
+  background: rgba(16, 24, 48, 0.65);
 }
-.ds-demo-tour strong { color: #fef3c7; }
+.ds-sidebar-status-title {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #7d94c4;
+  margin-bottom: 0.45rem;
+}
+.ds-sidebar-status-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  margin-bottom: 0.4rem;
+}
+.ds-sidebar-status-row:last-child { margin-bottom: 0; }
+.ds-sidebar-status-label {
+  font-size: 0.68rem;
+  color: #6b82b3;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ds-sidebar-status-value {
+  font-size: 0.82rem;
+  color: #e8eeff;
+  line-height: 1.35;
+  word-break: break-word;
+}
+.ds-sidebar-status-value .ds-mode-chip {
+  font-size: 0.78rem;
+  padding: 0.12rem 0.45rem;
+}
+section.main .block-container {
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-top: 1.25rem;
+}
+section.main,
+[data-testid="stAppViewContainer"] {
+  overflow-anchor: none;
+}
 </style>
         """,
         unsafe_allow_html=True,
@@ -194,6 +205,53 @@ def render_section_title(title: str) -> None:
 # Backend OK — prefetch login (#6)
 # ---------------------------------------------------------------------------
 
+_BACKEND_TTL_OK = 90
+_BACKEND_TTL_STICKY = 120
+
+
+def on_ux_mode_change() -> None:
+    """Changement de profil — flag scroll + prolonger le statut API."""
+    st.session_state["_ux_mode_changed"] = True
+    if st.session_state.get("backend_ok"):
+        st.session_state["backend_ok_ts"] = time.time()
+
+
+def sync_ux_mode(ux_mode: str) -> None:
+    """Mémorise le profil actif (API stale + cohérence UI)."""
+    prev_mode = st.session_state.get("_ux_mode_last")
+    if prev_mode is not None and prev_mode != ux_mode:
+        st.session_state["_ux_mode_changed"] = True
+        if st.session_state.get("backend_ok"):
+            st.session_state["backend_ok_ts"] = time.time()
+        if ux_mode == "Mode démo" and prev_mode != "Mode démo":
+            st.session_state["demo_main_tab"] = "🤖 IA"
+    st.session_state["_ux_mode_last"] = ux_mode
+
+
+def reset_scroll_on_mode_change() -> None:
+    """Remonte la page une seule fois après changement de profil (script en tête, pas en bas)."""
+    if not st.session_state.pop("_ux_mode_changed", False):
+        return
+    st.markdown(
+        """
+<script>
+(function () {
+  var p = window.parent;
+  var d = p.document;
+  function top() {
+    var main = d.querySelector("section.main");
+    if (main) { main.scrollTop = 0; }
+    var view = d.querySelector('[data-testid="stAppViewContainer"]');
+    if (view) { view.scrollTop = 0; }
+  }
+  top();
+  p.requestAnimationFrame(top);
+})();
+</script>
+        """,
+        unsafe_allow_html=True,
+    )
+
 
 def prefetch_backend_ok(api_base: str) -> None:
     ok = check_api_health(api_base)
@@ -202,18 +260,29 @@ def prefetch_backend_ok(api_base: str) -> None:
 
 
 def resolve_backend_ok(api_base: str) -> bool:
+    now = time.time()
     ts = st.session_state.get("backend_ok_ts")
-    if ts and time.time() - float(ts) < 20:
-        return bool(st.session_state.get("backend_ok", False))
+    cached = st.session_state.get("backend_ok")
+    if ts is not None and cached is not None and now - float(ts) < _BACKEND_TTL_OK:
+        return bool(cached)
     ok = check_api_health(api_base)
+    # Un échec transient pendant un rerun lourd ne doit pas afficher « hors ligne ».
+    if not ok and cached is True and ts is not None and now - float(ts) < _BACKEND_TTL_STICKY:
+        return True
     st.session_state["backend_ok"] = ok
-    st.session_state["backend_ok_ts"] = time.time()
+    st.session_state["backend_ok_ts"] = now
     return ok
 
 
 # ---------------------------------------------------------------------------
 # Cache (#4)
 # ---------------------------------------------------------------------------
+
+
+@st.cache_data(show_spinner=False, ttl=30)
+def latest_run_summary_cached(root_str: str) -> dict | None:
+    latest, _ = latest_run_summary_reports(Path(root_str))
+    return latest
 
 
 @st.cache_data(show_spinner=False, ttl=30)
@@ -250,14 +319,40 @@ def growth_timeline_cached(root_str: str) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-def _mongo_label(ctx: PageContext) -> tuple[str, str]:
+def _mongo_label_from_session() -> tuple[str, str]:
     cache = st.session_state.get("mongo_status_cache")
     if isinstance(cache, dict) and cache.get("connected"):
         n = len(cache.get("files", []) or [])
-        return f"Mongo · {n} fichiers", "ds-mode-chip-ok"
+        return f"En ligne · {n} fichiers", "ds-mode-chip-ok"
     if isinstance(cache, dict):
-        return "Mongo · hors ligne", "ds-mode-chip-ko"
-    return "Mongo · non vérifié", ""
+        return "Hors ligne", "ds-mode-chip-ko"
+    return "Non vérifié", ""
+
+
+def _mongo_label(ctx: PageContext) -> tuple[str, str]:
+    _ = ctx
+    return _mongo_label_from_session()
+
+
+def render_sidebar_status(
+    *,
+    backend_ok: bool,
+    project_root: Path,
+) -> None:
+    """Statut compact sidebar — API + dernier run uniquement."""
+    api_label = "Connectée" if backend_ok else "Hors ligne"
+    latest = latest_run_summary_cached(str(project_root))
+    run_line = "Aucun run"
+    if latest:
+        status = str(latest.get("status", "—"))
+        kpi = latest.get("kpis", {}) if isinstance(latest, dict) else {}
+        loaded = int(float(kpi.get("loaded", 0) or 0))
+        day = str(latest.get("generated_at_utc", ""))[:10]
+        run_line = f"{day or '?'} · {status} · {loaded:,} lignes"
+
+    st.caption("État système")
+    st.write(f"**API E2** · {api_label}")
+    st.write(f"**Dernier run** · {run_line}")
 
 
 def get_active_model_summary(root: Path) -> dict[str, Any]:
@@ -311,7 +406,7 @@ def render_expert_kpi_strip(ctx: PageContext) -> None:
     api_cls = "ds-mode-chip-ok" if ctx.backend_ok else "ds-mode-chip-ko"
     api_val = "En ligne" if ctx.backend_ok else "Hors ligne"
 
-    latest, _ = latest_run_summary_reports(ctx.project_root)
+    latest = latest_run_summary_cached(str(ctx.project_root))
     run_val = "Aucun run"
     run_cls = ""
     if latest:
@@ -504,72 +599,3 @@ def render_monitoring_date_filter() -> str | None:
             st.session_state.pop("expert_goto_hint", None)
             st.rerun()
     return str(filt)
-
-
-# ---------------------------------------------------------------------------
-# Parcours démo guidé (#3)
-# ---------------------------------------------------------------------------
-
-
-def render_demo_tour_sidebar() -> None:
-    st.markdown("##### Parcours jury")
-    active = st.session_state.get("demo_tour_active", False)
-    step = int(st.session_state.get("demo_tour_step", 0) or 0)
-
-    if not active:
-        if st.button("▶ Parcours jury 5 min", key="demo_tour_start", use_container_width=True):
-            st.session_state.demo_tour_active = True
-            st.session_state.demo_tour_step = 1
-            st.rerun()
-        return
-
-    total = len(DEMO_TOUR_STEPS)
-    st.progress(min(step, total) / total)
-    if step >= 1 and step <= total:
-        info = DEMO_TOUR_STEPS[step - 1]
-        st.caption(f"Étape {step}/{total} · onglet **{info['tab']}**")
-    c1, c2 = st.columns(2)
-    with c1:
-        if step > 1 and st.button("← Préc.", key="demo_tour_prev"):
-            st.session_state.demo_tour_step = step - 1
-            st.rerun()
-    with c2:
-        if step < total and st.button("Suiv. →", key="demo_tour_next"):
-            st.session_state.demo_tour_step = step + 1
-            st.rerun()
-    if st.button("Terminer le parcours", key="demo_tour_stop", use_container_width=True):
-        st.session_state.demo_tour_active = False
-        st.session_state.demo_tour_step = 0
-        st.rerun()
-
-
-def render_demo_tour_banner(expected_tab: str) -> None:
-    if not st.session_state.get("demo_tour_active"):
-        return
-    step = int(st.session_state.get("demo_tour_step", 0) or 0)
-    if step < 1 or step > len(DEMO_TOUR_STEPS):
-        return
-    info = DEMO_TOUR_STEPS[step - 1]
-    if info["tab"] != expected_tab:
-        st.markdown(
-            f'<div class="ds-demo-tour">Étape en cours sur l’onglet <strong>{info["tab"]}</strong> '
-            f"— basculez d’onglet pour continuer.</div>",
-            unsafe_allow_html=True,
-        )
-        return
-    st.markdown(
-        f'<div class="ds-demo-tour"><strong>{info["title"]}</strong> — {info["body"]}</div>',
-        unsafe_allow_html=True,
-    )
-
-
-def demo_tour_expand(key: str, default: bool = False) -> bool:
-    """Auto-ouvre un expander si le parcours démo le demande (#3)."""
-    if not st.session_state.get("demo_tour_active"):
-        return default
-    step = int(st.session_state.get("demo_tour_step", 0) or 0)
-    if step == 5 and key == "hist_runs":
-        return True
-    if step == 4 and key == "proof_run":
-        return True
-    return default

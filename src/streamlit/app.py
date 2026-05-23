@@ -23,9 +23,12 @@ from src.streamlit._cockpit_helpers import (
 )
 from src.streamlit.cockpit_ux import (
     inject_cockpit_ux_css,
-    render_demo_tour_sidebar,
+    on_ux_mode_change,
     render_expert_kpi_strip,
+    render_sidebar_status,
+    reset_scroll_on_mode_change,
     resolve_backend_ok,
+    sync_ux_mode,
 )
 from src.streamlit._cockpit_helpers import (
     inject_css as _inject_css,
@@ -34,7 +37,7 @@ from src.streamlit._cockpit_helpers import (
     inject_demo_css as _inject_demo_css,
 )
 from src.streamlit._cockpit_helpers import (
-    inject_presentation_css as _inject_presentation_css,
+    inject_ia_css as _inject_ia_css,
 )
 from src.streamlit._cockpit_helpers import (
     inject_readability_css as _inject_readability_css,
@@ -42,7 +45,6 @@ from src.streamlit._cockpit_helpers import (
 from src.streamlit._cockpit_helpers import (
     render_brand_logo,
     render_demo_header,
-    render_demo_status_strip,
     render_mode_intro,
 )
 from src.streamlit.auth_plug import (
@@ -91,6 +93,30 @@ def _mode_options_for_user() -> list[str]:
     return ["Standard"]
 
 
+def _compass_body(ux_mode: str) -> str:
+    if ux_mode == "Mode démo":
+        return """
+            <ul class="ds-compass-list">
+              <li>🤖 IA — sentiment et insights</li>
+              <li>🔁 Pipeline — volumes, preuve de run, historique</li>
+            </ul>
+            """
+    if ux_mode == "Expert":
+        return """
+            <ul class="ds-compass-list">
+              <li>🏠 Vue d'ensemble — KPI, tuiles, modèle actif</li>
+              <li>🔁 Pipeline — Synthèse & run · Explorer les fichiers</li>
+              <li>🤖 IA — Sentiment · Modèles (benchmark, fine-tuning)</li>
+              <li>⚙️ Pilotage — Actions · Infra & MongoDB</li>
+            </ul>
+            """
+    return """
+            <ul class="ds-compass-list">
+              <li>🤖 IA — sentiment et insights métier</li>
+            </ul>
+            """
+
+
 def main() -> None:
     settings = get_settings()
     _logo = brand_logo_raster_path(PROJECT_ROOT) or brand_logo_path(PROJECT_ROOT)
@@ -105,7 +131,6 @@ def main() -> None:
         },
     )
     ux_mode = "Standard"
-    show_compass = True
 
     api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
     backend_ok = resolve_backend_ok(api_base)
@@ -132,76 +157,28 @@ def main() -> None:
                     mode_options,
                     key="ux_mode_select",
                     help="Standard : IA seule · Démo : IA + pipeline · Expert : cockpit complet",
+                    on_change=on_ux_mode_change,
                 )
-                demo_mode = ux_mode == "Mode démo"
-                expert_mode = ux_mode == "Expert"
-                st.divider()
-                if demo_mode:
-                    st.caption("Mode démo — IA + pipeline pour présentation jury.")
-                    st.markdown(
-                        """
-            <div class="ds-compass-box">
-              <div class="ds-compass-title">🧭 Parcours démo</div>
-              <ul class="ds-compass-list">
-                <li>🤖 IA — sentiment et insights</li>
-                <li>🔁 Pipeline — volumes, preuve de run, historique</li>
-              </ul>
-            </div>
-            """,
-                        unsafe_allow_html=True,
-                    )
-                    st.caption("API connectée" if backend_ok else "API arrêtée")
-                    st.checkbox(
-                        "Mode présentation (plein écran)",
-                        value=False,
-                        key="demo_presentation",
-                        help="Masque le menu et la barre Streamlit pour projection jury.",
-                    )
-                    render_demo_tour_sidebar()
-                else:
-                    st.caption(f"API · `{api_base}`")
-                    st.caption("Connectée" if backend_ok else "Arrêtée")
-                st.divider()
-                if demo_mode:
-                    show_compass = False
-                else:
-                    show_compass = st.checkbox(
-                        "Afficher la boussole cockpit",
-                        value=True,
-                        key="ux_show_compass",
-                        help="Repérage rapide des panneaux.",
-                    )
-                if not demo_mode:
-                    if expert_mode:
-                        compass_body = """
-            <ul class="ds-compass-list">
-              <li>🏠 Vue d'ensemble — état pipeline + MongoDB</li>
-              <li>🔁 Pipeline — fusion, exploration, ops</li>
-              <li>🤖 IA — benchmark, fine-tuning</li>
-              <li>⚙️ Pilotage — run, backup, Prometheus</li>
-            </ul>
-            """
-                    else:
-                        compass_body = """
-            <ul class="ds-compass-list">
-              <li>🤖 IA — sentiment et insights métier</li>
-            </ul>
-            """
-                    if not show_compass:
-                        compass_body = '<div class="ds-compass-muted">Boussole masquée.</div>'
+                sync_ux_mode(ux_mode)
+                render_sidebar_status(
+                    backend_ok=backend_ok,
+                    project_root=PROJECT_ROOT,
+                )
+                show_compass = st.checkbox(
+                    "Afficher la boussole",
+                    value=True,
+                    key="ux_show_compass",
+                )
+                if show_compass:
                     st.markdown(
                         f"""
             <div class="ds-compass-box">
-              <div class="ds-compass-title">🧭 Boussole cockpit</div>
-              {compass_body}
+              <div class="ds-compass-title">🧭 Boussole</div>
+              {_compass_body(ux_mode)}
             </div>
             """,
                         unsafe_allow_html=True,
                     )
-                    if expert_mode:
-                        st.caption("Mode Expert — Pilotage, fusion, exploration.")
-                    elif ux_mode == "Standard":
-                        st.caption("Standard — IA et insights (lecture seule).")
 
     if not is_logged_in():
         _inject_css()
@@ -210,12 +187,12 @@ def main() -> None:
         st.stop()
 
     is_demo = ux_mode == "Mode démo"
-    presentation = is_demo and st.session_state.get("demo_presentation", False)
+    reset_scroll_on_mode_change()
     _inject_css()
     inject_cockpit_ux_css()
-    _inject_readability_css(is_demo)
-    _inject_demo_css(is_demo)
-    _inject_presentation_css(presentation)
+    _inject_ia_css()
+    _inject_readability_css(True)
+    _inject_demo_css(True)
     history_mode = True
     show_advanced = ux_mode == "Expert"
 
@@ -242,7 +219,6 @@ def main() -> None:
 
     if is_demo:
         render_demo_header(PROJECT_ROOT)
-        render_demo_status_strip(ctx)
     elif not render_brand_logo(PROJECT_ROOT, placement="header_main"):
         st.title("DataSens Cockpit")
 
@@ -251,26 +227,35 @@ def main() -> None:
 
     if ux_mode == "Standard":
         page_ia.render(ctx)
+    elif ux_mode == "Mode démo":
+        # Radio (pas st.tabs) : un seul panneau rendu → évite le scroll vers le Pipeline caché.
+        st.markdown('<div class="ds-demo-main-nav"></div>', unsafe_allow_html=True)
+        demo_tab = st.radio(
+            "Section",
+            ["🤖 IA", "🔁 Pipeline"],
+            horizontal=True,
+            key="demo_main_tab",
+            label_visibility="collapsed",
+        )
+        ctx.cockpit_tab = demo_tab
+        if demo_tab == "🤖 IA":
+            page_ia.render(ctx)
+        else:
+            page_pipeline_data.render(ctx)
     else:
         if ux_mode == "Expert":
             render_expert_kpi_strip(ctx)
-        tab_config: list[tuple[str, Callable[[PageContext], None]]] = []
-        if ux_mode == "Mode démo":
-            tab_config = [
-                ("🤖 IA", page_ia.render),
-                ("🔁 Pipeline", page_pipeline_data.render),
-            ]
-        else:
-            tab_config = [
-                ("🏠 Vue d'ensemble", page_overview.render),
-                ("🔁 Pipeline", page_pipeline_data.render),
-                ("🤖 IA", page_ia_models.render),
-                ("⚙️ Pilotage", page_pilotage_ops.render),
-            ]
+        tab_config: list[tuple[str, Callable[[PageContext], None]]] = [
+            ("🏠 Vue d'ensemble", page_overview.render),
+            ("🔁 Pipeline", page_pipeline_data.render),
+            ("🤖 IA", page_ia_models.render),
+            ("⚙️ Pilotage", page_pilotage_ops.render),
+        ]
 
         rendered_tabs = st.tabs([label for label, _ in tab_config])
-        for tab_ui, (_, render_fn) in zip(rendered_tabs, tab_config, strict=False):
+        for tab_ui, (label, render_fn) in zip(rendered_tabs, tab_config, strict=False):
             with tab_ui:
+                ctx.cockpit_tab = label
                 render_fn(ctx)
 
 

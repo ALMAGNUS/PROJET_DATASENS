@@ -23,6 +23,7 @@ import streamlit as st
 
 from src.streamlit._cockpit_helpers import (
     PageContext,
+    cockpit_tab_is_active,
 )
 from src.streamlit._cockpit_helpers import (
     csv_row_count_cached as _csv_row_count_cached,
@@ -108,6 +109,8 @@ def _latest_gold(gold_dir: Path) -> tuple[int, str]:
 
 
 def render(ctx: PageContext) -> None:
+    if not cockpit_tab_is_active(ctx, "🏠 Vue d'ensemble"):
+        return
     project_root = ctx.project_root
     settings = ctx.settings
     silver_dir = ctx.silver_dir

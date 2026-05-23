@@ -22,9 +22,7 @@ from src.streamlit._cockpit_helpers import (
 )
 from src.streamlit.cockpit_ux import (
     altair_status_scale,
-    demo_tour_expand,
     latest_db_state_cached,
-    render_demo_tour_banner,
     run_summary_history_cached,
 )
 from src.streamlit.page_modules.overview import (
@@ -464,7 +462,6 @@ def _runs_with_alerts(hist: list[dict]) -> pd.DataFrame:
 
 
 def render(ctx: PageContext) -> None:
-    render_demo_tour_banner("Pipeline")
     root = ctx.project_root
     db_state = latest_db_state_cached(str(root))
     last_run, _ = latest_run_summary_reports(root)
@@ -505,7 +502,7 @@ def render(ctx: PageContext) -> None:
     st.markdown('<p class="ds-section">Parcours d\'un article</p>', unsafe_allow_html=True)
     render_article_journey(ctx, demo_mode=True)
 
-    with st.expander("Historique des runs", expanded=demo_tour_expand("hist_runs")):
+    with st.expander("Historique des runs", expanded=False):
         hist = run_summary_history_cached(str(root), limit=14)
         hist_df = _build_runs_history_df(root, limit=14, hist=hist)
         hist_chart = _chart_runs_history(hist_df) if hist_df is not None else None

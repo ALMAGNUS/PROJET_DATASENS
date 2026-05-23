@@ -167,6 +167,27 @@ def _fmt_ttl(seconds: int | None) -> str:
     return f"{s}s"
 
 
+def api_reachable(timeout: float = 2.0) -> bool:
+    """True si GET /health répond (API E2 démarrée)."""
+    try:
+        r = requests.get(f"{_api_base()}/health", timeout=timeout)
+        return r.ok
+    except requests.exceptions.RequestException:
+        return False
+
+
+def _login_network_error_message(exc: Exception) -> str:
+    base = _api_base()
+    if isinstance(exc, requests.exceptions.ConnectionError):
+        return (
+            f"**API injoignable** ({base}). "
+            "Le cockpit a besoin du backend FastAPI pour l'authentification JWT.\n\n"
+            "→ Lancez **`python run_e2_api.py`** ou **`.\\start_full.bat`** "
+            "et gardez la fenêtre **DataSensBackend** ouverte."
+        )
+    return f"Erreur réseau : {exc}"
+
+
 def login(email: str, password: str) -> tuple[bool, str]:
     """
     Appelle l'API E2 POST /auth/login. Retourne (success, message).
@@ -182,7 +203,7 @@ def login(email: str, password: str) -> tuple[bool, str]:
             headers={"Content-Type": "application/json"},
         )
     except requests.exceptions.RequestException as e:
-        return False, f"Erreur réseau: {e}"
+        return False, _login_network_error_message(e)
 
     if r.status_code != 200:
         detail = (r.json().get("detail") if r.headers.get("content-type", "").startswith("application/json") else None) or r.text
@@ -266,6 +287,12 @@ def render_login_page(project_root: Path | None = None) -> bool:
             """,
             unsafe_allow_html=True,
         )
+        if not api_reachable():
+            st.warning(
+                f"Backend **hors ligne** (`{_api_base()}`). "
+                "Démarrez l'API : `python run_e2_api.py` ou `.\\start_full.bat` "
+                "(fenêtre **DataSensBackend**)."
+            )
         with st.form("auth_login_main", clear_on_submit=False):
             email = st.text_input("Email", placeholder="vous@exemple.com")
             password = st.text_input("Mot de passe", type="password")

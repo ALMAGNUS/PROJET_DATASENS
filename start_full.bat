@@ -24,7 +24,16 @@ echo.
 echo Ports: API 8001, Cockpit 8501
 echo.
 start "DataSensBackend" cmd /k call "%ROOT%_launch_api.bat"
-ping -n 4 127.0.0.1 >nul
+echo Attente demarrage API (port 8001, max ~90 s)...
+for /L %%i in (1,1,45) do (
+    "%ROOT%.venv\Scripts\python.exe" -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=2)" 2>nul && goto api_ready
+    ping -n 2 127.0.0.1 >nul
+)
+echo ATTENTION: API non detectee — verifiez la fenetre **DataSensBackend**.
+goto start_cockpit
+:api_ready
+echo API OK — demarrage du cockpit.
+:start_cockpit
 start "DataSensFrontend" cmd /k call "%ROOT%_launch_cockpit.bat"
 echo.
 echo Deux fenetres ouvertes. Pour arreter : fermer les 2 terminaux Backend et Frontend.

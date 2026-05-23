@@ -52,10 +52,18 @@ class PageContext:
     goldai_dir: Path
     ia_dir: Path
     settings: Any
+    cockpit_tab: str = ""
 
     @property
     def root(self) -> Path:
         return self.project_root
+
+
+def cockpit_tab_is_active(ctx: PageContext, *labels: str) -> bool:
+    """Vrai si l'onglet principal affiché correspond (Standard = toujours vrai)."""
+    if ctx.ux_mode == "Standard":
+        return True
+    return ctx.cockpit_tab in labels
 
 
 def inject_css() -> None:
@@ -98,6 +106,7 @@ def inject_css() -> None:
     .ds-logo-shell--header-main {
       margin: 0.15rem 0 0.85rem;
       max-width: 320px;
+      min-height: 72px;
     }
     .ds-logo-img {
       display: block;
@@ -124,6 +133,7 @@ def inject_css() -> None:
       font-size: 0.92rem;
       margin: -0.35rem 0 1rem 0;
       line-height: 1.45;
+      min-height: 2.6rem;
     }
     .ds-mode-strip {
       display: flex;
@@ -207,6 +217,10 @@ def inject_css() -> None:
     }
     [data-testid="stTabs"] [role="tabpanel"] > div {
       row-gap: 0.85rem;
+    }
+    /* Onglets inactifs : pas de fantôme en bas de page (hidden natif Streamlit uniquement) */
+    [data-testid="stTabs"] [role="tabpanel"][hidden] {
+      display: none !important;
     }
     [data-testid="stVerticalBlock"] > div {
       row-gap: 0.65rem;
@@ -371,18 +385,23 @@ def inject_ia_css() -> None:
     div[data-testid="stVerticalBlock"] div:has(> div > .ds-ia-panel) {
       gap: 0.5rem;
     }
-    [data-testid="stVerticalBlockBorderWrapper"] {
+    [data-testid="stTabs"] [role="tabpanel"]:not([hidden]) [data-testid="stVerticalBlockBorderWrapper"] {
       background: rgba(15, 22, 44, 0.55) !important;
       border-color: rgba(116, 149, 255, 0.22) !important;
       border-radius: 14px !important;
       padding: 0.85rem 1rem !important;
     }
-    .ds-ia-examples .stButton > button {
+    .ds-ia-examples .stButton > button,
+    [data-testid="stPopover"] .stButton > button {
       white-space: normal !important;
       line-height: 1.3 !important;
       min-height: 2.75rem !important;
       font-size: 0.84rem !important;
       padding: 0.45rem 0.65rem !important;
+    }
+    [data-testid="stPopover"] > button {
+      font-size: 0.88rem !important;
+      justify-content: space-between !important;
     }
     .ds-insight-grid {
       display: grid;
@@ -513,18 +532,16 @@ def inject_demo_css(enabled: bool) -> None:
     st.markdown(
         """
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
-
     [data-testid="stAppViewContainer"],
     [data-testid="stSidebar"] {
-      font-family: "DM Sans", "Segoe UI", system-ui, sans-serif !important;
+      font-family: "Segoe UI", system-ui, sans-serif !important;
     }
     [data-testid="stHeader"] { background: transparent; }
     h1, h2, h3, h4, h5, h6,
     [data-testid="stMarkdownContainer"] h1,
     [data-testid="stMarkdownContainer"] h2,
     [data-testid="stMarkdownContainer"] h3 {
-      font-family: "DM Sans", "Segoe UI", system-ui, sans-serif !important;
+      font-family: "Segoe UI", system-ui, sans-serif !important;
       letter-spacing: -0.02em;
     }
     [data-testid="stMarkdownContainer"] p,
@@ -533,10 +550,17 @@ def inject_demo_css(enabled: bool) -> None:
       line-height: 1.5 !important;
     }
 
+    /* Navigation principale mode démo (IA / Pipeline) */
+    .element-container:has(.ds-demo-main-nav) + .element-container [data-testid="stRadio"] > div[role="radiogroup"] {
+      width: 100% !important;
+      max-width: 520px;
+      margin-bottom: 1rem !important;
+    }
     .ds-demo-lead {
       color: #a8bdf6;
       font-size: 0.92rem;
       margin: -0.5rem 0 1rem 0;
+      min-height: 2.6rem;
     }
     .ds-section {
       color: #dce6ff;
@@ -821,13 +845,13 @@ def render_demo_header(project_root: Path) -> None:
     )
 
 
-@st.cache_data(show_spinner=False, ttl=20)
+@st.cache_data(show_spinner=False, ttl=30)
 def check_api_health(api_base: str) -> bool:
     """Health check API avec cache court (évite plusieurs appels par rerun)."""
     try:
         import requests
 
-        return requests.get(f"{api_base}/health", timeout=2).ok
+        return requests.get(f"{api_base}/health", timeout=4).ok
     except Exception:
         return False
 
@@ -871,7 +895,7 @@ def _render_status_strip(ctx: PageContext) -> None:
 
 
 def render_mode_intro(ctx: PageContext) -> None:
-    """Bandeau unifié Standard / Expert : profil, API et dernier run."""
+    """Bandeau profil (sans statut API/run — voir sidebar)."""
     if ctx.ux_mode == "Standard":
         intro = "Lecture seule — analyse de sentiment et insights métier."
     elif ctx.ux_mode == "Expert":
@@ -880,12 +904,11 @@ def render_mode_intro(ctx: PageContext) -> None:
         return
 
     st.markdown(f'<p class="ds-mode-intro">{intro}</p>', unsafe_allow_html=True)
-    _render_status_strip(ctx)
 
 
 def render_demo_status_strip(ctx: PageContext) -> None:
-    """Pastilles de statut en mode démo (aligné Standard/Expert)."""
-    _render_status_strip(ctx)
+    """Deprecated — statut dans la sidebar."""
+    _ = ctx
 
 
 @st.cache_data(show_spinner=False, ttl=60)

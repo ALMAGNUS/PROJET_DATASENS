@@ -350,10 +350,16 @@ def build_enrichment_table(root: Path) -> list[dict]:
 
     silver_candidates: list[Path] = []
     if silver_dir.exists():
-        for d in sorted(silver_dir.iterdir(), reverse=True):
-            if d.is_dir():
-                for f in d.rglob("*.parquet"):
-                    silver_candidates.append(f)
+        silver_dirs = sorted(
+            [d for d in silver_dir.iterdir() if d.is_dir()],
+            key=lambda d: d.name.replace("date=", "").replace("v_", ""),
+            reverse=True,
+        )
+        for d in silver_dirs:
+            for name in ("silver_articles.parquet", "silver_articles.csv"):
+                p = d / name
+                if p.exists():
+                    silver_candidates.append(p)
                     break
             if silver_candidates:
                 break

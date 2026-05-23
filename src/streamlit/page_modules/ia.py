@@ -15,14 +15,13 @@ import streamlit as st
 from src.ml.inference.sentiment_postprocess import finalize_sentiment
 from src.streamlit._cockpit_helpers import (
     PageContext,
-    inject_ia_css,
+    cockpit_tab_is_active,
 )
 from src.insights.goldai_data import load_enriched_goldai
 from src.insights.builder import build_insight_pack
 from src.streamlit.auth_plug import (
     get_token,
 )
-from src.streamlit.cockpit_ux import render_demo_tour_banner
 
 _DEMO_SENTIMENT_MODEL = "ac0hik/Sentiment_Analysis_French"
 
@@ -45,6 +44,12 @@ _TONE_COLORS = {
     "Neutre": "#90a4ae",
     "Négatif": "#ef5350",
 }
+
+
+def _ia_key(ctx: PageContext, name: str) -> str:
+    """Clés widgets isolées par profil (Standard vs Démo) — évite page blanche au changement de mode."""
+    scope = "demo" if ctx.ux_mode == "Mode démo" else "std"
+    return f"ia_{scope}_{name}"
 
 
 def _label_fr(label_raw: str) -> str:
@@ -151,6 +156,30 @@ def _clear_sentiment_result() -> None:
     st.session_state.pop("ia_last_resolved_model", None)
 
 
+def _render_sentiment_examples(*, ctx: PageContext, text_key: str, ex_label_key: str) -> None:
+    """Menu exemples — popover (s'ouvre et se referme proprement, contrairement au selectbox)."""
+    key_prefix = _ia_key(ctx, "ex")
+    applied = st.session_state.get(ex_label_key)
+    popover_label = applied if applied else "Exemple"
+
+    with st.popover(popover_label, use_container_width=True):
+        if st.button(
+            "— Saisir votre texte —",
+            key=f"{key_prefix}_custom",
+            use_container_width=True,
+        ):
+            st.session_state[ex_label_key] = None
+            st.session_state[text_key] = ""
+            _clear_sentiment_result()
+            st.rerun()
+        for label, sample in _DEMO_EXAMPLES:
+            if st.button(label, key=f"{key_prefix}_{label}", use_container_width=True):
+                st.session_state[text_key] = sample
+                st.session_state[ex_label_key] = label
+                _clear_sentiment_result()
+                st.rerun()
+
+
 def _run_sentiment(text: str, api_v1: str, *, allow_api_fallback: bool) -> tuple[bool, dict | str]:
     """Toujours ac0hik en local dans le cockpit (évite le mauvais modèle Hub via API)."""
     try:
@@ -187,54 +216,39 @@ def _render_sentiment_tab(
 
     col_in, col_out = st.columns([1.05, 0.95], gap="large")
 
+    text_key = _ia_key(ctx, "text")
+    ex_label_key = _ia_key(ctx, "ex_label")
+    analyze_key = _ia_key(ctx, "analyze_pending")
+
     with col_in:
         st.markdown('<p class="ds-ia-section">Texte</p>', unsafe_allow_html=True)
         with st.container(border=True):
-            if "ia_text" not in st.session_state:
-                st.session_state.ia_text = "" if demo_mode else _DEMO_EXAMPLES[0][1]
+            if text_key not in st.session_state:
+                st.session_state[text_key] = ""
 
-            if demo_mode:
-                example_labels = ["— Saisir votre texte —"] + [
-                    label for label, _ in _DEMO_EXAMPLES
-                ]
-                picked = st.selectbox(
-                    "Exemple (optionnel)",
-                    example_labels,
-                    key="ia_demo_example_pick",
-                    label_visibility="collapsed",
-                )
-                if picked != example_labels[0]:
-                    sample_map = dict(_DEMO_EXAMPLES)
-                    if st.session_state.get("_ia_demo_ex_applied") != picked:
-                        st.session_state.ia_text = sample_map[picked]
-                        st.session_state._ia_demo_ex_applied = picked
-                        _clear_sentiment_result()
-            else:
-                st.caption("Exemples rapides")
-                st.markdown('<div class="ds-ia-examples">', unsafe_allow_html=True)
-                for i, (label, sample) in enumerate(_DEMO_EXAMPLES):
-                    if st.button(label, key=f"ia_ex_{i}", use_container_width=True):
-                        st.session_state.ia_text = sample
-                        _clear_sentiment_result()
-                        st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
+            _render_sentiment_examples(ctx=ctx, text_key=text_key, ex_label_key=ex_label_key)
 
             pred_text = st.text_area(
                 "Texte à analyser",
                 height=110,
-                key="ia_text",
+                key=text_key,
                 label_visibility="collapsed",
             )
             if not demo_mode:
                 _render_model_chip()
-            if st.button("Analyser", type="primary", use_container_width=True, key="ia_run_sentiment"):
-                st.session_state.ia_analyze_pending = True
+            if st.button(
+                "Analyser",
+                type="primary",
+                use_container_width=True,
+                key=_ia_key(ctx, "run_sentiment"),
+            ):
+                st.session_state[analyze_key] = True
 
     with col_out:
         st.markdown('<p class="ds-ia-section">Sentiment</p>', unsafe_allow_html=True)
 
-        pred_text = st.session_state.get("ia_text", "")
-        if st.session_state.pop("ia_analyze_pending", False) and str(pred_text).strip():
+        pred_text = st.session_state.get(text_key, "")
+        if st.session_state.pop(analyze_key, False) and str(pred_text).strip():
             _clear_sentiment_result()
             with st.spinner("Analyse…"):
                 ok, payload = _run_sentiment(
@@ -362,12 +376,17 @@ def _render_insight_messages(messages: list[dict]) -> None:
 
 
 def _render_insights_tab(
+    ctx: PageContext,
     api_v1: str,
     api_ok: bool,
     api_warning: str,
     *,
     demo_mode: bool = False,
 ) -> None:
+    question_key = _ia_key(ctx, "insight_question")
+    theme_key = _ia_key(ctx, "theme")
+    theme_prev_key = _ia_key(ctx, "theme_prev")
+    clear_chat_key = _ia_key(ctx, "clear_chat")
     _purge_legacy_insight_chat()
     _warm_goldai_cache()
 
@@ -399,7 +418,7 @@ def _render_insights_tab(
         st.session_state.ia_clear_insight_question = True
 
     if st.session_state.pop("ia_clear_insight_question", False):
-        st.session_state["ia_insight_question"] = ""
+        st.session_state[question_key] = ""
 
     theme = "politique"
     with st.container(border=True):
@@ -407,33 +426,37 @@ def _render_insights_tab(
             "Domaine",
             list(_THEME_OPTIONS.keys()),
             horizontal=True,
-            key="ia_theme",
+            key=theme_key,
             label_visibility="collapsed",
         )
         theme = _THEME_OPTIONS[theme_display]
 
-        prev_theme = st.session_state.get("ia_theme_prev")
+        prev_theme = st.session_state.get(theme_prev_key)
         msgs = st.session_state.get("ia_chat_messages", [])
         awaiting = msgs and msgs[-1].get("role") == "user"
         if prev_theme is not None and prev_theme != theme_display and not awaiting:
             st.session_state.ia_chat_messages = []
-            st.session_state["ia_insight_question"] = ""
-        st.session_state.ia_theme_prev = theme_display
+            st.session_state[question_key] = ""
+        st.session_state[theme_prev_key] = theme_display
 
         example_q = _INSIGHT_EXAMPLES.get(theme_display, "")
         if demo_mode:
-            if st.button("Effacer", key="ia_clear_chat", use_container_width=True):
+            if st.button("Effacer", key=clear_chat_key, use_container_width=True):
                 st.session_state.ia_chat_messages = []
                 st.session_state.ia_clear_insight_question = True
                 st.rerun()
         else:
             c1, c2 = st.columns([3, 1])
             with c1:
-                if st.button("Question exemple", key="ia_insight_ex", use_container_width=True):
-                    st.session_state["ia_insight_question"] = example_q
+                if st.button(
+                    "Question exemple",
+                    key=_ia_key(ctx, "insight_ex"),
+                    use_container_width=True,
+                ):
+                    st.session_state[question_key] = example_q
                     st.rerun()
             with c2:
-                if st.button("Effacer", key="ia_clear_chat", use_container_width=True):
+                if st.button("Effacer", key=clear_chat_key, use_container_width=True):
                     st.session_state.ia_chat_messages = []
                     st.session_state.ia_clear_insight_question = True
                     st.rerun()
@@ -443,7 +466,7 @@ def _render_insights_tab(
         question = st.text_area(
             "Votre question",
             height=72,
-            key="ia_insight_question",
+            key=question_key,
             label_visibility="collapsed",
             placeholder=(
                 example_q if demo_mode else "Posez votre question…"
@@ -453,7 +476,7 @@ def _render_insights_tab(
             "Envoyer",
             type="primary",
             use_container_width=True,
-            key="ia_send_insight",
+            key=_ia_key(ctx, "send_insight"),
         )
 
     if send and question.strip():
@@ -466,7 +489,8 @@ def _render_insights_tab(
 
 
 def render(ctx: PageContext) -> None:
-    inject_ia_css()
+    if not cockpit_tab_is_active(ctx, "🤖 IA"):
+        return
     settings = ctx.settings
     api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
     api_v1 = f"{api_base}{settings.api_v1_prefix}"
@@ -475,15 +499,6 @@ def render(ctx: PageContext) -> None:
         "API indisponible. Lancez l'API E2 (`python run_e2_api.py`) avant l'assistant."
     )
     demo_mode = ctx.ux_mode == "Mode démo"
-
-    if demo_mode:
-        render_demo_tour_banner("IA")
-
-    if demo_mode:
-        st.markdown(
-            '<p class="ds-demo-lead">Saisissez un texte, analysez le sentiment, puis explorez les insights.</p>',
-            unsafe_allow_html=True,
-        )
 
     # Purge d'un ancien résultat API (Hub +0.96) encore en session
     stale = st.session_state.get("ia_last_result")
@@ -496,11 +511,13 @@ def render(ctx: PageContext) -> None:
         "Vue IA",
         ["Sentiment", "Insights"],
         horizontal=True,
-        key="ia_view",
+        key=_ia_key(ctx, "view"),
         label_visibility="collapsed",
     )
 
     if ia_view == "Sentiment":
         _render_sentiment_tab(ctx, api_v1, api_ok, api_warning, demo_mode)
     else:
-        _render_insights_tab(api_v1, api_ok, api_warning, demo_mode=demo_mode)
+        _render_insights_tab(
+            ctx, api_v1, api_ok, api_warning, demo_mode=demo_mode
+        )

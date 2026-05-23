@@ -26,10 +26,6 @@ from src.streamlit._cockpit_helpers import (
 from src.streamlit.auth_plug import (
     can_admin,
     can_write,
-    get_token,
-)
-from src.streamlit.metrics import (
-    load_benchmark_results as _load_benchmark_results,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -37,7 +33,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 def render(ctx: PageContext) -> None:
     PROJECT_ROOT = ctx.project_root
-    settings = ctx.settings
     show_advanced = ctx.show_advanced
 
     if show_advanced:
@@ -62,8 +57,8 @@ def render(ctx: PageContext) -> None:
 
     st.info(
         "**Centre d'actions du cockpit.** Les chiffres de volumétrie sont dans "
-        "**Vue d'ensemble** ; la qualité et l'historique sont dans **Monitoring**. "
-        "Ici, on **lance** le pipeline, la fusion, la copie IA, l'API et les backups."
+        "**Vue d'ensemble** et **Pipeline** ; benchmark / fine-tuning dans **IA → Modèles**. "
+        "Ici : lancer le pipeline, fusion, copie IA, API et backups."
     )
     # ── RBAC : seul un role writer/deleter/admin peut executer les pipelines ─
     may_run = can_write()
@@ -106,8 +101,6 @@ def render(ctx: PageContext) -> None:
 
     # Rapport d'exécution (affiché juste après les boutons principaux)
     _render_last_report("pilotage")
-
-    _render_drift_panel(settings)
 
     b4, b5, _ = st.columns(3)
     with b4:
@@ -174,140 +167,7 @@ def render(ctx: PageContext) -> None:
             else:
                 st.warning("Déposez un fichier CSV.")
 
-    st.caption("Fine-tuning : améliore le modèle IA avec les données GoldAI")
-
-    # Auto-suggestion du meilleur backbone basée sur le benchmark
-    _bench_for_ft = _load_benchmark_results(PROJECT_ROOT)
-    _best_backbone_suggestion = "sentiment_fr"
-    if _bench_for_ft:
-        _pretrained_only = {
-            k: v for k, v in _bench_for_ft.items()
-            if k != "finetuned_local" and "error" not in v
-        }
-        _backbone_map = {
-            "bert_multilingual": "bert_multilingual",
-            "sentiment_fr": "sentiment_fr",
-            "xlm_roberta_twitter": "flaubert",
-            "flaubert_multilingual": "flaubert",
-        }
-        if _pretrained_only:
-            _best_bench_key = max(_pretrained_only, key=lambda k: _pretrained_only[k].get("accuracy", 0))
-            _best_backbone_suggestion = _backbone_map.get(_best_bench_key, "sentiment_fr")
-            _best_acc = _pretrained_only[_best_bench_key].get("accuracy", 0)
-            f1_best = _pretrained_only[_best_bench_key].get("f1_macro", 0)
-            st.info(
-                f"**Recommandation** : fine-tuner **{_best_bench_key}** "
-                f"(F1 macro {f1_best:.1%}). Évitez CamemBERT distil (le plus faible). "
-                f"Un bon pré-entraîné donne un meilleur fine-tuné."
-            )
-
-    ft_col1, ft_col2, ft_col3 = st.columns(3)
-    with ft_col1:
-        _backbone_choices = ["sentiment_fr", "bert_multilingual", "camembert", "flaubert"]
-        _default_idx = _backbone_choices.index(_best_backbone_suggestion) if _best_backbone_suggestion in _backbone_choices else 0
-        ft_backbone = st.selectbox(
-            "Backbone à entraîner",
-            _backbone_choices,
-            index=_default_idx,
-            format_func=lambda x: {
-                "camembert": "CamemBERT distil (léger, CPU rapide)",
-                "bert_multilingual": "BERT multilingue 5★ (nlptown) — pas CamemBERT",
-                "sentiment_fr": "sentiment_fr (RECOMMANDÉ — meilleur bench) ★",
-                "flaubert": "FlauBERT base uncased (FR)",
-            }.get(x, x),
-            key="ft_backbone",
-            help="sentiment_fr est le meilleur pré-entraîné sur le benchmark. Fine-tuner le meilleur backbone donne le meilleur résultat final.",
-        )
-    with ft_col2:
-        ft_mode = st.selectbox(
-            "Mode",
-            ["quick", "full"],
-            format_func=lambda x: "Quick (1 epoch, ~3000 ex.)" if x == "quick" else "Full (3 epochs, toutes données)",
-            key="ft_mode",
-        )
-    with ft_col3:
-        ft_epochs = 1 if ft_mode == "quick" else 3
-        ft_max_train = 3000 if ft_mode == "quick" else None
-        ft_max_val = 800 if ft_mode == "quick" else None
-        st.caption(f"Epochs: {ft_epochs}")
-        if ft_max_train:
-            st.caption(f"Max train: {ft_max_train} · Max val: {ft_max_val}")
-
-    ft_topics = st.checkbox(
-        "Filtrer finance + politique + météo uniquement",
-        value=False,
-        key="ft_topics_filter",
-        help="Entraîne sur les articles avec topic_1 ou topic_2 = finance/politique/meteo. Meilleure restitution veille.",
-    )
-    ft_pos_ratio = st.slider(
-        "Recalibrage classe positif (train)",
-        min_value=0.0,
-        max_value=0.40,
-        value=0.25,
-        step=0.01,
-        help="0 = off. Augmente la part de la classe positif dans le train via sur-échantillonnage contrôlé.",
-        key="ft_target_pos_ratio",
-    )
-    ft_pos_mult = st.slider(
-        "Limite sur-échantillonnage positif (x)",
-        min_value=1.0,
-        max_value=6.0,
-        value=3.0,
-        step=0.5,
-        help="Garde-fou pour éviter de dupliquer excessivement la classe positif.",
-        key="ft_pos_oversample_multiplier",
-    )
-
-    b6, b7, _ = st.columns(3)
-    with b6:
-        if st.button(
-            "Lancer le fine-tuning",
-            type="primary",
-            use_container_width=True,
-            disabled=not may_admin,
-            help=(
-                "Rôle admin requis."
-                if not may_admin
-                else "Entraîne le backbone choisi sur train.parquet (Copie IA)."
-            ),
-        ):
-            cmd = [
-                sys.executable,
-                "scripts/finetune_sentiment.py",
-                "--model", ft_backbone,
-                "--epochs", str(ft_epochs),
-            ]
-            if ft_max_train:
-                cmd += ["--max-train-samples", str(ft_max_train)]
-            if ft_max_val:
-                cmd += ["--max-val-samples", str(ft_max_val)]
-            if ft_topics:
-                cmd += ["--topics", "finance,politique,meteo"]
-            if ft_pos_ratio > 0:
-                cmd += ["--target-pos-ratio", str(ft_pos_ratio)]
-                cmd += ["--pos-oversample-max-multiplier", str(ft_pos_mult)]
-            _run_command("finetune", cmd)
-    with b7:
-        if st.button(
-            "Évaluer modèle fine-tuné",
-            use_container_width=True,
-            disabled=not may_run,
-            help="Calcule accuracy/F1 sur val.parquet (modèle fine-tuné)",
-        ):
-            _run_command(
-                "eval", [sys.executable, "scripts/finetune_sentiment.py", "--eval-only"]
-            )
-    finetuned_path = getattr(settings, "sentiment_finetuned_model_path", None)
-    if finetuned_path:
-        st.caption(f"Modèle fine-tuné actif : `{finetuned_path}`")
-    else:
-        _expected_path = f"models/{ft_backbone}-sentiment-finetuned" if "ft_backbone" in dir() else "models/sentiment_fr-sentiment-finetuned"
-        st.caption(
-            f"Après fine-tuning, activez le modèle dans **Modèles & Sélection** "
-            f"ou ajoutez dans `.env` : `SENTIMENT_FINETUNED_MODEL_PATH={_expected_path}`"
-        )
-
-    with st.expander("Paramètres & détails", expanded=False):
+    with st.expander("Paramètres pipeline & Mongo (avancé)", expanded=False):
         force_reimport = st.checkbox("FORCE_ZZDB_REIMPORT (zzdb_csv)", value=False)
         env = {"FORCE_ZZDB_REIMPORT": "true" if force_reimport else "false"}
         if st.button("Pipeline E1 (avec params)", disabled=not may_run):
@@ -332,117 +192,5 @@ def render(ctx: PageContext) -> None:
                 st.caption("Tables : " + ", ".join(f"{t}={c}" for t, c in tables[:8]))
             except Exception:
                 pass
-        if st.button("Veille IA", disabled=not may_run):
-            _run_command("veille", [sys.executable, "scripts/veille_digest.py"])
-        if st.button("Benchmark IA (rapide 200 ex.)", disabled=not may_run):
-            _run_command("benchmark", [sys.executable, "scripts/ai_benchmark.py", "--max-samples", "200"])
-        if st.button("Benchmark IA (complet)", disabled=not may_run):
-            _run_command("benchmark", [sys.executable, "scripts/ai_benchmark.py"])
         if st.button("Lister Parquet MongoDB", disabled=not may_run):
             _run_command("mongo", [sys.executable, "scripts/list_mongo_parquet.py"])
-        st.divider()
-        st.caption("Après fine-tuning, le chemin du modèle :")
-        st.code("SENTIMENT_FINETUNED_MODEL_PATH=models/sentiment_fr-sentiment-finetuned")
-
-
-def _render_drift_panel(settings) -> None:
-    """Panneau drift : appelle /drift-metrics pour alimenter les gauges Prometheus.
-
-    Comportement :
-    - auto-refresh au chargement, avec TTL 60 s (cf. session_state)
-    - bouton "Rafraîchir maintenant" pour forcer immédiatement
-    - affiche les 4 valeurs (drift_score, entropy, dominance, articles_total)
-    - lien vers Grafana
-
-    Cf. RUNBOOK § 11.4 pour la procédure complète et `scripts/refresh_drift_metrics.py`.
-    """
-    import time
-
-    import requests
-
-    api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
-    grafana_url = f"http://localhost:{settings.grafana_port}"
-    drift_url = f"{api_base}/api/v1/analytics/drift-metrics"
-    cache_key = "_drift_cache"
-    ttl_seconds = 60
-
-    with st.expander("Drift modèle (Prometheus + Grafana)", expanded=False):
-        st.caption(
-            "Recalcule la distribution sentiment + topic dominance sur la zone Gold "
-            "et alimente les gauges Prometheus exposées par l'API E2. "
-            "Indispensable pour que Grafana affiche les courbes de drift."
-        )
-
-        col_btn, col_info = st.columns([1, 3])
-        force_refresh = col_btn.button("Rafraîchir maintenant", use_container_width=True)
-
-        cache = st.session_state.get(cache_key)
-        now = time.time()
-        should_call = force_refresh or cache is None or (now - cache["ts"]) > ttl_seconds
-
-        if should_call:
-            token = get_token()
-            if not token:
-                col_info.warning("Pas de token JWT en session. Reconnecte-toi pour pouvoir rafraîchir.")
-                cache = None
-            else:
-                try:
-                    r = requests.get(
-                        drift_url,
-                        headers={"Authorization": f"Bearer {token}"},
-                        timeout=10,
-                    )
-                    if r.ok:
-                        body = r.json()
-                        cache = {"ts": now, "data": body, "error": None}
-                        st.session_state[cache_key] = cache
-                    else:
-                        cache = {
-                            "ts": now,
-                            "data": None,
-                            "error": f"HTTP {r.status_code} : {r.text[:120]}",
-                        }
-                        st.session_state[cache_key] = cache
-                except requests.exceptions.ConnectionError:
-                    cache = {"ts": now, "data": None, "error": f"API E2 injoignable ({api_base})"}
-                    st.session_state[cache_key] = cache
-                except Exception as e:
-                    cache = {"ts": now, "data": None, "error": f"{type(e).__name__}: {e}"}
-                    st.session_state[cache_key] = cache
-
-        if cache is None:
-            col_info.info("Connecte-toi pour activer le rafraîchissement.")
-            return
-
-        if cache.get("error"):
-            col_info.error(f"Refresh KO : {cache['error']}")
-        else:
-            age = int(time.time() - cache["ts"])
-            col_info.caption(f"Dernier refresh : il y a {age} s — TTL cache {ttl_seconds} s")
-
-        if cache.get("data"):
-            data = cache["data"]
-            score = data.get("drift_score", 0.0)
-            entropy = data.get("sentiment_entropy", 0.0)
-            dominance = data.get("topic_dominance", 0.0)
-            total = data.get("articles_total", 0)
-
-            m1, m2, m3, m4 = st.columns(4)
-            score_status = "🔴" if score >= 0.7 else ("🟠" if score >= 0.5 else "🟢")
-            m1.metric(f"{score_status} Drift score", f"{score:.3f}", help="Composite (1−entropy_norm)·0.5 + dominance·0.5. Alerte si > 0.7.")
-            m2.metric("Entropy sentiment", f"{entropy:.3f}", help="Plus haut = distribution équilibrée (idéal).")
-            m3.metric("Topic dominance", f"{dominance:.3f}", help="Fraction du topic le plus fréquent. Plus haut = un sujet écrase les autres.")
-            m4.metric("Articles base", f"{total:,}".replace(",", " "), help="Volume total dans la zone Gold pris pour le calcul.")
-
-            if score >= 0.7:
-                st.error(
-                    "Drift score ≥ 0.7 — l'alerte Prometheus `DriftScoreHigh` se déclenche après 15 min. "
-                    "Envisager un réentraînement (cf. RUNBOOK § 11.4)."
-                )
-            elif score >= 0.5:
-                st.warning("Drift score ≥ 0.5 — à surveiller.")
-
-        st.markdown(
-            f"Voir les courbes dans **Grafana** : [DataSens – Métriques & Drift]({grafana_url}/d/datasens-full) "
-            "(folder *DataSens*)."
-        )

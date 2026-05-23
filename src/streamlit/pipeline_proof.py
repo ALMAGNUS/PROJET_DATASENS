@@ -36,7 +36,7 @@ from src.streamlit._cockpit_helpers import (
     brand_logo_raster_path,
     parquet_row_count_cached,
 )
-from src.streamlit.cockpit_ux import demo_tour_expand, lazy_panel, render_section_title
+from src.streamlit.cockpit_ux import lazy_panel, render_section_title
 
 # ---------------------------------------------------------------------------
 # Chargement et parsing des rapports db_state
@@ -952,8 +952,14 @@ def render_last_run_proof_compact(ctx: PageContext) -> None:
     )
 
 
-def render_last_run_proof_full(ctx: PageContext, *, demo_mode: bool = False) -> None:
-    """Rendu complet pour l'onglet Pipeline (ou bloc démo jury)."""
+def render_last_run_proof_full(
+    ctx: PageContext, *, demo_mode: bool = False, embedded: bool = False
+) -> None:
+    """Rendu complet pour l'onglet Pipeline (ou bloc démo jury).
+
+    ``embedded=True`` : dans un expander Pipeline — pas de titre H3 ni de rangée
+    metrics (déjà couverts par « Run du jour » au-dessus).
+    """
     root = ctx.project_root
     key_prefix = "demo_proof" if demo_mode else "proof"
 
@@ -964,12 +970,17 @@ def render_last_run_proof_full(ctx: PageContext, *, demo_mode: bool = False) -> 
             "lignes réelles et export PDF."
         )
     else:
-        render_section_title("Dernier run — enrichissement prouvé par étape")
-        st.caption(
-            "Comparaison entre les deux derniers rapports `reports/db_state_*.json`. "
-            "Chaque étape affiche les lignes **avant**, **après** et le **delta** ajouté "
-            "par l'exécution. Les lignes elles-mêmes sont visibles ci-dessous."
-        )
+        if not embedded:
+            render_section_title("Dernier run — enrichissement prouvé par étape")
+            st.caption(
+                "Comparaison entre les deux derniers rapports `reports/db_state_*.json`. "
+                "Chaque étape affiche les lignes **avant**, **après** et le **delta** ajouté "
+                "par l'exécution. Les lignes elles-mêmes sont visibles ci-dessous."
+            )
+        else:
+            st.caption(
+                "Deltas `db_state` (avant / après / Δ) — complète le bandeau **Run du jour** ci-dessus."
+            )
     proof = compute_last_run_deltas(root)
     if not proof or not proof.stages:
         st.info(
@@ -995,11 +1006,11 @@ def render_last_run_proof_full(ctx: PageContext, *, demo_mode: bool = False) -> 
     hdr3.caption(f"**Cohérence** : {status_emoji} {proof.coherence_status}")
     hdr3.caption(f"Partition GOLD : `{proof.latest_gold_date or '—'}`")
 
-    # Metrics (5 étapes)
-    cols = st.columns(len(proof.stages))
-    for col, s in zip(cols, proof.stages, strict=False):
-        label = s.stage.split(". ", 1)[-1]
-        col.metric(label, f"{s.after:,}", delta=_format_delta(s.delta))
+    if not embedded:
+        cols = st.columns(len(proof.stages))
+        for col, s in zip(cols, proof.stages, strict=False):
+            label = s.stage.split(". ", 1)[-1]
+            col.metric(label, f"{s.after:,}", delta=_format_delta(s.delta))
 
     # Tableau de preuve détaillé
     proof_df = pd.DataFrame(
@@ -1019,28 +1030,37 @@ def render_last_run_proof_full(ctx: PageContext, *, demo_mode: bool = False) -> 
 
     # Deltas par source (si dispo)
     if proof.source_deltas:
-        with st.expander(
-            f"Deltas par source raw_data ({len(proof.source_deltas)} sources)",
-            expanded=False,
-        ):
-            src_df = pd.DataFrame(proof.source_deltas)
+        src_title = f"Deltas par source raw_data ({len(proof.source_deltas)} sources)"
+        src_df = pd.DataFrame(proof.source_deltas)
+        if not src_df.empty:
+            src_df = src_df.rename(
+                columns={"source": "Source", "delta": "Delta", "current": "Total courant"}
+            )
+        if embedded:
+            st.markdown(f"**{src_title}**")
             if not src_df.empty:
-                src_df = src_df.rename(
-                    columns={"source": "Source", "delta": "Delta", "current": "Total courant"}
-                )
                 st.dataframe(src_df, use_container_width=True, hide_index=True)
+        else:
+            with st.expander(src_title, expanded=False):
+                if not src_df.empty:
+                    st.dataframe(src_df, use_container_width=True, hide_index=True)
 
     # Lignes nouvelles réelles — SQLite et GOLD
     lines_label = "Lignes nouvelles réelles"
     if demo_mode:
-        with st.expander(lines_label, expanded=demo_tour_expand("proof_run")):
+        with st.expander(lines_label, expanded=False):
             _render_proof_line_tabs(proof, root, compact=True)
     else:
-        render_section_title(lines_label)
-        _render_proof_line_tabs(proof, root)
+        if embedded:
+            st.markdown(f"**{lines_label}**")
+        else:
+            render_section_title(lines_label)
+        _render_proof_line_tabs(proof, root, embedded=embedded)
 
-    if not demo_mode:
+    if not demo_mode and not embedded:
         render_section_title("Export de la preuve d'enrichissement")
+    elif not demo_mode and embedded:
+        st.markdown("**Export de la preuve**")
     _render_proof_exports(
         proof,
         root,
@@ -1054,6 +1074,7 @@ def _render_proof_line_tabs(
     root: Path,
     *,
     compact: bool = False,
+    embedded: bool = False,
 ) -> None:
     """Onglets SQLite / GOLD / sync / timeline (partagé expert + démo)."""
     tab_sql, tab_gold, tab_sync, tab_timeline = st.tabs(
@@ -1130,7 +1151,7 @@ def _render_proof_line_tabs(
                 f"(de {tl.index.min()} à {tl.index.max()})."
             )
             st.line_chart(tl, use_container_width=True)
-            if compact:
+            if compact or embedded:
                 st.caption("Données brutes de la timeline")
                 st.dataframe(tl, use_container_width=True, height=220)
             else:

@@ -67,14 +67,10 @@ def render(ctx: PageContext) -> None:
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("""
-    **Ce pipeline réalise :**
-    1. Collecte depuis les sources (RSS, CSV, bases de données) → **RAW**
-    2. Nettoyage, fusion, ajout des topics IA → **SILVER**
-    3. Analyse de sentiment (positif / négatif / neutre) → **GOLD**
-    4. Fusion long terme, stockage MongoDB → **GoldAI**
-    5. Split train / val / test pour l'entraînement → **Copie IA**
-    """)
+    st.caption(
+        "Inspectez une couche (RAW, SILVER, GOLD…) et chargez les fichiers manuellement. "
+        "La synthèse run + fusion est dans l'autre sous-onglet."
+    )
 
     # ── Helpers locaux ───────────────────────────────────────────────────────
     SENT_COLORS = {
