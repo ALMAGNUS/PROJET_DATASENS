@@ -22,15 +22,19 @@ import requests
 import streamlit as st
 
 from src.config import get_settings
-from src.streamlit._cockpit_helpers import render_brand_logo
+from src.streamlit._cockpit_helpers import (
+    PageContext,
+    get_api_base,
+    probe_http_get,
+    render_brand_logo,
+)
 from src.streamlit.cockpit_ux import prefetch_backend_ok
 
 ROLES_HIERARCHY = ("reader", "writer", "deleter", "admin")
 
 
 def _api_base() -> str:
-    settings = get_settings()
-    return os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
+    return get_api_base()
 
 
 def _auth_prefix() -> str:

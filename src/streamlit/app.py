@@ -20,6 +20,7 @@ from src.streamlit._cockpit_helpers import (
     PageContext,
     brand_logo_path,
     brand_logo_raster_path,
+    get_api_base,
 )
 from src.streamlit.cockpit_ux import (
     inject_cockpit_ux_css,
@@ -132,7 +133,7 @@ def main() -> None:
     )
     ux_mode = "Standard"
 
-    api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
+    api_base = get_api_base(settings)
     backend_ok = resolve_backend_ok(api_base)
 
     with st.sidebar:
@@ -151,7 +152,12 @@ def main() -> None:
                 mode_options = _mode_options_for_user()
                 current_mode = st.session_state.get("ux_mode_select", "Standard")
                 if current_mode not in mode_options:
-                    st.session_state["ux_mode_select"] = mode_options[0]
+                    for candidate in ("Expert", "Mode démo", "Standard"):
+                        if candidate in mode_options:
+                            st.session_state["ux_mode_select"] = candidate
+                            break
+                    else:
+                        st.session_state["ux_mode_select"] = mode_options[0]
                 ux_mode = st.selectbox(
                     "Profil d'usage",
                     mode_options,
@@ -251,12 +257,18 @@ def main() -> None:
             ("🤖 IA", page_ia_models.render),
             ("⚙️ Pilotage", page_pilotage_ops.render),
         ]
-
-        rendered_tabs = st.tabs([label for label, _ in tab_config])
-        for tab_ui, (label, render_fn) in zip(rendered_tabs, tab_config, strict=False):
-            with tab_ui:
-                ctx.cockpit_tab = label
-                render_fn(ctx)
+        tab_labels = [label for label, _ in tab_config]
+        st.markdown('<div class="ds-expert-main-nav"></div>', unsafe_allow_html=True)
+        expert_tab = st.radio(
+            "Section Expert",
+            tab_labels,
+            horizontal=True,
+            key="expert_main_tab",
+            label_visibility="collapsed",
+        )
+        ctx.cockpit_tab = expert_tab
+        render_fn = dict(tab_config)[expert_tab]
+        render_fn(ctx)
 
 
 if __name__ == "__main__":

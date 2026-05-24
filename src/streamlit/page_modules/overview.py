@@ -18,12 +18,13 @@ import os
 import sqlite3
 from pathlib import Path
 
-import requests
 import streamlit as st
 
 from src.streamlit._cockpit_helpers import (
     PageContext,
     cockpit_tab_is_active,
+    probe_http_get,
+    summarize_prometheus_metrics,
 )
 from src.streamlit._cockpit_helpers import (
     csv_row_count_cached as _csv_row_count_cached,
@@ -38,6 +39,7 @@ from src.streamlit.metrics import fmt_size as _fmt_size
 from src.streamlit.pipeline_proof import render_last_run_proof_compact
 from src.streamlit.cockpit_ux import (
     layer_sparkline_values,
+    prefetch_backend_ok,
     render_active_model_card,
     render_expert_breadcrumb,
     render_layer_tile,
@@ -106,6 +108,57 @@ def _latest_gold(gold_dir: Path) -> tuple[int, str]:
     if not gfile.exists():
         return 0, label
     return _parquet_row_count_cached(str(gfile)), label
+
+
+def _render_api_health_panel(api_base: str, api_v1: str, api_ok: bool) -> None:
+    """Tests /health et /metrics (résultats persistés en session_state)."""
+    ba, bb = st.columns(2)
+    if ba.button("Tester /health", key="overview_probe_health"):
+        with st.spinner("Appel /health…"):
+            st.session_state["overview_health_probe"] = probe_http_get(f"{api_base}/health")
+        prefetch_backend_ok(api_base)
+    if bb.button("Résumé /metrics", key="overview_probe_metrics"):
+        with st.spinner("Appel /metrics…"):
+            st.session_state["overview_metrics_probe"] = probe_http_get(f"{api_base}/metrics")
+
+    health_probe = st.session_state.get("overview_health_probe")
+    if health_probe:
+        if health_probe["ok"]:
+            st.success(
+                f"/health OK · {health_probe['elapsed_s']} s · HTTP {health_probe['status_code']}"
+            )
+            st.code(health_probe["text"], language="json")
+        else:
+            err = health_probe["error"] or f"HTTP {health_probe['status_code']}"
+            st.error(f"/health échec après {health_probe['elapsed_s']} s : {err[:220]}")
+            st.caption(
+                "Relancer : `.\\stop_full.bat` puis `start_full.bat`."
+            )
+
+    metrics_probe = st.session_state.get("overview_metrics_probe")
+    if metrics_probe:
+        if metrics_probe["ok"]:
+            st.success(f"/metrics OK · {metrics_probe['elapsed_s']} s")
+            st.code(summarize_prometheus_metrics(metrics_probe["text"]), language="text")
+            if st.checkbox("Afficher extrait brut Prometheus (debug)", key="overview_show_raw_metrics"):
+                st.code(metrics_probe["text"][-1200:], language="text")
+        else:
+            err = metrics_probe["error"] or f"HTTP {metrics_probe['status_code']}"
+            st.error(f"/metrics échec après {metrics_probe['elapsed_s']} s : {err[:220]}")
+
+    if api_ok:
+        st.caption("Endpoints principaux :")
+        st.code(
+            "\n".join(
+                [
+                    f"{api_base}/health",
+                    f"{api_base}/metrics",
+                    f"{api_v1}/ai/predict",
+                    f"{api_v1}/ai/dataset",
+                ]
+            ),
+            language="text",
+        )
 
 
 def render(ctx: PageContext) -> None:
@@ -343,8 +396,11 @@ def render(ctx: PageContext) -> None:
     st.divider()
 
     # --- Expander : Santé technique (fermé par défaut) ---------------------
-    with st.expander("Santé technique (API, branches App/IA)", expanded=False):
-        api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
+    has_probe = bool(
+        st.session_state.get("overview_health_probe") or st.session_state.get("overview_metrics_probe")
+    )
+    with st.expander("Santé technique (API, branches App/IA)", expanded=has_probe):
+        api_base = ctx.api_base
         api_v1 = f"{api_base}{settings.api_v1_prefix}"
         api_ok = ctx.backend_ok
 
@@ -353,38 +409,12 @@ def render(ctx: PageContext) -> None:
             api_col.success(f"API E2 : en ligne · {api_base}")
         else:
             api_col.warning(
-                "API E2 : hors ligne. Démarrer via l'onglet **Pilotage → Lancer API E2**."
+                "API E2 : hors ligne ou lente. Démarrer via **Pilotage → Lancer API E2** "
+                "ou relancer `start_full.bat`."
             )
-        # Statut Mongo uniquement informatif : déjà surveillé en profondeur
-        # dans le panel Monitoring, on évite le doublon ici.
         mongo_col.caption("Mongo/lineage : voir l'onglet **Monitoring** pour le détail.")
 
-        if api_ok:
-            ba, bb = st.columns(2)
-            if ba.button("Tester /health"):
-                try:
-                    resp = requests.get(f"{api_base}/health", timeout=5)
-                    st.code(resp.text, language="json")
-                except Exception as exc:
-                    st.error(str(exc)[:200])
-            if bb.button("Afficher /metrics (extrait)"):
-                try:
-                    resp = requests.get(f"{api_base}/metrics", timeout=5)
-                    st.code(resp.text[-1500:], language="text")
-                except Exception as exc:
-                    st.error(str(exc)[:200])
-            st.caption("Endpoints principaux :")
-            st.code(
-                "\n".join(
-                    [
-                        f"{api_base}/health",
-                        f"{api_base}/metrics",
-                        f"{api_v1}/ai/predict",
-                        f"{api_v1}/ai/dataset",
-                    ]
-                ),
-                language="text",
-            )
+        _render_api_health_panel(api_base, api_v1, api_ok)
 
         st.divider()
 

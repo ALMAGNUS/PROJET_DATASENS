@@ -82,6 +82,7 @@ HUGGINGFACE_API_KEY=<ta_clé>        # facultatif
 OPENWEATHERMAP_API_KEY=<ta_clé>     # sinon fallback Open-Meteo
 INSEE_CLIENT_ID=...                 # facultatif, sinon fallback HTML public
 INSEE_CLIENT_SECRET=...
+ACCESS_TOKEN_EXPIRE_MINUTES=180     # optionnel — soutenance / démo (défaut 30 min, cf. § 6.7)
 ```
 
 `.env` est ignoré par Git (cf. `.gitignore` : `.env*` sauf `.env.example`).
@@ -132,15 +133,25 @@ lancer_tout.bat
 Pour un poste **déjà installé** :
 
 ```bat
+start_full.bat
+```
+
+Démarre **2 fenêtres** : `DataSensBackend` (API 8001) + `DataSensFrontend` (cockpit 8501).  
+→ http://127.0.0.1:8501
+
+**Arrêt propre** (évite les fenêtres Backend fantômes) :
+
+```bat
+stop_full.bat
+```
+
+Alternative historique :
+
+```bat
 lancer_tout.bat
 ```
 
-Démarre :
-1. Prometheus + Grafana via Docker (si Docker Desktop répond),
-2. terminal dédié pour l'API E2,
-3. terminal dédié pour le cockpit Streamlit.
-
-→ http://localhost:8501. Tout le reste est en background.
+Démarre Prometheus + Grafana (Docker) + API + cockpit (plus lourd).
 
 Pour un run pipeline manuel : `python main.py` (sans tout relancer).
 
@@ -473,6 +484,33 @@ Conserve l'historique d'audit (`user_action_log`) tout en bloquant la connexion.
 
 L'**API E2 ne mute jamais SILVER** (HTTP 501 par design, isolation E1).
 L'écriture SILVER passe exclusivement par le pipeline E1.
+
+### 6.7 Durée de session JWT (soutenance / démo)
+
+Par défaut, le token JWT cockpit expire au bout de **30 minutes**
+(`ACCESS_TOKEN_EXPIRE_MINUTES`, défaut dans `src/config.py`).
+
+**Checklist jour J** (soutenance ou démo > 30 min) :
+
+1. Dans `.env` :
+   ```env
+   ACCESS_TOKEN_EXPIRE_MINUTES=180
+   ```
+   (180 = 3 h ; ajuster si besoin.)
+2. **Redémarrer l'API E2** (`run_e2_api.py` ou relancer `start_full.bat`) — le
+   cockpit Streamlit seul ne suffit pas. **Uvicorn ne recharge pas le `.env` à
+   chaud** : il faut tuer l'ancien processus API (cf. `scripts/kill_port_8001.ps1`).
+3. **Vérifier** : `GET http://localhost:8001/health` doit afficher
+   `"access_token_expire_minutes": 240` (ou la valeur choisie). Si `30`, l'ancienne
+   API tourne encore.
+4. **Se reconnecter** au cockpit : les tokens déjà émis conservent l'ancienne
+   durée jusqu'à expiration.
+
+La sidebar affiche le temps restant. À expiration, déconnexion automatique
+(401 → écran login). Voir aussi § 14 « API renvoie 401 ».
+
+Modèle documenté dans `.env.example` (valeur `30` ; commentaire pour passer à
+`180` le jour J).
 
 ---
 
@@ -842,6 +880,7 @@ Statut consultable sur https://github.com/ALMAGNUS/PROJET_DATASENS/actions.
 | `HUGGINGFACE_API_KEY` | Settings HuggingFace → revoke + new → `.env` | trimestriel |
 | `MONGO_PASSWORD` | Voir § 12.3 | annuel |
 | `JWT_SECRET_KEY` | `.env` → redémarrer API (invalide tous les tokens) | annuel ou sur incident |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `.env` → redémarrer API (nouveaux tokens uniquement) | avant soutenance / démo longue (cf. § 6.7) |
 | Mots de passe utilisateurs | `python scripts/change_password.py` | sur demande |
 
 ### 12.3 Rotation MongoDB password
@@ -975,7 +1014,9 @@ ports:
 
 ### API renvoie 401 malgré login OK
 
-1. Token expiré (durée par défaut courte) : refaire un `POST /auth/login`.
+1. Token expiré (défaut **30 min**, variable `ACCESS_TOKEN_EXPIRE_MINUTES` dans
+   `.env`) : se reconnecter au cockpit ou `POST /auth/login`. Pour une soutenance,
+   passer à `180` et redémarrer l'API (§ 6.7).
 2. Mauvais rôle pour la route : vérifier le RBAC (§ 6.6).
 3. Compte désactivé : `python scripts/change_password.py --list` → `ACTIF: non` ?
    → réactiver via SQL (cf. § 6.5 inversé : `active=1`).
@@ -1096,4 +1137,4 @@ Préparer dans l’explorateur ou l’IDE trois favoris : **`data/goldai`**, **`
 
 ---
 
-*Dernière mise à jour : 8 mai 2026 — RUNBOOK v2 (refonte exploitation : 15 sections ; ajout § 15 « Carte des emplacements des fichiers » pour audit / soutenance).*
+*Dernière mise à jour : 19 mai 2026 — ajout § 6.7 `ACCESS_TOKEN_EXPIRE_MINUTES` (session JWT soutenance / démo).*

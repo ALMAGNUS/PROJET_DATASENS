@@ -11,12 +11,15 @@ def _base_dir() -> Path:
     return p
 
 
+_ENV_FILE = _base_dir() / ".env"
+
+
 class Settings(BaseSettings):
     """Configuration centralisée pour E1, E2, E3"""
 
     model_config = SettingsConfigDict(
         protected_namespaces=("settings_",),  # Évite le conflit model_device / model_
-        env_file=".env",
+        env_file=str(_ENV_FILE) if _ENV_FILE.is_file() else None,
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -57,9 +60,12 @@ class Settings(BaseSettings):
     # ============================================================
     # E3: FastAPI Configuration
     # ============================================================
-    fastapi_host: str = Field(default="0.0.0.0", description="FastAPI host")
+    fastapi_host: str = Field(
+        default="127.0.0.1",
+        description="FastAPI host (127.0.0.1 en local Windows ; 0.0.0.0 en Docker)",
+    )
     fastapi_port: int = Field(default=8001, description="FastAPI port")
-    fastapi_reload: bool = Field(default=True, description="FastAPI auto-reload")
+    fastapi_reload: bool = Field(default=False, description="FastAPI auto-reload (false en démo/soutenance)")
     api_v1_prefix: str = Field(default="/api/v1", description="API v1 prefix")
     cors_origins: str = Field(
         default="*",
@@ -177,6 +183,12 @@ _settings: Settings | None = None
 
 
 _DEFAULT_SECRET = "your-secret-key-change-in-production"
+
+
+def reset_settings() -> None:
+    """Force le rechargement du singleton (ex. après modification du .env)."""
+    global _settings
+    _settings = None
 
 
 def get_settings() -> Settings:

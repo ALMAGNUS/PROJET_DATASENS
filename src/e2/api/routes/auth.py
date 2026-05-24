@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 
 from src.config import get_settings
 from src.e2.api.middleware.audit import log_login
-from src.e2.api.middleware.prometheus import record_auth_failure, record_auth_success
+from src.e2.api.middleware.prometheus import record_auth_failure, record_auth_success, record_active_user
 from src.e2.api.schemas.auth import LoginRequest, LoginResponse
 from src.e2.api.schemas.token import TokenData
 from src.e2.api.services.user_service import get_user_service
@@ -50,9 +50,11 @@ async def login(login_data: LoginRequest, request: Request):
 
     # Enregistrer succès authentification
     record_auth_success()
+    record_active_user(user.profil_id)
 
     # Créer le token JWT
-    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+    ttl_minutes = get_settings().access_token_expire_minutes
+    access_token_expires = timedelta(minutes=ttl_minutes)
     token_data = TokenData(profil_id=user.profil_id, email=user.email, role=user.role)
     access_token = security_service.create_access_token(
         data={"sub": str(token_data.profil_id), "email": token_data.email, "role": token_data.role},

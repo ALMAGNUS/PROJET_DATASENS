@@ -198,7 +198,8 @@ def _render_drift_panel(settings) -> None:
 
     with st.expander("Drift production (Prometheus + Grafana)", expanded=False):
         st.caption(
-            "Distribution sentiment + topic dominance sur Gold → gauges API E2 / Grafana."
+            "Distribution sentiment + topic dominance sur la dernière partition Gold. "
+            "Cliquez **Rafraîchir drift** (calcul ~5–15 s, n'affecte plus /health)."
         )
 
         col_btn, col_info = st.columns([1, 3])
@@ -206,7 +207,8 @@ def _render_drift_panel(settings) -> None:
 
         cache = st.session_state.get(cache_key)
         now = time.time()
-        should_call = force_refresh or cache is None or (now - cache["ts"]) > ttl_seconds
+        # Pas d'appel auto au premier affichage — évite de bloquer l'API en navigation Expert.
+        should_call = force_refresh
 
         if should_call:
             token = get_token()
@@ -218,7 +220,7 @@ def _render_drift_panel(settings) -> None:
                     r = requests.get(
                         drift_url,
                         headers={"Authorization": f"Bearer {token}"},
-                        timeout=10,
+                        timeout=60,
                     )
                     if r.ok:
                         body = r.json()
@@ -239,7 +241,7 @@ def _render_drift_panel(settings) -> None:
                     st.session_state[cache_key] = cache
 
         if cache is None:
-            col_info.info("Connecte-toi pour activer le rafraîchissement.")
+            col_info.info("Cliquez **Rafraîchir drift** pour calculer les gauges Prometheus.")
             return
 
         if cache.get("error"):

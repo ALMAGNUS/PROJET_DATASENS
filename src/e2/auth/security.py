@@ -77,7 +77,9 @@ class SecurityService:
         if expires_delta:
             expire = datetime.now(UTC) + expires_delta
         else:
-            expire = datetime.now(UTC) + timedelta(minutes=self.access_token_expire_minutes)
+            expire = datetime.now(UTC) + timedelta(
+                minutes=get_settings().access_token_expire_minutes
+            )
 
         to_encode.update({"exp": expire})
         encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)

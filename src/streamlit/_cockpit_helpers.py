@@ -17,6 +17,7 @@ import csv
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -34,6 +35,192 @@ except Exception:  # pragma: no cover
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+# (connect, read) — l'API peut mettre >5 s au 1er hit (reload uvicorn, poste chargé).
+HTTP_PROBE_TIMEOUT: tuple[float, float] = (3.0, 20.0)
+
+
+def get_api_base(settings: Any | None = None) -> str:
+    """URL API E2 — 127.0.0.1 par défaut (évite latences localhost/IPv6 sous Windows)."""
+    from src.config import get_settings
+
+    s = settings or get_settings()
+    return os.getenv("API_BASE", f"http://127.0.0.1:{s.fastapi_port}").rstrip("/")
+
+
+def probe_http_get(
+    url: str,
+    timeout: tuple[float, float] | float = HTTP_PROBE_TIMEOUT,
+) -> dict[str, Any]:
+    """GET HTTP avec durée mesurée — utilisé par les checks cockpit."""
+    import time
+
+    import requests
+
+    t0 = time.time()
+    try:
+        resp = requests.get(url, timeout=timeout)
+        elapsed = time.time() - t0
+        return {
+            "ok": resp.ok,
+            "status_code": resp.status_code,
+            "text": resp.text,
+            "elapsed_s": round(elapsed, 2),
+            "error": None,
+        }
+    except Exception as exc:
+        elapsed = time.time() - t0
+        return {
+            "ok": False,
+            "status_code": None,
+            "text": "",
+            "elapsed_s": round(elapsed, 2),
+            "error": str(exc),
+        }
+
+
+_METRIC_LINE_RE = re.compile(
+    r"^(?P<name>[a-zA-Z_:][a-zA-Z0-9_:]*)(?:\{(?P<labels>[^}]*)\})?\s+(?P<value>[-+eE0-9.]+)$"
+)
+_LABEL_RE = re.compile(r'(\w+)="((?:\\.|[^"\\])*)"')
+
+
+def _parse_prometheus_samples(body: str) -> list[tuple[str, dict[str, str], float]]:
+    samples: list[tuple[str, dict[str, str], float]] = []
+    for raw in body.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = _METRIC_LINE_RE.match(line)
+        if not match:
+            continue
+        name = match.group("name")
+        if name.endswith("_created") or name.endswith("_bucket"):
+            continue
+        labels = {
+            key: val
+            for key, val in (
+                (m.group(1), m.group(2)) for m in _LABEL_RE.finditer(match.group("labels") or "")
+            )
+        }
+        try:
+            value = float(match.group("value"))
+        except ValueError:
+            continue
+        samples.append((name, labels, value))
+    return samples
+
+
+def _fmt_int(n: float) -> str:
+    return f"{int(n):,}".replace(",", " ")
+
+
+def summarize_prometheus_metrics(body: str, *, max_request_lines: int = 8) -> str:
+    """Résumé lisible des métriques E2 pour la soutenance (sans bruit *_created)."""
+    samples = _parse_prometheus_samples(body)
+    by_name: dict[str, list[tuple[dict[str, str], float]]] = {}
+    for name, labels, value in samples:
+        by_name.setdefault(name, []).append((labels, value))
+
+    lines: list[str] = ["=== API E2 — Résumé Prometheus ===", ""]
+
+    # Auth
+    auth_rows = by_name.get("datasens_e2_api_authentications_total", [])
+    if auth_rows:
+        lines.append("Authentification")
+        for labels, value in sorted(auth_rows, key=lambda x: x[0].get("status", "")):
+            status = labels.get("status", "?")
+            lines.append(f"  {status:7} : {_fmt_int(value)}")
+        lines.append("")
+
+    # HTTP requests
+    req_rows = [
+        (labels, value)
+        for labels, value in by_name.get("datasens_e2_api_requests_total", [])
+        if value > 0
+    ]
+    if req_rows:
+        lines.append("Requêtes HTTP (top endpoints)")
+        req_rows.sort(key=lambda x: x[1], reverse=True)
+        for labels, value in req_rows[:max_request_lines]:
+            method = labels.get("method", "?")
+            endpoint = labels.get("endpoint", "?")
+            status = labels.get("status_code", "?")
+            lines.append(f"  {method:4} {endpoint} -> {_fmt_int(value)} ({status})")
+        if len(req_rows) > max_request_lines:
+            lines.append(f"  … +{len(req_rows) - max_request_lines} autres combinaisons")
+        lines.append("")
+
+    # Zone RBAC
+    zone_rows = [
+        (labels, value)
+        for labels, value in by_name.get("datasens_e2_api_zone_access_total", [])
+        if value > 0
+    ]
+    if zone_rows:
+        lines.append("Accès par zone (RBAC)")
+        zone_rows.sort(key=lambda x: (x[0].get("zone", ""), x[0].get("method", "")))
+        for labels, value in zone_rows:
+            zone = labels.get("zone", "?")
+            method = labels.get("method", "?")
+            lines.append(f"  {zone:6} {method:4} : {_fmt_int(value)}")
+        lines.append("")
+
+    # Errors
+    err_rows = [
+        (labels, value)
+        for labels, value in by_name.get("datasens_e2_api_errors_total", [])
+        if value > 0
+    ]
+    lines.append("Erreurs HTTP")
+    if err_rows:
+        err_rows.sort(key=lambda x: x[1], reverse=True)
+        for labels, value in err_rows[:6]:
+            endpoint = labels.get("endpoint", "?")
+            status = labels.get("status_code", "?")
+            lines.append(f"  {status} {endpoint} -> {_fmt_int(value)}")
+    else:
+        lines.append("  (aucune)")
+    lines.append("")
+
+    # Live gauges
+    lines.append("Etat courant (instantane — 0 entre deux requetes = normal)")
+    for gauge, label in (
+        ("datasens_e2_api_active_connections", "connexions HTTP en cours"),
+        ("datasens_e2_api_active_users", "sessions JWT actives (API)"),
+    ):
+        rows = by_name.get(gauge, [])
+        val = rows[0][1] if rows else 0.0
+        lines.append(f"  {label:28} : {_fmt_int(val)}")
+    if not by_name.get("datasens_e2_api_active_users") or by_name["datasens_e2_api_active_users"][0][1] == 0:
+        lines.append("  (login cockpit seul : refaire login ou appeler une route API authentifiee)")
+    lines.append("")
+
+    # Drift
+    drift_map = {
+        "datasens_drift_score": "score composite (0=stable, 1=élevé)",
+        "datasens_drift_sentiment_entropy": "entropie sentiment",
+        "datasens_drift_topic_dominance": "dominance topic dominants",
+        "datasens_drift_articles_total": "articles GoldAI analysés",
+    }
+    drift_rows = [key for key in drift_map if by_name.get(key)]
+    if drift_rows:
+        lines.append("Drift modèle / données (GoldAI)")
+        for key in drift_rows:
+            val = by_name[key][0][1]
+            if key == "datasens_drift_articles_total":
+                lines.append(f"  {drift_map[key]:28} : {_fmt_int(val)}")
+            else:
+                lines.append(f"  {drift_map[key]:28} : {val:.4f}")
+        if drift_rows and by_name.get("datasens_drift_articles_total", [[None, 0]])[0][1] == 0:
+            lines.append("  (drift a 0 : Modèles > Rafraichir drift ou GET /api/v1/analytics/drift-metrics)")
+        lines.append("")
+
+    if len(lines) <= 2:
+        return "Aucune métrique datasens_e2_* trouvée dans la réponse /metrics."
+
+    lines.append("Source : GET /metrics · Grafana : http://localhost:3000")
+    return "\n".join(lines)
 
 
 @dataclass
@@ -550,10 +737,11 @@ def inject_demo_css(enabled: bool) -> None:
       line-height: 1.5 !important;
     }
 
-    /* Navigation principale mode démo (IA / Pipeline) */
-    .element-container:has(.ds-demo-main-nav) + .element-container [data-testid="stRadio"] > div[role="radiogroup"] {
+    /* Navigation principale mode démo / expert (radio horizontal) */
+    .element-container:has(.ds-demo-main-nav) + .element-container [data-testid="stRadio"] > div[role="radiogroup"],
+    .element-container:has(.ds-expert-main-nav) + .element-container [data-testid="stRadio"] > div[role="radiogroup"] {
       width: 100% !important;
-      max-width: 520px;
+      max-width: 100%;
       margin-bottom: 1rem !important;
     }
     .ds-demo-lead {
@@ -848,12 +1036,11 @@ def render_demo_header(project_root: Path) -> None:
 @st.cache_data(show_spinner=False, ttl=30)
 def check_api_health(api_base: str) -> bool:
     """Health check API avec cache court (évite plusieurs appels par rerun)."""
-    try:
-        import requests
-
-        return requests.get(f"{api_base}/health", timeout=4).ok
-    except Exception:
-        return False
+    result = probe_http_get(
+        f"{api_base.rstrip('/')}/health",
+        timeout=(2.0, 12.0),
+    )
+    return bool(result["ok"])
 
 
 def _run_status_chip_class(status: str) -> str:

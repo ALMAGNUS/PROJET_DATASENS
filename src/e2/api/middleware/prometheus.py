@@ -65,6 +65,30 @@ api_active_users = Gauge(
     registry=e2_registry,
 )
 
+# Sessions JWT vues par l'API (login + requêtes Bearer), pas la session Streamlit seule.
+_active_user_sessions: dict[str, float] = {}
+
+
+def _prune_active_user_sessions(ttl_sec: float) -> None:
+    from time import time
+
+    now = time.time()
+    stale = [pid for pid, ts in _active_user_sessions.items() if now - ts > ttl_sec]
+    for pid in stale:
+        del _active_user_sessions[pid]
+
+
+def record_active_user(profil_id: str | int) -> None:
+    """Enregistre un utilisateur JWT actif (login ou requête authentifiée)."""
+    from time import time
+
+    from src.config import get_settings
+
+    ttl = max(60.0, float(get_settings().access_token_expire_minutes) * 60.0)
+    _prune_active_user_sessions(ttl)
+    _active_user_sessions[str(profil_id)] = time.time()
+    api_active_users.set(len(_active_user_sessions))
+
 # Gauges - Drift (mis a jour par l’endpoint /api/v1/analytics/drift-metrics)
 drift_sentiment_entropy = Gauge(
     "datasens_drift_sentiment_entropy",
@@ -105,6 +129,18 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
         # Ignorer les endpoints de métriques et health check
         if request.url.path in ["/metrics", "/health", "/docs", "/redoc", "/openapi.json"]:
             return await call_next(request)
+
+        # Rafraîchir sessions actives si Bearer token valide
+        auth_header = request.headers.get("Authorization") or ""
+        if auth_header.startswith("Bearer "):
+            try:
+                from src.e2.auth.security import get_security_service
+
+                payload = get_security_service().decode_token(auth_header.split(" ", 1)[1])
+                if payload and payload.get("sub"):
+                    record_active_user(payload["sub"])
+            except Exception:
+                pass
 
         # Début du timing
         start_time = time()

@@ -81,7 +81,8 @@ def test_drift_metrics_endpoint_uses_pandas_fallback_when_spark_fails(tmp_path, 
             raise RuntimeError("JAVA_GATEWAY_EXITED")
 
     monkeypatch.setattr(analytics_routes, "GoldParquetReader", BrokenReader)
-    monkeypatch.setattr("src.config.get_data_dir", lambda: Path(data_dir))
+    monkeypatch.setattr(analytics_routes, "get_data_dir", lambda: Path(data_dir))
+    analytics_routes.clear_drift_cache()
 
     client = _build_test_client()
 
@@ -164,7 +165,8 @@ def test_metrics_expose_drift_gauge_after_drift_call(tmp_path, monkeypatch):
             raise RuntimeError("JAVA_GATEWAY_EXITED")
 
     monkeypatch.setattr(analytics_routes, "GoldParquetReader", BrokenReader)
-    monkeypatch.setattr("src.config.get_data_dir", lambda: Path(data_dir))
+    monkeypatch.setattr(analytics_routes, "get_data_dir", lambda: Path(data_dir))
+    analytics_routes.clear_drift_cache()
 
     client = _build_test_client()
     drift_response = client.get(

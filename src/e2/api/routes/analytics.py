@@ -4,13 +4,17 @@ Analytics Routes - E2 API
 Endpoints pour analyses Big Data avec PySpark
 """
 
+import asyncio
 import math
+import time
 from datetime import date
+from pathlib import Path
 
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from src.config import get_data_dir
 from src.e2.api.dependencies.permissions import require_reader
 from src.e2.api.middleware.prometheus import (
     drift_articles_total,
@@ -22,6 +26,15 @@ from src.spark.adapters import GoldParquetReader
 from src.spark.processors import GoldDataProcessor
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
+
+_DRIFT_CACHE_TTL_SECONDS = 300.0
+_drift_cache: dict[str, object] = {"key": None, "ts": 0.0, "data": None}
+_drift_lock = asyncio.Lock()
+
+
+def clear_drift_cache() -> None:
+    """Reset cache drift (tests / debug)."""
+    _drift_cache.update({"key": None, "ts": 0.0, "data": None})
 
 
 class SentimentDistributionResponse(BaseModel):
@@ -185,21 +198,48 @@ class DriftMetricsResponse(BaseModel):
     articles_total: int
 
 
-def _compute_drift_with_pandas(target_date: date | None = None) -> DriftMetricsResponse:
+def _latest_gold_partition_date() -> date:
+    """Dernière partition GOLD disponible (évite de charger tout l'historique)."""
+    base_path = Path(get_data_dir()) / "gold"
+    partitions = sorted(
+        base_path.glob("date=*/articles.parquet"),
+        key=lambda p: p.parent.name,
+        reverse=True,
+    )
+    if not partitions:
+        raise FileNotFoundError(f"No Parquet GOLD partitions found in {base_path}")
+    return date.fromisoformat(partitions[0].parent.name.split("=", 1)[1])
+
+
+def _resolve_drift_date(target_date: date | None, *, all_dates: bool) -> date | None:
+    if all_dates:
+        return target_date
+    return target_date or _latest_gold_partition_date()
+
+
+def _apply_drift_gauges(metrics: DriftMetricsResponse) -> None:
+    drift_sentiment_entropy.set(metrics.sentiment_entropy)
+    drift_topic_dominance.set(metrics.topic_dominance)
+    drift_score.set(metrics.drift_score)
+    drift_articles_total.set(metrics.articles_total)
+
+
+def _compute_drift_with_pandas(
+    target_date: date | None = None,
+    *,
+    all_dates: bool = False,
+) -> DriftMetricsResponse:
     """
     Fallback local sans Spark (utile si Java/Spark indisponible).
     Lit les partitions GOLD Parquet avec pandas.
     """
-    from pathlib import Path
-
-    from src.config import get_data_dir
-
     base_path = Path(get_data_dir()) / "gold"
-    if target_date:
-        partition = base_path / f"date={target_date:%Y-%m-%d}" / "articles.parquet"
+    resolved = _resolve_drift_date(target_date, all_dates=all_dates)
+    if resolved:
+        partition = base_path / f"date={resolved:%Y-%m-%d}" / "articles.parquet"
         if not partition.exists():
             raise FileNotFoundError(
-                f"Parquet GOLD not found for date {target_date:%Y-%m-%d} at {partition}"
+                f"Parquet GOLD not found for date {resolved:%Y-%m-%d} at {partition}"
             )
         partitions = [partition]
     else:
@@ -259,87 +299,118 @@ def _compute_drift_with_pandas(target_date: date | None = None) -> DriftMetricsR
     )
 
 
+def _compute_drift_with_spark(
+    target_date: date | None = None,
+    *,
+    all_dates: bool = False,
+) -> DriftMetricsResponse:
+    resolved = _resolve_drift_date(target_date, all_dates=all_dates)
+    reader = GoldParquetReader()
+    processor = GoldDataProcessor()
+    df = reader.read_gold(date=resolved) if resolved else reader.read_gold()
+    total = df.count()
+    if total == 0:
+        return DriftMetricsResponse(
+            sentiment_entropy=0.0, topic_dominance=0.0, drift_score=0.0, articles_total=0
+        )
+
+    stats = processor.get_statistics(df)
+    sentiment_dist = stats.get("sentiment_distribution") or {}
+    probs = [c / total for c in sentiment_dist.values() if c > 0]
+    entropy = 0.0
+    if probs:
+        n_classes = len(probs)
+        for p in probs:
+            if p > 0:
+                entropy -= p * math.log2(p)
+        entropy_max = math.log2(max(n_classes, 1))
+        entropy_norm = entropy / entropy_max if entropy_max > 0 else 0
+    else:
+        entropy_norm = 0
+
+    topic_col = None
+    for col_name in ("topic_1", "topic", "topics"):
+        if col_name in df.columns:
+            topic_col = col_name
+            break
+    dominance = 0.0
+    if topic_col in ("topic_1", "topic"):
+        from pyspark.sql.functions import count
+
+        topic_counts = df.groupBy(topic_col).agg(count("*").alias("c")).collect()
+        if topic_counts:
+            max_count = max(row["c"] for row in topic_counts)
+            dominance = max_count / total
+
+    drift_val = (1 - entropy_norm) * 0.5 + dominance * 0.5
+    return DriftMetricsResponse(
+        sentiment_entropy=round(entropy, 4),
+        topic_dominance=round(dominance, 4),
+        drift_score=round(drift_val, 4),
+        articles_total=total,
+    )
+
+
+def _compute_drift_sync(
+    target_date: date | None,
+    *,
+    all_dates: bool = False,
+) -> DriftMetricsResponse:
+    try:
+        return _compute_drift_with_spark(target_date, all_dates=all_dates)
+    except Exception as spark_error:
+        try:
+            return _compute_drift_with_pandas(target_date, all_dates=all_dates)
+        except FileNotFoundError:
+            raise
+        except Exception as pandas_error:
+            raise RuntimeError(
+                f"Spark: {spark_error!s}; pandas: {pandas_error!s}"
+            ) from pandas_error
+
+
 @router.get("/drift-metrics", response_model=DriftMetricsResponse)
 async def get_drift_metrics(
-    target_date: date | None = Query(None, description="Date (optionnel)"),
+    target_date: date | None = Query(None, description="Date (optionnel, défaut: dernière partition)"),
+    all_dates: bool = Query(
+        False,
+        description="Si true, agrège toutes les partitions GOLD (lourd — éviter en démo live)",
+    ),
     current_user=Depends(require_reader),
 ):
     """
     Calcule les métriques de drift (distribution sentiment + topics) et met à jour
-    les gauges Prometheus. À appeler régulièrement (cron ou cockpit) pour que
-    Grafana affiche les courbes de drift dans le temps.
+    les gauges Prometheus. Exécuté dans un thread pour ne pas bloquer /health.
     """
-    try:
-        reader = GoldParquetReader()
-        processor = GoldDataProcessor()
-        df = reader.read_gold(date=target_date) if target_date else reader.read_gold()
-        total = df.count()
-        if total == 0:
-            drift_sentiment_entropy.set(0)
-            drift_topic_dominance.set(0)
-            drift_score.set(0)
-            drift_articles_total.set(0)
-            return DriftMetricsResponse(
-                sentiment_entropy=0.0, topic_dominance=0.0, drift_score=0.0, articles_total=0
-            )
+    cache_key = f"{target_date}:{all_dates}"
+    now = time.time()
+    async with _drift_lock:
+        cached_key = _drift_cache.get("key")
+        cached_ts = float(_drift_cache.get("ts") or 0)
+        cached_data = _drift_cache.get("data")
+        if (
+            cached_key == cache_key
+            and cached_data is not None
+            and now - cached_ts < _DRIFT_CACHE_TTL_SECONDS
+        ):
+            metrics = cached_data
+            _apply_drift_gauges(metrics)
+            return metrics
 
-        stats = processor.get_statistics(df)
-        sentiment_dist = stats.get("sentiment_distribution") or {}
-        # Entropy: -sum(p * log2(p)), max = log2(n)
-        probs = [c / total for c in sentiment_dist.values() if c > 0]
-        entropy = 0.0
-        if probs:
-            n_classes = len(probs)
-            for p in probs:
-                if p > 0:
-                    entropy -= p * math.log2(p)
-            entropy_max = math.log2(max(n_classes, 1))
-            entropy_norm = entropy / entropy_max if entropy_max > 0 else 0
-        else:
-            entropy_norm = 0
-
-        # Topic dominance: fraction du topic le plus fréquent
-        topic_col = None
-        for col_name in ("topic_1", "topic", "topics"):
-            if col_name in df.columns:
-                topic_col = col_name
-                break
-        dominance = 0.0
-        if topic_col == "topic_1" or topic_col == "topic":
-            from pyspark.sql.functions import count
-
-            topic_counts = df.groupBy(topic_col).agg(count("*").alias("c")).collect()
-            if topic_counts:
-                max_count = max(row["c"] for row in topic_counts)
-                dominance = max_count / total
-
-        # Score composite drift 0-1 (plus haut = plus de déséquilibre / drift)
-        drift_val = (1 - entropy_norm) * 0.5 + dominance * 0.5
-
-        drift_sentiment_entropy.set(round(entropy, 4))
-        drift_topic_dominance.set(round(dominance, 4))
-        drift_score.set(round(drift_val, 4))
-        drift_articles_total.set(total)
-
-        return DriftMetricsResponse(
-            sentiment_entropy=round(entropy, 4),
-            topic_dominance=round(dominance, 4),
-            drift_score=round(drift_val, 4),
-            articles_total=total,
-        )
-    except Exception as spark_error:
-        # Fallback robuste pour environnements démo/école sans Java Spark
         try:
-            fallback = _compute_drift_with_pandas(target_date=target_date)
-            drift_sentiment_entropy.set(fallback.sentiment_entropy)
-            drift_topic_dominance.set(fallback.topic_dominance)
-            drift_score.set(fallback.drift_score)
-            drift_articles_total.set(fallback.articles_total)
-            return fallback
+            metrics = await asyncio.to_thread(
+                _compute_drift_sync,
+                target_date,
+                all_dates=all_dates,
+            )
         except FileNotFoundError as e:
             raise HTTPException(status_code=404, detail=f"Parquet GOLD not found: {e!s}") from e
         except Exception as e:
             raise HTTPException(
                 status_code=500,
-                detail=f"Error computing drift (Spark: {spark_error!s}; fallback: {e!s})",
+                detail=f"Error computing drift: {e!s}",
             ) from e
+
+        _apply_drift_gauges(metrics)
+        _drift_cache.update({"key": cache_key, "ts": now, "data": metrics})
+        return metrics

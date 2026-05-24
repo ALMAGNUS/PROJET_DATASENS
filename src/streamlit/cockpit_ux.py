@@ -266,8 +266,8 @@ def resolve_backend_ok(api_base: str) -> bool:
     if ts is not None and cached is not None and now - float(ts) < _BACKEND_TTL_OK:
         return bool(cached)
     ok = check_api_health(api_base)
-    # Un échec transient pendant un rerun lourd ne doit pas afficher « hors ligne ».
-    if not ok and cached is True and ts is not None and now - float(ts) < _BACKEND_TTL_STICKY:
+    # Ne pas masquer une panne API prolongée (évite « en ligne » + timeout au clic).
+    if not ok and cached is True and ts is not None and now - float(ts) < 30:
         return True
     st.session_state["backend_ok"] = ok
     st.session_state["backend_ok_ts"] = now

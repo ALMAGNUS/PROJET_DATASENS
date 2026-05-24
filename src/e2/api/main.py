@@ -78,7 +78,12 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health_check():
         """Health check endpoint"""
-        return {"status": "ok", "service": "DataSens E2 API"}
+        ttl = settings.access_token_expire_minutes
+        return {
+            "status": "ok",
+            "service": "DataSens E2 API",
+            "access_token_expire_minutes": ttl,
+        }
 
     # Prometheus metrics endpoint
     @app.get("/metrics")
