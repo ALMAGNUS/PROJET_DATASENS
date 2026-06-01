@@ -70,9 +70,7 @@ _active_user_sessions: dict[str, float] = {}
 
 
 def _prune_active_user_sessions(ttl_sec: float) -> None:
-    from time import time
-
-    now = time.time()
+    now = time()
     stale = [pid for pid, ts in _active_user_sessions.items() if now - ts > ttl_sec]
     for pid in stale:
         del _active_user_sessions[pid]
@@ -80,13 +78,11 @@ def _prune_active_user_sessions(ttl_sec: float) -> None:
 
 def record_active_user(profil_id: str | int) -> None:
     """Enregistre un utilisateur JWT actif (login ou requête authentifiée)."""
-    from time import time
-
     from src.config import get_settings
 
     ttl = max(60.0, float(get_settings().access_token_expire_minutes) * 60.0)
     _prune_active_user_sessions(ttl)
-    _active_user_sessions[str(profil_id)] = time.time()
+    _active_user_sessions[str(profil_id)] = time()
     api_active_users.set(len(_active_user_sessions))
 
 # Gauges - Drift (mis a jour par l’endpoint /api/v1/analytics/drift-metrics)

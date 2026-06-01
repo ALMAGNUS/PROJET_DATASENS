@@ -20,7 +20,9 @@ from src.streamlit._cockpit_helpers import (
     PageContext,
     brand_logo_path,
     brand_logo_raster_path,
+    ensure_telemetry_session,
     get_api_base,
+    render_brand_logo,
 )
 from src.streamlit.cockpit_ux import (
     inject_cockpit_ux_css,
@@ -44,7 +46,6 @@ from src.streamlit._cockpit_helpers import (
     inject_readability_css as _inject_readability_css,
 )
 from src.streamlit._cockpit_helpers import (
-    render_brand_logo,
     render_demo_header,
     render_mode_intro,
 )
@@ -191,6 +192,8 @@ def main() -> None:
         if render_login_page(PROJECT_ROOT):
             st.rerun()
         st.stop()
+
+    ensure_telemetry_session()
 
     is_demo = ux_mode == "Mode démo"
     reset_scroll_on_mode_change()

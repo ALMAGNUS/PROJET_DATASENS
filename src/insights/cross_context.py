@@ -80,6 +80,9 @@ def build_cross_context_block(
     theme: str,
     theme_label: str,
     cards: list[dict],
+    *,
+    crises: list[dict] | None = None,
+    sport_signals: list[dict] | None = None,
 ) -> str:
     """Assemble le bloc factuel envoyé à Mistral pour croisement analytique."""
     lines: list[str] = [
@@ -96,7 +99,7 @@ def build_cross_context_block(
         lines.append(f"Score moyen continu {theme_label} : {ms:+.3f}")
 
     for card in cards:
-        if card.get("type") in ("weather", "economy", "trend", "risk"):
+        if card.get("type") in ("weather", "economy", "trend", "risk", "crisis", "sport", "sentiment"):
             lines.append(f"[{card['title']}] {card['summary']}")
 
     weather = latest_weather_rows(df_full, limit=6)
@@ -114,7 +117,7 @@ def build_cross_context_block(
                 if t.strip():
                     lines.append(f"  - {t[:100]}")
 
-    crises = scan_crisis_signals(df_full, limit_titles=2)
+    crises = crises if crises is not None else scan_crisis_signals(df_full, limit_titles=2)
     if crises:
         lines.append("Signaux crise / événements dans tout GoldAI :")
         for c in crises[:6]:
@@ -125,7 +128,21 @@ def build_cross_context_block(
                 f"Ex. titres : {titles}"
             )
     else:
-        lines.append("Signaux crise : aucun mot-clé inondation/épidémie/hantavirus détecté dans les titres/contenus.")
+        lines.append("Signaux crise : aucun mot-clé inondation/épidémie/canicule dominant dans les titres.")
+
+    sport_signals = sport_signals if sport_signals is not None else []
+    if sport_signals:
+        lines.append("Sport / grands événements dans GoldAI :")
+        for s in sport_signals[:4]:
+            titles = "; ".join(s["sample_titles"][:2]) if s.get("sample_titles") else "—"
+            lines.append(
+                f"  - {s['theme']} : {s['count']} art., {s['dominant_sentiment']}. Ex. : {titles}"
+            )
+    else:
+        lines.append(
+            "Sport : peu d'articles majeurs (Coupe du monde, PSG/LDC) dans la fenêtre — "
+            "leviers d'euphorie locale à croiser quand présents."
+        )
 
     topics = topic_snapshot(df_theme)
     if topics:

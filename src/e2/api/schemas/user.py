@@ -6,13 +6,15 @@ Modèles de validation pour utilisateurs (PROFILS table)
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+from src.e2.api.schemas.common import DemoSafeEmail
 
 
 class UserBase(BaseModel):
     """Base user schema"""
 
-    email: EmailStr
+    email: DemoSafeEmail
     firstname: str = Field(..., min_length=1, max_length=100)
     lastname: str = Field(..., min_length=1, max_length=100)
     username: str | None = Field(None, max_length=50)
@@ -28,7 +30,7 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     """Schema pour mise à jour utilisateur (tous champs optionnels)"""
 
-    email: EmailStr | None = None
+    email: DemoSafeEmail | None = None
     firstname: str | None = Field(None, min_length=1, max_length=100)
     lastname: str | None = Field(None, min_length=1, max_length=100)
     username: str | None = Field(None, max_length=50)

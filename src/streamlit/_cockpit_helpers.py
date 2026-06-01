@@ -18,6 +18,7 @@ import io
 import json
 import os
 import re
+import sqlite3
 import subprocess
 import sys
 import time
@@ -765,6 +766,29 @@ def inject_demo_css(enabled: bool) -> None:
     .ds-hero h3 { font-size: 1.15rem !important; }
     .ds-hero p { font-size: 0.88rem !important; opacity: 0.92; }
 
+    .ds-journey-strip {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.35rem 0.5rem;
+      margin: 0.75rem 0 1.1rem 0;
+      padding: 0.85rem 1rem;
+      border-radius: 12px;
+      border: 1px solid rgba(116, 149, 255, 0.28);
+      background: linear-gradient(90deg, rgba(30, 41, 79, 0.55), rgba(18, 26, 50, 0.35));
+      font-size: 0.88rem;
+      color: #c5d4f7;
+    }
+    .ds-journey-strip strong { color: #eef3ff; font-weight: 600; }
+    .ds-journey-step {
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      white-space: nowrap;
+    }
+    .ds-journey-arrow { opacity: 0.55; user-select: none; }
+
     [data-testid="stMetric"] {
       min-height: 96px;
       padding: 0.65rem 0.85rem !important;
@@ -1024,13 +1048,9 @@ def render_brand_logo(
 
 
 def render_demo_header(project_root: Path) -> None:
-    """En-tête mode démo — même présentation que Standard/Expert (logo seul)."""
+    """En-tête mode démo — logo seul."""
     if not render_brand_logo(project_root, placement="header_main"):
         st.title("DataSens Cockpit")
-    st.markdown(
-        '<p class="ds-demo-lead">Analyse de sentiment et pipeline de données — démonstration</p>',
-        unsafe_allow_html=True,
-    )
 
 
 @st.cache_data(show_spinner=False, ttl=30)
@@ -1438,6 +1458,11 @@ def _telemetry_state() -> dict:
     return st.session_state[TELEMETRY_KEY]
 
 
+def ensure_telemetry_session() -> None:
+    """Initialise le chrono session des le login (pas seulement a l'ouverture du panneau)."""
+    _telemetry_state()
+
+
 def record_click(label: str) -> None:
     """Incremente le compteur de clics pour un label donne."""
     state = _telemetry_state()
@@ -1592,3 +1617,66 @@ def render_last_report(panel_key: str) -> None:
         )
         if report.get("err"):
             st.error(report.get("err", "Erreur inconnue"))
+
+
+def resolve_sqlite_db_path(project_root: Path) -> Path:
+    """Chemin SQLite opérationnel (aligné overview / monitoring)."""
+    db_candidate = os.getenv("DB_PATH")
+    if db_candidate and Path(db_candidate).exists():
+        return Path(db_candidate)
+    default_db = Path.home() / "datasens_project" / "datasens.db"
+    return default_db if default_db.exists() else project_root / "datasens.db"
+
+
+def fetch_user_audit_log(
+    project_root: Path,
+    *,
+    limit: int = 50,
+    role_filter: str | None = None,
+) -> tuple[list[dict[str, Any]], str | None]:
+    """Lit user_action_log joint à profils (journal actions utilisateurs)."""
+    db_path = resolve_sqlite_db_path(project_root)
+    if not db_path.exists():
+        return [], f"Base SQLite introuvable : `{db_path}`"
+
+    role_filter = (role_filter or "").strip().lower()
+    if role_filter in ("tous", "all", ""):
+        role_filter = ""
+
+    try:
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='user_action_log'"
+        )
+        if not cursor.fetchone():
+            conn.close()
+            return [], "Table `user_action_log` absente — lancer le pipeline E1 ou l'API E2."
+
+        query = """
+            SELECT
+                ual.action_date,
+                ual.profil_id,
+                p.email,
+                p.role,
+                ual.action_type,
+                ual.resource_type,
+                ual.resource_id,
+                ual.ip_address,
+                ual.details
+            FROM user_action_log ual
+            LEFT JOIN profils p ON p.profil_id = ual.profil_id
+        """
+        params: list[Any] = []
+        if role_filter:
+            query += " WHERE LOWER(COALESCE(p.role, '')) = ?"
+            params.append(role_filter)
+        query += " ORDER BY ual.action_date DESC LIMIT ?"
+        params.append(max(1, min(int(limit), 500)))
+
+        rows = [dict(r) for r in cursor.execute(query, params).fetchall()]
+        conn.close()
+        return rows, None
+    except Exception as exc:
+        return [], str(exc)[:200]

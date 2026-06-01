@@ -553,6 +553,28 @@ def set_monitoring_filter(date: str, *, reason: str = "") -> None:
     st.session_state["monitoring_filter_reason"] = reason
 
 
+def render_data_journey_strip(*, lead: str | None = None) -> None:
+    """Tuile fil rouge RAW → GoldAI (mode démo / pipeline)."""
+    extra = f"<div class='ds-demo-lead'>{lead}</div>" if lead else ""
+    st.markdown(
+        f"""
+        {extra}
+        <div class="ds-journey-strip">
+          <strong>Voyage d'un article</strong>
+          <span class="ds-journey-arrow">·</span>
+          <span class="ds-journey-step">🗄️ RAW collecte</span>
+          <span class="ds-journey-arrow">→</span>
+          <span class="ds-journey-step">🧹 SILVER topics</span>
+          <span class="ds-journey-arrow">→</span>
+          <span class="ds-journey-step">✨ GOLD sentiment</span>
+          <span class="ds-journey-arrow">→</span>
+          <span class="ds-journey-step">🤖 GoldAI ML</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_warn_monitoring_link(ctx: PageContext) -> None:
     """Bouton lien croisé WARN → Monitoring (#10)."""
     latest, _ = latest_run_summary_reports(ctx.project_root)

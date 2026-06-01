@@ -8,6 +8,15 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 from src.insights.cross_context import build_cross_context_block
+from src.insights.macro_narrative import (
+    narrate_crisis,
+    narrate_economy,
+    narrate_risk,
+    narrate_sport,
+    narrate_weather_cross,
+    parse_weather_conditions,
+    scan_sport_signals,
+)
 from src.insights.mistral_synthesis import mistral_cross_analysis
 from src.insights.goldai_data import (
     _ECONOMIC_SOURCES,
@@ -112,6 +121,8 @@ def _weather_cross(df_full: pd.DataFrame, df_theme: pd.DataFrame) -> dict | None
                 if tw_score is not None:
                     overlap_note = f"Sentiment thème sur 7j (avec météo récente) : {tw_score:+.2f}"
 
+    latest_titles = weather["title"].astype(str).head(5).tolist() if "title" in weather.columns else []
+
     return {
         "weather_count": len(weather),
         "cities": cities[:5],
@@ -120,7 +131,8 @@ def _weather_cross(df_full: pd.DataFrame, df_theme: pd.DataFrame) -> dict | None
         "weather_mean_score": w_score,
         "theme_mean_score": t_score,
         "overlap_note": overlap_note,
-        "latest_titles": weather["title"].astype(str).head(3).tolist() if "title" in weather.columns else [],
+        "latest_titles": latest_titles[:3],
+        "conditions": parse_weather_conditions(latest_titles),
     }
 
 
@@ -141,6 +153,32 @@ def _compose_reply(cards: list[dict], message: str) -> str:
     return "\n".join(lines)
 
 
+def _curate_cards(cards: list[dict], theme: str, question: str, *, max_cards: int = 6) -> list[dict]:
+    """Priorise les cartes à forte valeur métier (6 bulles + 1 synthèse Mistral)."""
+    q = question.lower()
+    if any(w in q for w in ("source", "contenu", "utilisateur")):
+        order = ("sources", "sources_bias", "sentiment", "crisis", "weather", "sport", "economy", "risk", "trend")
+    elif any(w in q for w in ("meteo", "météo", "weather", "canicule", "climat")):
+        order = ("weather", "crisis", "sentiment", "sport", "economy", "risk", "sources", "sources_bias", "trend")
+    elif any(w in q for w in ("sport", "psg", "coupe", "football")):
+        order = ("sport", "economy", "sentiment", "weather", "crisis", "risk", "sources", "sources_bias", "trend")
+    elif any(w in q for w in ("risque", "alerte")):
+        order = ("risk", "crisis", "sentiment", "weather", "economy", "sport", "sources", "sources_bias", "trend")
+    elif theme == "financier":
+        order = ("economy", "weather", "sport", "crisis", "sentiment", "risk", "trend", "sources", "sources_bias")
+    else:
+        order = ("crisis", "weather", "sport", "economy", "sentiment", "risk", "trend", "sources", "sources_bias")
+
+    rank = {t: i for i, t in enumerate(order)}
+    sorted_cards = sorted(cards, key=lambda c: (rank.get(c.get("type"), 99), c.get("id", "")))
+    skip_optional = {"sources", "sources_bias", "trend"}
+    if theme in ("politique", "financier") and not any(
+        w in q for w in ("source", "contenu", "utilisateur", "tendance", "trend")
+    ):
+        sorted_cards = [c for c in sorted_cards if c.get("type") not in skip_optional]
+    return sorted_cards[:max_cards]
+
+
 def build_insight_pack(theme: str, message: str, *, include_mistral: bool = True) -> InsightPack:
     """Génère plusieurs cartes insight + reply synthétique."""
     theme = theme.lower()
@@ -156,22 +194,27 @@ def build_insight_pack(theme: str, message: str, *, include_mistral: bool = True
     dist = sentiment_distribution(df_theme)
     dom, dom_pct = _dominant(dist)
     m_score = mean_score(df_theme)
+    neg = _neg_pct(dist)
+    risk = _risk_score(neg)
+    crises = get_crisis_signals_cached(df_full)
+    sport_signals = scan_sport_signals(df_full)
     cards: list[dict] = []
 
-    # 1 — Vue sentiment
     dist_txt = " · ".join(f"{k} {v['pct']:.0%}" for k, v in sorted(dist.items(), key=lambda x: -x[1]["count"])[:3])
-    score_txt = f" Score moyen {m_score:+.2f}." if m_score is not None else ""
+    score_txt = f" Score {m_score:+.2f}." if m_score is not None else ""
+    sentiment_summary = f"{total:,} articles — {dom} dominant ({dom_pct:.0%}). {dist_txt}.{score_txt}"
+    if neg >= 0.4:
+        sentiment_summary += " Climat défiant, au-dessus du simple bruit médiatique."
     cards.append(
         _card(
             "sentiment_overview",
             "sentiment",
             f"Sentiment {label}",
-            f"{total:,} articles — dominant {dom} ({dom_pct:.0%}). Répartition : {dist_txt}.{score_txt}",
+            sentiment_summary,
             {"total": total, "dominant": dom, "dominant_pct": dom_pct, "mean_score": m_score, "distribution": dist},
         )
     )
 
-    # 2 — Mix sources
     sources = _source_breakdown(df_theme)
     if sources:
         src_txt = " · ".join(f"{s} {pct:.0%}" for s, _, pct in sources)
@@ -185,7 +228,6 @@ def build_insight_pack(theme: str, message: str, *, include_mistral: bool = True
             )
         )
 
-    # 3 — Tendance temporelle
     trend = _temporal_trend(df_theme)
     if trend:
         cards.append(
@@ -193,55 +235,47 @@ def build_insight_pack(theme: str, message: str, *, include_mistral: bool = True
                 "temporal_trend",
                 "trend",
                 "Tendance temporelle",
-                f"Sentiment en {trend['trend']} : récent {trend['score_recent']:+.2f} vs période antérieure {trend['score_old']:+.2f}.",
+                f"Sentiment en {trend['trend']} : récent {trend['score_recent']:+.2f} vs antérieur {trend['score_old']:+.2f}.",
                 trend,
             )
         )
 
-    # 4 — Croisement météo
     wx = _weather_cross(df_full, df_theme)
     if wx:
-        cities = ", ".join(wx["cities"]) if wx["cities"] else "France"
-        extra = f" {wx['overlap_note']}." if wx.get("overlap_note") else ""
-        latest = wx.get("latest_titles") or []
-        sample = f" Ex. : {latest[0][:70]}…" if latest else ""
-        w_sc = wx["weather_mean_score"]
-        t_sc = wx["theme_mean_score"]
-        scores_txt = ""
-        if w_sc is not None and t_sc is not None:
-            scores_txt = f" Score météo {w_sc:+.2f} vs thème {t_sc:+.2f}."
-        elif w_sc is not None:
-            scores_txt = f" Score météo {w_sc:+.2f}."
         cards.append(
             _card(
                 "weather_cross",
                 "weather",
-                "Croisement météo",
-                f"{wx['weather_count']} bulletins OpenWeather/Météo dans GoldAI ({cities}). "
-                f"Sentiment météo : {wx['weather_dominant']} ({wx['weather_dominant_pct']:.0%})."
-                f"{scores_txt}{extra}{sample}",
+                "Météo & climat social",
+                narrate_weather_cross(wx, crises, label, neg),
                 wx,
             )
         )
 
-    # 5 — Économie / INSEE (financier ou toujours si data)
     eco_df = filter_sources(df_full, _ECONOMIC_SOURCES)
     if len(eco_df) >= 5 and theme in ("financier", "politique"):
         eco_dist = sentiment_distribution(eco_df)
         eco_dom, eco_pct = _dominant(eco_dist)
-        eco_sources = _source_breakdown(eco_df, 3)
-        src_e = " · ".join(f"{s} ({n:,})" for s, n, _ in eco_sources)
         cards.append(
             _card(
                 "economic_cross",
                 "economy",
                 "Signal économique",
-                f"{len(eco_df):,} articles Yahoo/INSEE/Data.gouv — sentiment dominant {eco_dom} ({eco_pct:.0%}). Sources : {src_e}.",
-                {"total": len(eco_df), "dominant": eco_dom, "sources": src_e},
+                narrate_economy(len(eco_df), eco_dom, eco_pct, theme, neg if theme == "politique" else None),
+                {"total": len(eco_df), "dominant": eco_dom, "dominant_pct": eco_pct},
             )
         )
 
-    # 6 — Participatif vs médias
+    cards.append(
+        _card(
+            "sport_macro",
+            "sport",
+            "Sport & effet événement",
+            narrate_sport(sport_signals, theme),
+            {"signals": sport_signals[:5]},
+        )
+    )
+
     part = filter_sources(df_theme, _PARTICIPATORY_SOURCES)
     media = filter_sources(df_theme, _MEDIA_SOURCES)
     if len(part) > 0 or len(media) > 0:
@@ -270,50 +304,33 @@ def build_insight_pack(theme: str, message: str, *, include_mistral: bool = True
             )
         )
 
-    # 7b — Signaux crise (inondation, épidémie, etc.)
-    crises = get_crisis_signals_cached(df_full)
     if crises:
-        parts = []
-        for c in crises[:4]:
-            ex = c["sample_titles"][0][:60] + "…" if c.get("sample_titles") else ""
-            parts.append(f"{c['theme']} ({c['count']} art.)")
         cards.append(
             _card(
                 "crisis_signals",
                 "crisis",
                 "Signaux crise & santé",
-                f"Détectés dans GoldAI : {' · '.join(parts)}.",
+                narrate_crisis(crises, label),
                 {"signals": crises[:5]},
             )
         )
 
-    # 8 — Score risque
-    neg = _neg_pct(dist)
-    risk = _risk_score(neg)
     cards.append(
         _card(
             "risk_score",
             "risk",
             "Score de risque",
-            f"Risque {risk}/10 — part négative {neg:.0%} sur le périmètre {label}.",
+            narrate_risk(risk, neg, label, crises),
             {"risk_score": risk, "neg_pct": neg},
         )
     )
 
-    # Filtrer cartes selon question (prioriser)
-    q = message.lower()
-    if any(w in q for w in ("source", "contenu", "utilisateur")):
-        cards.sort(key=lambda c: 0 if c["type"] in ("sources", "sources_bias") else 1)
-    elif any(w in q for w in ("meteo", "météo", "weather", "croiser")):
-        cards.sort(key=lambda c: 0 if c["type"] == "weather" else 1)
-    elif any(w in q for w in ("risque", "alerte")):
-        cards.sort(key=lambda c: 0 if c["type"] == "risk" else 1)
-    elif theme in ("politique", "financier"):
-        cards.sort(key=lambda c: (0 if c["type"] in ("cross_analysis", "crisis", "weather") else 1, c.get("id", "")))
+    cards = _curate_cards(cards, theme, message, max_cards=6)
 
-    # Analyse croisée Mistral (météo × politique × économie × crises)
     if include_mistral:
-        context = build_cross_context_block(df_full, df_theme, theme, label, cards)
+        context = build_cross_context_block(
+            df_full, df_theme, theme, label, cards, crises=crises, sport_signals=sport_signals
+        )
         analysis = mistral_cross_analysis(context, message, label)
         if analysis:
             cards.insert(
@@ -332,4 +349,4 @@ def build_insight_pack(theme: str, message: str, *, include_mistral: bool = True
     else:
         reply = _compose_reply(cards, message)
 
-    return InsightPack(reply=reply, insights=cards[:8], data_label=data_label)
+    return InsightPack(reply=reply, insights=cards[:7], data_label=data_label)

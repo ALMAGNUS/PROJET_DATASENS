@@ -438,25 +438,65 @@ class APIExtractor(BaseExtractor):
                 return self._extract_insee_indicators()
             if "reddit" in src_low:
                 raw_subs = (os.getenv("REDDIT_SUBREDDITS") or "").strip()
+                # Subreddits français vérifiés (RSS 200) — r/actualites (404) et r/politique (403) retirés.
                 subreddits = [s.strip() for s in raw_subs.split(",") if s.strip()] or [
                     "france",
-                    "actualites",
-                    "politique",
                     "vosfinances",
+                    "paris",
+                    "Lyon",
                 ]
                 reddit_api_limit = _env_int("REDDIT_API_LIMIT", 50, minimum=10, maximum=100)
                 reddit_posts_per_sub = _env_int(
                     "REDDIT_POSTS_PER_SUBREDDIT", 25, minimum=5, maximum=100
                 )
                 reddit_min_score = _env_int("REDDIT_MIN_SCORE", 3, minimum=0, maximum=1000)
-                for sr in subreddits:
+                reddit_ua = (
+                    os.getenv("REDDIT_USER_AGENT")
+                    or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                )
+
+                def _reddit_via_rss(sr: str) -> int:
+                    """Repli RSS : l'API JSON publique renvoie 403 (anti-bot Reddit), le flux .rss reste ouvert."""
+                    added = 0
                     try:
-                        # Try JSON API first
+                        feed = feedparser.parse(
+                            f"https://www.reddit.com/r/{sr}/top/.rss?t=week"
+                        )
+                        for entry in feed.entries[:reddit_posts_per_sub]:
+                            title = (entry.get("title") or "").strip()
+                            link = entry.get("link") or ""
+                            if not title or not link:
+                                continue
+                            # Le résumé RSS est surtout de la navigation HTML (submitted by, [link], [comments]) :
+                            # on nettoie, et si rien d'exploitable, le titre porte le signal de sentiment.
+                            summary_html = entry.get("summary") or ""
+                            body = BeautifulSoup(summary_html, "html.parser").get_text(
+                                " ", strip=True
+                            )
+                            content = body if len(body) >= 60 else title
+                            a = Article(
+                                title=f"[{sr.upper()}] {title}"[:500],
+                                content=content[:2000],
+                                url=link,
+                                source_name=self.name,
+                            )
+                            if a.is_valid() and a.url:
+                                articles.append(a)
+                                added += 1
+                    except Exception as e:
+                        logger.warning("Reddit {} RSS fallback error: {}", sr, str(e)[:40])
+                    return added
+
+                for idx, sr in enumerate(subreddits):
+                    if idx > 0:
+                        # Pause polie : évite le rate-limit Reddit (429) sur des requêtes rapprochées.
+                        time.sleep(0.6)
+                    got = 0
+                    try:
+                        # API JSON d'abord (conservée pour compat si OAuth/identifiants ajoutés plus tard)
                         resp = requests.get(
                             f"https://www.reddit.com/r/{sr}/top.json?t=week&limit={reddit_api_limit}",
-                            headers={
-                                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                            },
+                            headers={"User-Agent": reddit_ua},
                             timeout=10,
                         )
                         if resp.status_code == 200:
@@ -473,35 +513,12 @@ class APIExtractor(BaseExtractor):
                                     )
                                     if a.is_valid() and a.url:
                                         articles.append(a)
-                        else:
-                            # Fallback: HTML scraping
-                            html_resp = requests.get(
-                                f"https://www.reddit.com/r/{sr}/top/?t=week",
-                                headers={
-                                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                                },
-                                timeout=10,
-                            )
-                            if html_resp.status_code == 200:
-                                soup = BeautifulSoup(html_resp.text, "html.parser")
-                                for item in soup.find_all(["a"], {"data-testid": "post-title"})[
-                                    :reddit_posts_per_sub
-                                ]:
-                                    title = item.get_text().strip()
-                                    href = item.get("href", "")
-                                    if title and href:
-                                        a = Article(
-                                            title=f"[{sr.upper()}] {title}"[:500],
-                                            content=f"Reddit post from r/{sr}"[:2000],
-                                            url=f"https://www.reddit.com{href}"
-                                            if href.startswith("/")
-                                            else href,
-                                            source_name=self.name,
-                                        )
-                                        if a.is_valid():
-                                            articles.append(a)
+                                        got += 1
                     except Exception as e:
-                        logger.warning("Reddit {} extraction error: {}", sr, str(e)[:40])
+                        logger.warning("Reddit {} JSON error: {}", sr, str(e)[:40])
+                    # Repli RSS si l'API JSON est bloquée (403) ou n'a rien renvoyé — Reddit ne doit pas sortir 0.
+                    if got == 0:
+                        _reddit_via_rss(sr)
             elif "weather" in src_low or "meteo" in src_low:
                 owm_key = (os.getenv("OPENWEATHERMAP_API_KEY") or "").strip()
                 cities = ["Paris", "Lyon", "Marseille", "Toulouse", "Nice"]
@@ -696,7 +713,13 @@ class APIExtractor(BaseExtractor):
                                 articles.append(a)
         except Exception as e:
             logger.error("API extraction error for {}: {}", self.name, str(e)[:40])
-        return articles[:50]
+        # Reddit = ressource riche (plusieurs subreddits) : plafond plus large que les autres API.
+        api_cap = (
+            _env_int("REDDIT_MAX_ITEMS", 200, minimum=50, maximum=500)
+            if "reddit" in src_low
+            else 50
+        )
+        return articles[:api_cap]
 
 
 class ScrapingExtractor(BaseExtractor):
@@ -791,7 +814,23 @@ class ScrapingExtractor(BaseExtractor):
             elif "monavis" in src_low or "monaviscitoyen" in src_low:
                 monavis_limit = _env_int("MONAVIS_ITEMS_LIMIT", 30, minimum=10, maximum=120)
                 base_url = "https://www.monaviscitoyen.fr"
+                # Cibler la rubrique Actualité (vrais sondages d'opinion citoyens),
+                # pas la page d'accueil qui renvoie surtout des éléments de navigation.
+                listing_url = (self.url or "").strip() or f"{base_url}/actualite/"
+                if listing_url.rstrip("/").lower().endswith("monaviscitoyen.fr"):
+                    listing_url = f"{base_url}/actualite/"
                 seen = set()
+
+                def _is_real_article(href: str, text: str) -> bool:
+                    """Garde uniquement les vrais articles d'opinion (filtre navigation)."""
+                    h = (href or "").lower()
+                    if "/actualite/" not in h:
+                        return False
+                    if h.rstrip("/").endswith("/actualite"):
+                        return False
+                    if any(x in h for x in ("categorie-", "reglement-jeu", "/concours")):
+                        return False
+                    return len(text.strip()) >= 25
 
                 def add_item(title_text: str, content_text: str, link: str):
                     if not link:
@@ -801,62 +840,52 @@ class ScrapingExtractor(BaseExtractor):
                     if link in seen:
                         return
                     seen.add(link)
+                    title_clean = title_text.strip().split(". ")[0][:300] or title_text.strip()[:300]
                     a = Article(
-                        title=f"[MONAVIS] {title_text}"[:500],
-                        content=content_text[:2000],
+                        title=f"[MONAVIS] {title_clean}"[:500],
+                        content=(content_text or title_text)[:2000],
                         url=link,
                         source_name=self.name,
                     )
                     if a.is_valid():
                         articles.append(a)
 
-                def parse_from_soup(soup):
-                    for item in soup.find_all(["article", "div", "li"]):
-                        title_e = item.find(["h1", "h2", "h3"])
-                        link_e = item.find("a", href=True)
-                        if title_e and link_e:
-                            content_text = item.get_text(" ", strip=True)
-                            add_item(
-                                title_e.get_text().strip(), content_text, link_e.get("href", "")
-                            )
+                def parse_listing(soup):
+                    for link_e in soup.find_all("a", href=True):
                         if len(articles) >= monavis_limit:
                             break
-                    if len(articles) < min(10, monavis_limit):
-                        for link_e in soup.find_all("a", href=True):
-                            text = link_e.get_text(" ", strip=True)
-                            if len(text) < 20:
-                                continue
-                            href = link_e.get("href", "")
-                            if "monaviscitoyen" not in href and not href.startswith("/"):
-                                continue
-                            add_item(text, text, href)
-                            if len(articles) >= monavis_limit:
-                                break
+                        href = link_e.get("href", "")
+                        # Texte de la carte (div.listing-card) = titre + résumé + date,
+                        # spécifique à chaque article (≠ bloc global de la page).
+                        text = link_e.get_text(" ", strip=True)
+                        if not _is_real_article(href, text):
+                            continue
+                        add_item(text, text, href)
 
-                # Try Botasaurus first (if installed)
-                try:
-                    from botasaurus.request import Request, request
-                    from botasaurus.soupify import soupify
+                def _fetch_soup(url: str):
+                    """Récupère le HTML : GET classique d'abord, Botasaurus en secours (WAF/JS)."""
+                    resp = _http_get_with_retries(url, timeout=15, attempts=2, log_failures=False)
+                    if resp:
+                        return BeautifulSoup(resp.text, "html.parser")
+                    try:
+                        from botasaurus.request import Request, request
+                        from botasaurus.soupify import soupify
 
-                    @request
-                    def _botasaurus_request(req: Request, _data):
-                        resp = req.get(self.url)
-                        return {
-                            "status": getattr(resp, "status_code", None),
-                            "text": getattr(resp, "text", ""),
-                        }
+                        @request
+                        def _botasaurus_request(req: Request, _data):
+                            r = req.get(url)
+                            return {
+                                "status": getattr(r, "status_code", None),
+                                "text": getattr(r, "text", ""),
+                            }
 
-                    payload = _botasaurus_request()
-                    if isinstance(payload, list):
-                        payload = payload[0] if payload else {}
-                    if payload and payload.get("status") == 200:
-                        soup = soupify(payload.get("text", ""))
-                        parse_from_soup(soup)
-                except Exception as e:
-                    logger.warning("Botasaurus request failed for {}: {}", self.name, str(e)[:40])
-
-                # Try Botasaurus browser (JS/anti-bot)
-                if not articles:
+                        payload = _botasaurus_request()
+                        if isinstance(payload, list):
+                            payload = payload[0] if payload else {}
+                        if payload and payload.get("status") == 200:
+                            return soupify(payload.get("text", ""))
+                    except Exception as e:
+                        logger.warning("Botasaurus request failed for {}: {}", self.name, str(e)[:40])
                     try:
                         import time as _time
 
@@ -864,7 +893,7 @@ class ScrapingExtractor(BaseExtractor):
 
                         @browser
                         def _botasaurus_browser(driver: Driver, _data):
-                            driver.get(self.url)
+                            driver.get(url)
                             _time.sleep(2)
                             return driver.page_source
 
@@ -872,24 +901,19 @@ class ScrapingExtractor(BaseExtractor):
                         if isinstance(html, list):
                             html = html[0] if html else ""
                         if html:
-                            soup = BeautifulSoup(html, "html.parser")
-                            parse_from_soup(soup)
+                            return BeautifulSoup(html, "html.parser")
                     except Exception as e:
-                        logger.warning(
-                            "Botasaurus browser failed for {}: {}", self.name, str(e)[:40]
-                        )
+                        logger.warning("Botasaurus browser failed for {}: {}", self.name, str(e)[:40])
+                    return None
 
-                # Fallback: classic requests
-                if not articles:
-                    resp = _http_get_with_retries(self.url or base_url, timeout=15, attempts=3)
-                    if not resp:
-                        logger.warning(
-                            "Scraping sans réponse HTTP 200 pour {} (403/WAF ou réseau).",
-                            self.name,
-                        )
-                        return articles
-                    soup = BeautifulSoup(resp.text, "html.parser")
-                    parse_from_soup(soup)
+                soup = _fetch_soup(listing_url)
+                if soup is None:
+                    logger.warning(
+                        "Scraping sans réponse HTTP 200 pour {} (403/WAF ou réseau).",
+                        self.name,
+                    )
+                    return articles
+                parse_listing(soup)
             else:
                 resp = _http_get_with_retries(self.url, timeout=12, attempts=2)
                 if not resp:

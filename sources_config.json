@@ -178,10 +178,10 @@
     },
     {
       "source_name": "monavis_citoyen",
-      "description": "Avis citoyens - monaviscitoyen.fr",
+      "description": "Avis citoyens - monaviscitoyen.fr (scraping HTML rubrique Actualité)",
       "acquisition_type": "scraping",
       "theme": "society",
-      "url": "https://www.monaviscitoyen.fr/",
+      "url": "https://www.monaviscitoyen.fr/actualite/",
       "partition_path": "/data/raw/monavis_citoyen/date=YYYY-MM-DD/",
       "file_naming": "monavis_citoyen_france_YYYYMMDD_HHMMSS.parquet",
       "refresh_frequency": "Daily",

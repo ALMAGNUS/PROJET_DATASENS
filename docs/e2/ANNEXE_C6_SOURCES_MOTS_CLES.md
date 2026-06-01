@@ -1,6 +1,6 @@
 # Annexe C6 - Sources et mots-clés de veille
 Thématique: veille_ia_datasens
-Mise à jour: 2026-05-24 12:12
+Mise à jour: 2026-06-01 10:30
 
 ## OpenAI Blog
 - URL: https://openai.com/blog/rss.xml

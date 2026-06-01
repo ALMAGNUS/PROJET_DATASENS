@@ -4,13 +4,14 @@ Auth Schemas - Pydantic Models
 Modèles pour authentification
 """
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
+from src.e2.api.schemas.common import DemoSafeEmail
 
 
 class LoginRequest(BaseModel):
     """Schema pour login"""
 
-    email: EmailStr
+    email: DemoSafeEmail = Field(..., min_length=3, max_length=254)
     password: str = Field(..., min_length=1)
 
 

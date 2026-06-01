@@ -1492,11 +1492,16 @@ def render_article_journey(ctx: PageContext, *, demo_mode: bool = False) -> None
 
     st.markdown("### Le parcours d'un article")
     if not samples:
-        st.info(
-            "Aucun article récent dans la base SQLite. Lancez le pipeline E1 "
-            "(onglet **Pilotage** → **Pipeline E1**) pour déclencher "
-            "l'ingestion, puis revenez ici."
-        )
+        if demo_mode:
+            st.caption(
+                "Aucun article récent en base — lancez le pipeline E1 pour alimenter le parcours."
+            )
+        else:
+            st.info(
+                "Aucun article récent dans la base SQLite. Lancez le pipeline E1 "
+                "(onglet **Pilotage** → **Pipeline E1**) pour déclencher "
+                "l'ingestion, puis revenez ici."
+            )
         return
 
     total_day = added_today if added_today is not None else len(samples)

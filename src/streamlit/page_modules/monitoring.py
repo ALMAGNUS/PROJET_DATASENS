@@ -16,6 +16,7 @@ import streamlit as st
 
 from src.streamlit._cockpit_helpers import (
     PageContext,
+    fetch_user_audit_log,
     get_telemetry_snapshot,
     reset_telemetry,
 )
@@ -55,8 +56,80 @@ from src.streamlit.cockpit_ux import (
     render_section_title,
     run_summary_history_cached,
 )
+from src.streamlit.auth_plug import can_admin
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+_OPTIONAL_MLOPS_SERVICES = frozenset({"Prometheus", "Grafana", "Uptime Kuma"})
+
+
+def _render_user_audit_journal(ctx: PageContext) -> None:
+    """Journal des actions utilisateurs (user_action_log) — différenciant soutenance."""
+    st.markdown("**Journal des actions utilisateurs**")
+    st.caption(
+        "Connexions et requêtes API authentifiées · table SQLite `user_action_log` "
+        "(corrélation email / rôle via `profils`)."
+    )
+    if not can_admin():
+        st.caption("Réservé aux comptes **admin**.")
+        return
+
+    col_role, col_limit, col_refresh = st.columns([2, 1, 1])
+    with col_role:
+        role_pick = st.selectbox(
+            "Filtrer par rôle",
+            ["Tous", "admin", "reader", "writer", "deleter"],
+            key="audit_role_filter",
+        )
+    with col_limit:
+        limit = st.number_input("Lignes", min_value=10, max_value=200, value=40, step=10)
+    with col_refresh:
+        st.write("")
+        refresh = st.button("Actualiser", key="audit_refresh", use_container_width=True)
+
+    if refresh:
+        st.session_state.pop("audit_log_cache", None)
+
+    cache_key = f"{role_pick}:{limit}"
+    if st.session_state.get("audit_log_cache_key") != cache_key:
+        st.session_state.pop("audit_log_cache", None)
+
+    if "audit_log_cache" not in st.session_state:
+        rows, err = fetch_user_audit_log(
+            ctx.project_root,
+            limit=int(limit),
+            role_filter=None if role_pick == "Tous" else role_pick,
+        )
+        st.session_state.audit_log_cache = (rows, err)
+        st.session_state.audit_log_cache_key = cache_key
+
+    rows, err = st.session_state.audit_log_cache
+    if err:
+        st.info(err)
+        return
+    if not rows:
+        st.caption("Aucune entrée d'audit — connectez-vous et effectuez quelques actions API.")
+        return
+
+    df = pd.DataFrame(rows)
+    rename = {
+        "action_date": "Date",
+        "email": "Email",
+        "role": "Rôle",
+        "action_type": "Action",
+        "resource_type": "Ressource",
+        "resource_id": "ID ressource",
+        "ip_address": "IP",
+        "details": "Détail",
+    }
+    show_cols = [c for c in rename.keys() if c in df.columns]
+    df = df[show_cols].rename(columns=rename)
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    if "Action" in df.columns:
+        counts = df["Action"].value_counts().head(6)
+        parts = [f"{k} ({v})" for k, v in counts.items()]
+        st.caption("Répartition : " + " · ".join(parts))
 
 
 def render(ctx: PageContext) -> None:
@@ -166,42 +239,83 @@ def render(ctx: PageContext) -> None:
 
     st.dataframe(pd.DataFrame(status_rows), use_container_width=True, hide_index=True)
     up_count = sum(1 for row in status_rows if row["Statut"] == "UP")
+    critical_down = [
+        row["Service"]
+        for row in status_rows
+        if row["Statut"] != "UP" and row["Service"] not in _OPTIONAL_MLOPS_SERVICES
+    ]
+    optional_down = [
+        row["Service"]
+        for row in status_rows
+        if row["Statut"] != "UP" and row["Service"] in _OPTIONAL_MLOPS_SERVICES
+    ]
     if up_count == len(status_rows):
         st.success(f"MLOps opérationnel : {up_count}/{len(status_rows)} services UP.")
+    elif not critical_down and optional_down:
+        st.info(
+            f"Services métier OK · stack monitoring optionnelle non démarrée "
+            f"({', '.join(optional_down)})."
+        )
     else:
-        st.warning(f"MLOps partiel : {up_count}/{len(status_rows)} services UP.")
+        st.warning(
+            f"MLOps partiel : {up_count}/{len(status_rows)} services UP"
+            + (f" · critique : {', '.join(critical_down)}" if critical_down else "")
+            + "."
+        )
 
     if show_advanced:
+        _render_user_audit_journal(ctx)
+
         with st.expander("Administration et diagnostic technique", expanded=False):
             st.markdown("**Contrôle scrape Prometheus (targets)**")
-            try:
-                r = requests.get(f"{prometheus_url}/api/v1/targets", timeout=4)
-                if r.status_code == 200:
-                    payload = r.json().get("data", {}).get("activeTargets", [])
-                    rows = []
-                    for t in payload:
-                        labels = t.get("labels", {}) or {}
-                        rows.append(
-                            {
-                                "job": labels.get("job", "n/a"),
-                                "instance": labels.get("instance", "n/a"),
-                                "health": t.get("health", "unknown"),
-                                "last_error": (t.get("lastError") or "")[:120],
-                            }
-                        )
-                    if rows:
-                        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            if prom_status != "UP":
+                st.info(
+                    "Prometheus n'est pas démarré sur ce poste (normal avec `start_full.bat` seul). "
+                    "L'API expose déjà ses métriques sur `/metrics` ; Prometheus les scrape une fois lancé.\n\n"
+                    "**Démarrer Prometheus** (terminal séparé, depuis la racine du projet) :\n"
+                    "- Binaire local : `start_prometheus.bat`\n"
+                    "- Docker : `docker compose up -d prometheus grafana`\n\n"
+                    f"Puis ouvrir {prometheus_url}/targets"
+                )
+                if api_metrics_status == "UP":
+                    st.caption(
+                        f"En attendant : métriques API disponibles → {api_base}/metrics "
+                        "(compteurs requêtes, latence, utilisateurs JWT actifs)."
+                    )
+            else:
+                try:
+                    r = requests.get(f"{prometheus_url}/api/v1/targets", timeout=4)
+                    if r.status_code == 200:
+                        payload = r.json().get("data", {}).get("activeTargets", [])
+                        rows = []
+                        for t in payload:
+                            labels = t.get("labels", {}) or {}
+                            rows.append(
+                                {
+                                    "job": labels.get("job", "n/a"),
+                                    "instance": labels.get("instance", "n/a"),
+                                    "health": t.get("health", "unknown"),
+                                    "last_error": (t.get("lastError") or "")[:120],
+                                }
+                            )
+                        if rows:
+                            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                        else:
+                            st.caption("Aucune target active remontée par Prometheus.")
                     else:
-                        st.caption("Aucune target active remontée par Prometheus.")
-                else:
-                    st.warning(f"Prometheus targets indisponibles: HTTP {r.status_code}")
-            except Exception as exc:
-                st.warning(f"Prometheus targets indisponibles: {str(exc)[:150]}")
+                        st.warning(f"Prometheus targets indisponibles: HTTP {r.status_code}")
+                except Exception as exc:
+                    st.warning(f"Prometheus targets indisponibles: {str(exc)[:150]}")
 
             st.markdown("**Liens techniques Prometheus / Grafana**")
             st.caption(
                 f"API metrics : {api_base}/metrics · Prometheus : {prometheus_url} · Grafana : {grafana_url}"
             )
+            if prom_status != "UP" or graf_status != "UP":
+                st.caption(
+                    "Stack monitoring complète = optionnelle pour la démo cockpit ; "
+                    "obligatoire seulement pour la soutenance E5 (Prometheus + Grafana)."
+                )
     else:
         st.caption("Détails techniques masqués (mode Expert requis).")
 
@@ -641,8 +755,8 @@ def render(ctx: PageContext) -> None:
     st.divider()
     with st.expander("Détail technique — activité de session (télémétrie)", expanded=False):
         st.caption(
-            "Comptage interne des clics et des commandes lancées depuis ce navigateur. "
-            "Réservé au débogage ; la lecture métier se fait dans **Vue d'ensemble** et **Pipeline**."
+            "Chronomètre session + actions cockpit (IA, jobs Pilotage/Modèles) dans **ce navigateur**. "
+            "Ce n'est pas l'audit API (`user_action_log`) — voir **Journal des actions utilisateurs** ci-dessus."
         )
         snap = get_telemetry_snapshot()
         c_age, c_runs, c_err, c_avg = st.columns(4)

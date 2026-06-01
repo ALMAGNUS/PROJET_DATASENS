@@ -23,6 +23,7 @@ from src.streamlit._cockpit_helpers import (
 from src.streamlit.cockpit_ux import (
     altair_status_scale,
     latest_db_state_cached,
+    render_data_journey_strip,
     run_summary_history_cached,
 )
 from src.streamlit.page_modules.overview import (
@@ -479,6 +480,11 @@ def render(ctx: PageContext) -> None:
         unsafe_allow_html=True,
     )
 
+    render_data_journey_strip(
+        lead="Même empreinte, même article — de la collecte à l'enrichissement IA."
+    )
+    render_article_journey(ctx, demo_mode=True)
+
     st.markdown('<p class="ds-section">Volumes</p>', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("RAW", f"{snapshot['raw_cumulative']:,}")
@@ -498,9 +504,6 @@ def render(ctx: PageContext) -> None:
     m3.metric("Statut", kpis["status"])
 
     render_last_run_proof_full(ctx, demo_mode=True)
-
-    st.markdown('<p class="ds-section">Parcours d\'un article</p>', unsafe_allow_html=True)
-    render_article_journey(ctx, demo_mode=True)
 
     with st.expander("Historique des runs", expanded=False):
         hist = run_summary_history_cached(str(root), limit=14)

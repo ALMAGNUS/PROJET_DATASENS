@@ -66,6 +66,15 @@ _FACTUAL_NEUTRAL_RE = re.compile(
     r"^(le |la |les |l'|un |une |des ).*(présente|classe|collectées|collectees|stockées|stockees|affiche|comprend|utilise|mises à jour|genere|génère|testé|teste|identifie|doivent être|doivent etre|sont stockés|sont stockes)\b",
     re.I,
 )
+# Lexique marché / opinion — ne pas forcer le neutre factuel si marqueur clair.
+_MARKET_POS_RE = re.compile(
+    r"\b(forte hausse|forte progression|hausse|haussier|rebond|rallye|bondit|record|optimiste|enthousiasme)\b",
+    re.I,
+)
+_MARKET_NEG_RE = re.compile(
+    r"\b(forte baisse|baisse|baissier|recul|effondre\w*|inquiète|inquiete|pessimiste|controvers\w*|scandal\w*)\b",
+    re.I,
+)
 
 
 def compute_sentiment_output(scores: list[dict]) -> dict:
@@ -138,6 +147,10 @@ def refine_factual_neutral(text: str, out: dict) -> dict:
     if out.get("label") == "NEUTRAL":
         return out
     if _POS_HINT_RE.search(text) or _IMPROVE_RE.search(text):
+        return out
+    if _MARKET_POS_RE.search(text) or _MARKET_NEG_RE.search(text):
+        return out
+    if float(out.get("p_pos", 0)) - float(out.get("p_neg", 0)) >= 0.35:
         return out
     if not _FACTUAL_NEUTRAL_RE.search(text):
         return out
