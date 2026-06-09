@@ -13,6 +13,7 @@ from typing import Any, Callable
 
 import streamlit as st
 
+from src.config import canonical_sentiment_label
 from src.streamlit._cockpit_helpers import (
     PageContext,
     check_api_health,
@@ -172,12 +173,17 @@ def inject_cockpit_ux_css() -> None:
   font-size: 0.78rem;
   padding: 0.12rem 0.45rem;
 }
+/* Streamlit >=1.37 a renomme le conteneur principal (stMain/stMainBlockContainer).
+   On vise les deux DOM (ancien section.main + nouveau testid) pour rester robuste. */
+[data-testid="stMainBlockContainer"],
+.stMainBlockContainer,
 section.main .block-container {
   max-width: 1200px;
   margin-left: auto;
   margin-right: auto;
   padding-top: 1.25rem;
 }
+[data-testid="stMain"],
 section.main,
 [data-testid="stAppViewContainer"] {
   overflow-anchor: none;
@@ -239,13 +245,17 @@ def reset_scroll_on_mode_change() -> None:
   var p = window.parent;
   var d = p.document;
   function top() {
-    var main = d.querySelector("section.main");
-    if (main) { main.scrollTop = 0; }
-    var view = d.querySelector('[data-testid="stAppViewContainer"]');
-    if (view) { view.scrollTop = 0; }
+    // Streamlit >=1.37 : le conteneur scrollable est stMain (avant: section.main).
+    var sels = ['[data-testid="stMain"]', 'section.main', '[data-testid="stAppViewContainer"]'];
+    for (var i = 0; i < sels.length; i++) {
+      var el = d.querySelector(sels[i]);
+      if (el) { el.scrollTop = 0; }
+    }
+    try { p.scrollTo(0, 0); } catch (e) {}
   }
   top();
   p.requestAnimationFrame(top);
+  p.setTimeout(top, 80);
 })();
 </script>
         """,
@@ -392,6 +402,12 @@ def get_active_model_summary(root: Path) -> dict[str, Any]:
         f1_display = f"{float(inf_f1):.3f} (bench)"
     elif train_f1 is not None:
         f1_display = f"{float(train_f1):.3f} (train)"
+
+    # Nom canonique unifié (datasens-sentiment-fr) pour notre fine-tune, comme partout ailleurs.
+    if active_path:
+        name = canonical_sentiment_label(active_path)
+        if len(name) > 40:
+            name = "…" + name[-37:]
 
     return {
         "name": name,

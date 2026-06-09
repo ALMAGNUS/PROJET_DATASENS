@@ -55,7 +55,7 @@ email-validator==2.3.0  # Email validation
 # ============================================================
 # E3: Streamlit Dashboard
 # ============================================================
-streamlit==1.36.0
+streamlit==1.39.0  # 1.39 corrige le toggle capricieux des expanders/popover (issue #9067, regression 1.35-1.38)
 streamlit-aggrid==0.3.4  # Advanced data grid
 streamlit-plotly-events==0.0.6  # Interactive plots
 altair>=5.0,<6  # Graphiques cockpit (enrichissement pipeline, étape par étape)
