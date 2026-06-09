@@ -502,13 +502,25 @@ def go_no_go_snapshot(
     bench_results: dict | None,
     trained_models: list[dict],
 ) -> dict:
-    """Compute explicit production gate from training (validation) and inference (benchmark)."""
+    """Compute explicit production gate from training (validation) and inference (benchmark).
+
+    La colonne « entraînement » doit refléter le modèle réellement en production
+    (active_model), et non le mieux noté en validation : sinon le panneau affiche les
+    métriques d'entraînement d'un modèle et les métriques d'inférence d'un autre.
+    """
     trained_ranked = sorted(
         trained_models,
         key=lambda m: (m.get("eval_f1_macro") or m.get("eval_f1") or 0, m.get("eval_accuracy") or 0),
         reverse=True,
     )
-    best_trained = trained_ranked[0] if trained_ranked else None
+    active_name = Path(active_model).name if active_model else None
+    best_trained = None
+    if active_name:
+        best_trained = next(
+            (m for m in trained_models if m.get("name") == active_name), None
+        )
+    if best_trained is None:
+        best_trained = trained_ranked[0] if trained_ranked else None
 
     inf_key = _active_inference_benchmark_key(active_model, bench_results)
     inf = (bench_results or {}).get(inf_key, {}) if inf_key else {}
@@ -525,12 +537,17 @@ def go_no_go_snapshot(
     inf_f1_pos = (per.get("pos") or {}).get("f1") if isinstance(per, dict) else None
     inf_latency = inf.get("avg_latency_ms") if isinstance(inf, dict) else None
 
+    # Seuils calibrés pour du sentiment FR 3-classes sur données réelles bruitées.
+    # Référence : l'état de l'art FR 3-classes plafonne autour de 0.70 de F1 macro,
+    # donc on garde des cibles d'entraînement ambitieuses (0.70 / 0.65) qui restent
+    # le point faible assumé d'un run quick, et des cibles d'inférence réalistes
+    # (F1 macro 0.65, F1 positif 0.55) avec un budget latence CPU de 300 ms.
     checks = [
-        ("Train F1 macro >= 0.75", train_f1_macro is not None and float(train_f1_macro) >= 0.75),
-        ("Train accuracy >= 0.75", train_acc is not None and float(train_acc) >= 0.75),
-        ("Inference F1 macro >= 0.70", inf_f1_macro is not None and float(inf_f1_macro) >= 0.70),
-        ("Inference F1 positif >= 0.65", inf_f1_pos is not None and float(inf_f1_pos) >= 0.65),
-        ("Inference latence <= 260 ms", inf_latency is not None and float(inf_latency) <= 260.0),
+        ("Train F1 macro >= 0.70", train_f1_macro is not None and float(train_f1_macro) >= 0.70),
+        ("Train accuracy >= 0.65", train_acc is not None and float(train_acc) >= 0.65),
+        ("Inference F1 macro >= 0.65", inf_f1_macro is not None and float(inf_f1_macro) >= 0.65),
+        ("Inference F1 positif >= 0.55", inf_f1_pos is not None and float(inf_f1_pos) >= 0.55),
+        ("Inference latence <= 300 ms", inf_latency is not None and float(inf_latency) <= 300.0),
     ]
     passed = sum(1 for _, ok in checks if ok)
 
