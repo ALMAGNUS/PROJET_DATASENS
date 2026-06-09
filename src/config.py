@@ -13,6 +13,22 @@ def _base_dir() -> Path:
 
 _ENV_FILE = _base_dir() / ".env"
 
+# Nom canonique du modèle de sentiment maison. Étiquette unique affichée et
+# enregistrée partout (cockpit + model_version des prédictions). Le chargement
+# des poids reste local/offline ; ceci n'est qu'un libellé.
+SENTIMENT_MODEL_DISPLAY_NAME = "datasens-sentiment-fr"
+
+
+def canonical_sentiment_label(model_id: str | None) -> str:
+    """Mappe un chemin/identifiant de notre fine-tune vers le nom canonique.
+
+    Les autres modèles (backbone ac0hik, camembert…) gardent leur identifiant réel.
+    """
+    low = (model_id or "").lower()
+    if any(tag in low for tag in ("datasens-sentiment-fr", "sentiment_fr-sentiment-finetuned", "finetuned-colab")):
+        return SENTIMENT_MODEL_DISPLAY_NAME
+    return model_id or SENTIMENT_MODEL_DISPLAY_NAME
+
 
 class Settings(BaseSettings):
     """Configuration centralisée pour E1, E2, E3"""

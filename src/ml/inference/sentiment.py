@@ -14,7 +14,7 @@ from uuid import uuid4
 
 import pandas as pd
 
-from src.config import get_settings
+from src.config import canonical_sentiment_label, get_settings
 from src.data_contracts import assert_no_target_leakage
 
 from .goldai_loader import get_goldai_texts, load_goldai
@@ -400,7 +400,9 @@ def write_predictions_parquet(
         root = Path(__file__).resolve().parents[3] / root
 
     run_id = inference_run_id or f"infer_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}"
-    model_ver = model_version or settings.sentiment_finetuned_model_path or settings.camembert_model_path
+    model_ver = canonical_sentiment_label(
+        model_version or settings.sentiment_finetuned_model_path or settings.camembert_model_path
+    )
     ts = datetime.now(UTC)
     date_part = ts.strftime("%Y-%m-%d")
 

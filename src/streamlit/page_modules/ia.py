@@ -20,13 +20,32 @@ from src.streamlit._cockpit_helpers import (
     record_click,
     record_run,
 )
+from src.config import SENTIMENT_MODEL_DISPLAY_NAME
 from src.insights.goldai_data import load_enriched_goldai
 from src.insights.builder import build_insight_pack
 from src.streamlit.auth_plug import (
     get_token,
 )
 
-_DEMO_SENTIMENT_MODEL = "ac0hik/Sentiment_Analysis_French"
+_SENTIMENT_BACKBONE = "ac0hik/Sentiment_Analysis_French"
+
+
+def _resolve_demo_model() -> tuple[str, str]:
+    """Modèle de l'onglet sentiment = le meilleur modèle benchmarké.
+
+    Priorité au fine-tuné maison (models/sentiment_fr-sentiment-finetuned) — le même
+    qui alimente les prédictions/insights — sinon repli sur le backbone ac0hik.
+    Retourne (chemin de chargement local, nom canonique affiché).
+    """
+    from pathlib import Path
+
+    local = Path("models/sentiment_fr-sentiment-finetuned")
+    if (local / "config.json").exists():
+        return str(local.resolve()), SENTIMENT_MODEL_DISPLAY_NAME
+    return _SENTIMENT_BACKBONE, "ac0hik (backbone, fallback)"
+
+
+_DEMO_SENTIMENT_MODEL, _DEMO_MODEL_LABEL = _resolve_demo_model()
 
 # Thèmes uniquement — pas de libellé de sentiment (c'est l'IA qui décide à l'analyse).
 _DEMO_EXAMPLES = [
@@ -123,8 +142,9 @@ def _render_sentiment_result(last: dict | None, *, demo_mode: bool = False) -> N
 
 
 def _render_model_chip() -> None:
+    suffix = "fine-tuné maison · inférence locale" if _DEMO_MODEL_LABEL == SENTIMENT_MODEL_DISPLAY_NAME else "inférence locale"
     st.markdown(
-        '<span class="ds-chip">ac0hik · inférence locale (cockpit)</span>',
+        f'<span class="ds-chip">{html.escape(_DEMO_MODEL_LABEL)} · {suffix}</span>',
         unsafe_allow_html=True,
     )
 
@@ -168,10 +188,10 @@ def _predict_demo_local(text: str) -> dict:
     scores = raw[0] if raw and isinstance(raw[0], list) else raw
     out = finalize_sentiment(text, scores)
     return {
-        "model": "sentiment_fr",
+        "model": "finetuned_local",
         "task": "sentiment-analysis",
         "result": [out],
-        "resolved_model": _DEMO_SENTIMENT_MODEL,
+        "resolved_model": _DEMO_MODEL_LABEL,
     }
 
 
@@ -207,13 +227,13 @@ def _render_sentiment_examples(*, ctx: PageContext, text_key: str, ex_label_key:
 
 
 def _run_sentiment(text: str, api_v1: str, *, allow_api_fallback: bool) -> tuple[bool, dict | str]:
-    """Toujours ac0hik en local dans le cockpit (évite le mauvais modèle Hub via API)."""
+    """Inférence locale avec le meilleur modèle (fine-tuné maison), même moteur que les insights."""
     try:
         return True, _predict_demo_local(text)
     except Exception as local_err:
         if not allow_api_fallback:
             return False, f"Modèle local indisponible : {local_err!s}"[:200]
-        ok, payload = _call_predict(api_v1, text, "sentiment_fr")
+        ok, payload = _call_predict(api_v1, text, "finetuned_local")
         if ok and isinstance(payload, dict):
             payload.setdefault("resolved_model", "API /predict")
         return ok, payload
@@ -302,10 +322,6 @@ def _render_sentiment_tab(
             if resolved and st.session_state.get("ia_last_result"):
                 short = resolved if len(resolved) < 56 else "…" + resolved[-53:]
                 st.caption(f"Modèle · `{short}`")
-                if "datasens-sentiment-fr" in short.lower():
-                    st.warning(
-                        "Ancien modèle Hub détecté — rafraîchissez la page (F5) puis relancez l'analyse."
-                    )
 
             if st.session_state.get("ia_last_result"):
                 with st.expander("Détail technique", expanded=False):
@@ -555,13 +571,6 @@ def render(ctx: PageContext) -> None:
         "API indisponible. Lancez l'API E2 (`python run_e2_api.py`) avant l'assistant."
     )
     demo_mode = ctx.ux_mode == "Mode démo"
-
-    # Purge d'un ancien résultat API (Hub +0.96) encore en session
-    stale = st.session_state.get("ia_last_result")
-    if stale and float(stale.get("sentiment_score", 0) or 0) > 0.9:
-        resolved = str(st.session_state.get("ia_last_resolved_model", ""))
-        if "ac0hik" not in resolved:
-            _clear_sentiment_result()
 
     ia_view = st.radio(
         "Vue IA",
