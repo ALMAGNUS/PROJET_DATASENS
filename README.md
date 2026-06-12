@@ -217,7 +217,7 @@ Sources `active: false` (Kaggle stopwords, lexicons, ifop annuel, zzdb_synthetic
 - **RBAC** — 4 rôles (`src/e2/api/dependencies/permissions.py`) : `reader` (lecture RAW/SILVER/GOLD), `writer` (création/màj), `deleter` (suppression), `admin` (tout). Lève **403** si rôle insuffisant. Test couvert (`tests/test_e2_api.py`).
 - **OWASP Top 10** — couverture documentée dans `docs/e2/`.
 - **Isolation** — E1 / E2 / E3 séparés par interfaces. L'API E2 ne mute pas SILVER : HTTP 501 par design, message explicite (*"is not supported (E1 isolation by design)"*).
-- **RGPD** — registre des traitements, procédure de tri des données personnelles (`docs/e4/`).
+- **RGPD** — [`docs/REGISTRE_TRAITEMENTS_RGPD.md`](docs/REGISTRE_TRAITEMENTS_RGPD.md), [`docs/PROCEDURE_TRI_DONNEES_PERSONNELLES.md`](docs/PROCEDURE_TRI_DONNEES_PERSONNELLES.md).
 - **Gestion comptes** — `python scripts/change_password.py --list` puis `python scripts/change_password.py <email>`. Pas d'API de gestion utilisateurs (volontaire).
 
 ---
