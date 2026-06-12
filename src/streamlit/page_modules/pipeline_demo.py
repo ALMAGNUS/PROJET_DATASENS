@@ -1,5 +1,5 @@
 """
-Vue Pipeline & Données — Mode démo jury (simplifiée).
+Vue Pipeline & Données — mode démo simplifié.
 
 Charts + lineage article. Pas de fusion ops, pas d'exploration expert.
 Le mode Expert conserve pipeline.py + flux.py inchangés.

@@ -64,7 +64,7 @@ _OPTIONAL_MLOPS_SERVICES = frozenset({"Prometheus", "Grafana", "Uptime Kuma"})
 
 
 def _render_user_audit_journal(ctx: PageContext) -> None:
-    """Journal des actions utilisateurs (user_action_log) — différenciant soutenance."""
+    """Journal des actions utilisateurs (user_action_log)."""
     st.markdown("**Journal des actions utilisateurs**")
     st.caption(
         "Connexions et requêtes API authentifiées · table SQLite `user_action_log` "
@@ -314,7 +314,7 @@ def render(ctx: PageContext) -> None:
             if prom_status != "UP" or graf_status != "UP":
                 st.caption(
                     "Stack monitoring complète = optionnelle pour la démo cockpit ; "
-                    "obligatoire seulement pour la soutenance E5 (Prometheus + Grafana)."
+                    "requis pour le monitoring E5 (Prometheus + Grafana)."
                 )
     else:
         st.caption("Détails techniques masqués (mode Expert requis).")

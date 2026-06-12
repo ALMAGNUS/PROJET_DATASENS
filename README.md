@@ -5,31 +5,31 @@
 > modèle de sentiment fine-tuné. Tout est tracé, tout est vérifiable par les chiffres.
 
 ![Python](https://img.shields.io/badge/Python-3.13-blue?style=flat-square)
-![Tests](https://img.shields.io/badge/pytest-52%20passed-brightgreen?style=flat-square)
+![Tests](https://img.shields.io/badge/pytest-65%20passed-brightgreen?style=flat-square)
 ![Lint](https://img.shields.io/badge/ruff-0%20issues-brightgreen?style=flat-square)
 ![Coherence](https://img.shields.io/badge/db_state-OK-brightgreen?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)
 
 ---
 
-## TL;DR — ce qu'il y a dans la boîte (run du 8 mai 2026)
+## TL;DR — ce qu'il y a dans la boîte (run du 12 juin 2026)
 
 | Mesure | Valeur |
 |---|---|
-| Articles collectés (`raw_data`) | **51 495** sur 12 sources actives |
-| Volume SQLite | 96 Mo, source de vérité unique |
-| Liaisons `document_topic` | 90 562 |
-| Prédictions ML stockées (`model_output`) | 105 127 |
-| GoldAI consolidé | **87 659** lignes sur **66 dates** (16 déc 2025 → 8 mai 2026) |
-| Splits IA (`train/val/test`) | 70 127 / 8 765 / 8 767, 0 fuite, 0 doublon, ≥ 30 caractères |
+| Articles collectés (`raw_data`) | **56 631** sur ~13 sources actives |
+| Volume SQLite | 102 Mo, source de vérité unique |
+| Liaisons `document_topic` | 98 925 |
+| Prédictions ML stockées (`model_output`) | 110 263 |
+| GoldAI consolidé | **92 792** lignes sur **98 dates** (16 déc 2025 → 12 juin 2026) |
+| Splits IA (`train/val/test`) | 19 156 / 2 394 / 2 396, 0 fuite, split temporel |
 | Cohérence DB | **OK** (`scripts/db_state_report.py`, exécuté quotidiennement, archivé) |
-| Drift sentiment | **OK** (`neutre 52.1 % · négatif 35.6 % · positif 12.4 %`) |
-| Tests | **52 passed**, 0 failed (hors `test_spark_integration.py`) |
+| Drift sentiment | **OK** (`neutre 54.6 % · négatif 33.7 % · positif 11.7 %`) |
+| Tests | **65 passed**, 1 skipped, 0 failed |
 | Ruff | **0 issue** sur `src/` et `scripts/` |
 | LOC `src/` | ~17 600 lignes Python |
 
 Le rapport `db_state_*.{md,json}` est versionné dans [`reports/`](reports/) à chaque run. Le dernier en date :
-[`reports/db_state_2026-05-08T073503Z.md`](reports/db_state_2026-05-08T073503Z.md).
+[`reports/db_state_2026-06-12T072035Z.md`](reports/db_state_2026-06-12T072035Z.md).
 
 ---
 
@@ -177,21 +177,21 @@ Ré-injection locale du modèle entraîné : `python scripts/install_colab_model
 
 ## Sources actives — production
 
-| Source | Type | Volume cumulé (8 mai) |
+| Source | Type | Volume cumulé (12 juin) |
 |---|---|---|
 | `kaggle_french_opinions` | dataset (fondation) | 38 327 |
-| `yahoo_finance` | RSS | 3 430 |
-| `google_news_rss` | RSS | 3 251 |
-| `rss_french_news` | RSS | 1 614 |
-| `reddit_france` | API | 1 464 |
+| `yahoo_finance` | RSS | 4 907 |
+| `google_news_rss` | RSS | 4 607 |
+| `rss_french_news` | RSS | 2 380 |
+| `reddit_france` | API | 2 207 |
+| `datagouv_datasets` | dataset | 1 276 |
 | `zzdb_csv` | CSV interne | 980 |
 | `trustpilot_reviews` | scraping HTTP | 974 |
-| `datagouv_datasets` | dataset | 735 |
-| `openweather_api` | API | 465 |
-| `GDELT_Last15_English` | bigdata | 185 |
+| `openweather_api` | API | 642 |
+| `GDELT_Last15_English` | bigdata | 242 |
 | `insee_indicators` | API + fallback HTML | 36 |
+| `monavis_citoyen` | scraping Botasaurus | 33 |
 | `agora_consultations` | API | 19 |
-| `monavis_citoyen` | scraping Botasaurus | 14 |
 
 Configuration unique : [`sources_config.json`](sources_config.json).
 Sources `active: false` (Kaggle stopwords, lexicons, ifop annuel, zzdb_synthetic) gardées comme paliers de bascule.
@@ -200,7 +200,7 @@ Sources `active: false` (Kaggle stopwords, lexicons, ifop annuel, zzdb_synthetic
 
 ## Garanties techniques
 
-- **Tests** — `pytest tests/ --ignore=tests/test_spark_integration.py` → **52 passed, 0 failed**.
+- **Tests** — `pytest tests/` → **65 passed, 1 skipped, 0 failed** (`test_spark_integration.py` ignoré sur anciens snapshots GOLD).
 - **Lint** — `ruff check src/ scripts/` → **0 issue**.
 - **Cohérence DB** — `scripts/db_state_report.py` exécuté quotidiennement, sortie versionnée. Détecte toute incohérence `raw_data ↔ document_topic ↔ model_output ↔ GoldAI`.
 - **Drift sentiment** — comparaison entre rapports successifs, statut `OK / DRIFT` consigné dans le rapport `db_state`.
@@ -214,7 +214,7 @@ Sources `active: false` (Kaggle stopwords, lexicons, ifop annuel, zzdb_synthetic
 ## Sécurité et conformité
 
 - **Auth** — JWT court (`python-jose`), bcrypt sur les mots de passe (`passlib`), table SQLite `profils`.
-- **RBAC** — par zone : `viewer` (GOLD), `analyst` (SILVER + GOLD), `admin` (RAW + SILVER + GOLD). Test couvert (`tests/test_e2_api.py::TestPermissions`).
+- **RBAC** — 4 rôles (`src/e2/api/dependencies/permissions.py`) : `reader` (lecture RAW/SILVER/GOLD), `writer` (création/màj), `deleter` (suppression), `admin` (tout). Lève **403** si rôle insuffisant. Test couvert (`tests/test_e2_api.py`).
 - **OWASP Top 10** — couverture documentée dans `docs/e2/`.
 - **Isolation** — E1 / E2 / E3 séparés par interfaces. L'API E2 ne mute pas SILVER : HTTP 501 par design, message explicite (*"is not supported (E1 isolation by design)"*).
 - **RGPD** — registre des traitements, procédure de tri des données personnelles (`docs/e4/`).
@@ -226,13 +226,11 @@ Sources `active: false` (Kaggle stopwords, lexicons, ifop annuel, zzdb_synthetic
 
 | Bloc | Périmètre | Entrées dossier |
 |---|---|---|
-| **E1** | Extraction · transformation · stockage | [`docs/AUDIT_E1_COMPETENCES.md`](docs/AUDIT_E1_COMPETENCES.md), [`docs/Dossier_E1_preuves.md`](docs/Dossier_E1_preuves.md) |
-| **E2** | API REST · sécurité · MLOps fine-tuning | [`docs/AUDIT_E2_COMPETENCES.md`](docs/AUDIT_E2_COMPETENCES.md), [`docs/Dossier_E2_A3_C6_C7_C8_FINAL.md`](docs/Dossier_E2_A3_C6_C7_C8_FINAL.md), [`docs/e2/`](docs/e2/) |
-| **E3** | Distribué · orchestration IA Mistral | [`docs/AUDIT_E3_COMPETENCES.md`](docs/AUDIT_E3_COMPETENCES.md), [`docs/e3/`](docs/e3/) |
-| **E4** | Gouvernance · RGPD · éthique | [`docs/AUDIT_E4_ECART.md`](docs/AUDIT_E4_ECART.md) |
-| **E5** | Monitoring · MCO · incidents | [`docs/AUDIT_E5_COMPETENCES.md`](docs/AUDIT_E5_COMPETENCES.md), [`docs/e5/`](docs/e5/) |
-
-Index docs : [`docs/README.md`](docs/README.md).
+| **E1** | Extraction · transformation · stockage | [`main.py`](main.py), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/DATA_FLOW.md`](docs/DATA_FLOW.md), [`reports/`](reports/) |
+| **E2** | API REST · sécurité · MLOps fine-tuning | [`docs/e2/`](docs/e2/), [`docs/e2/E2_FAQ.md`](docs/e2/E2_FAQ.md), [`docs/FASTAPI_RBAC_IMPLEMENTATION.md`](docs/FASTAPI_RBAC_IMPLEMENTATION.md) |
+| **E3** | Distribué · orchestration IA Mistral | [`src/spark/`](src/spark/), [`src/e3/mistral/service.py`](src/e3/mistral/service.py), [`docs/MISTRAL_IA_INSIGHTS.md`](docs/MISTRAL_IA_INSIGHTS.md) |
+| **E4** | Gouvernance · RGPD · éthique | [`docs/REGISTRE_TRAITEMENTS_RGPD.md`](docs/REGISTRE_TRAITEMENTS_RGPD.md), [`docs/PROCEDURE_TRI_DONNEES_PERSONNELLES.md`](docs/PROCEDURE_TRI_DONNEES_PERSONNELLES.md) |
+| **E5** | Monitoring · MCO · incidents | [`docs/METRIQUES_SEUILS_ALERTES.md`](docs/METRIQUES_SEUILS_ALERTES.md), [`docs/PROCEDURE_INCIDENTS.md`](docs/PROCEDURE_INCIDENTS.md), [`docs/MONITORING_E2_API.md`](docs/MONITORING_E2_API.md) |
 
 ---
 
@@ -264,7 +262,7 @@ reports/                # db_state · run_summary · pipeline_proof (versionnés
 models/                 # checkpoints fine-tunés + trainer_state (gitignored)
 notebooks/              # E1 pédagogique + Colab fine-tuning
 scripts/                # 46 utilitaires actifs (post-audit) + scripts/_archive/
-tests/                  # 16 fichiers, 52 tests verts
+tests/                  # 16 fichiers, 65 tests verts (+ 1 skipped)
 docs/                   # E1-E5 + dev/ (LOGGING, DOCKER_RUNTIME, FLOW_DONNEES)
 monitoring/             # config Prometheus + Grafana + provisioning
 archive/legacy_docs/    # docs obsolètes archivées (audit code)
@@ -289,8 +287,8 @@ Arbre détaillé et conventions : [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 - **Confiance moyenne des topics** structurellement basse (rule-based, multi-labels par article). Conséquence directe du choix règles vs ML pour le tagging — assumée, pas un bug.
 - **OAuth2 INSEE** non implémenté (le fallback site public est actif et testé).
-- **130 lignes GoldAI** seulement portent un `raw_data_id` (les 87 529 autres sont historiques pré-traçabilité). Le rapport `db_state` le signale (`non_comparable_legacy_rows_without_raw_data_id`) et propose la métrique alternative correcte.
-- **Distribution sentiment déséquilibrée** (52 / 36 / 12). Compensée à l'entraînement par `class_weight="balanced"` dans `scripts/finetune_sentiment.py`.
+- **130 lignes GoldAI** seulement portent un `raw_data_id` (les 92 662 autres sont historiques pré-traçabilité). Le rapport `db_state` le signale (`non_comparable_legacy_rows_without_raw_data_id`) et propose la métrique alternative correcte.
+- **Distribution sentiment déséquilibrée** (~55 / 34 / 12 en base). Compensée à l'entraînement par `class_weight="balanced"` et sélection sur le F1 macro dans `scripts/finetune_sentiment.py`.
 
 ---
 
@@ -312,4 +310,4 @@ MIT — voir [`LICENSE.md`](LICENSE.md).
 
 ---
 
-*Dernière mise à jour : 8 mai 2026 (run du jour, 51 495 articles, cohérence OK, 52 tests verts, 0 ruff issue).*
+*Dernière mise à jour : 12 juin 2026 (run du jour, 56 631 articles, cohérence OK, 65 tests verts, 0 ruff issue).*

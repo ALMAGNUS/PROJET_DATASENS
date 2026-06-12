@@ -2,7 +2,7 @@
 """
 Évaluation complète des métriques de classification (3 classes : négatif/neutre/positif).
 
-Couvre le bloc demandé en soutenance :
+Métriques couvertes :
   - Accuracy
   - Precision & Recall (par classe + macro)
   - F1 score (par classe + macro)
@@ -20,7 +20,7 @@ Usage:
 
 Sorties:
     docs/e2/EVAL_CLASSIFICATION_METRICS.json   (toutes les métriques, tous modèles)
-    docs/e2/EVAL_CLASSIFICATION_METRICS.md     (tableaux lisibles jury)
+    docs/e2/EVAL_CLASSIFICATION_METRICS.md     (tableaux lisibles)
     docs/e2/figures/e2_eval_confusion_{model}.png
     docs/e2/figures/e2_eval_roc_{model}.png
     docs/e2/figures/e2_eval_metrics_table_{model}.png

@@ -117,7 +117,7 @@ def _fmt_int(n: float) -> str:
 
 
 def summarize_prometheus_metrics(body: str, *, max_request_lines: int = 8) -> str:
-    """Résumé lisible des métriques E2 pour la soutenance (sans bruit *_created)."""
+    """Résumé lisible des métriques E2 (sans bruit *_created)."""
     samples = _parse_prometheus_samples(body)
     by_name: dict[str, list[tuple[dict[str, str], float]]] = {}
     for name, labels, value in samples:
@@ -858,7 +858,7 @@ def inject_demo_css(enabled: bool) -> None:
 
 
 def inject_presentation_css(enabled: bool) -> None:
-    """Mode présentation jury : masque le chrome Streamlit (menu, header, footer)."""
+    """Mode présentation : masque le chrome Streamlit (menu, header, footer)."""
     if not enabled:
         return
     st.markdown(

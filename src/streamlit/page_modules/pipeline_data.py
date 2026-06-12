@@ -1,7 +1,7 @@
 """
 Onglet "Pipeline & Données" — regroupe la synthèse pipeline et l'exploration flux.
 
-- **Mode démo** : vue jury simplifiée (`pipeline_demo.py`) — charts + lineage.
+- **Mode démo** : vue simplifiée (`pipeline_demo.py`) — charts + lineage.
 - **Mode Expert** : synthèse complète + exploration (inchangé).
 """
 

@@ -81,7 +81,7 @@ class Settings(BaseSettings):
         description="FastAPI host (127.0.0.1 en local Windows ; 0.0.0.0 en Docker)",
     )
     fastapi_port: int = Field(default=8001, description="FastAPI port")
-    fastapi_reload: bool = Field(default=False, description="FastAPI auto-reload (false en démo/soutenance)")
+    fastapi_reload: bool = Field(default=False, description="FastAPI auto-reload (false en démo / présentation)")
     api_v1_prefix: str = Field(default="/api/v1", description="API v1 prefix")
     cors_origins: str = Field(
         default="*",

@@ -850,7 +850,7 @@ def _render_proof_exports(
         st.caption(
             "Export audit — le **PDF** reprend le tableau de preuve, "
             "les deltas par source et les lignes SQLite paginées "
-            "(ideal soutenance / annexe technique)."
+            "(idéal démo / annexe technique)."
         )
     else:
         st.caption(
@@ -955,7 +955,7 @@ def render_last_run_proof_compact(ctx: PageContext) -> None:
 def render_last_run_proof_full(
     ctx: PageContext, *, demo_mode: bool = False, embedded: bool = False
 ) -> None:
-    """Rendu complet pour l'onglet Pipeline (ou bloc démo jury).
+    """Rendu complet pour l'onglet Pipeline (ou bloc démo).
 
     ``embedded=True`` : dans un expander Pipeline — pas de titre H3 ni de rangée
     metrics (déjà couverts par « Run du jour » au-dessus).
@@ -1203,7 +1203,7 @@ _DEMO_SOURCE_AVOID = ("GDELT_Last15_English", "GDELT_Master_List", "gdelt_events
 
 
 def _is_readable_demo_text(text: str) -> bool:
-    """Filtre titres/contenus illisibles (binaire, encodage cassé) pour la démo jury."""
+    """Filtre titres/contenus illisibles (binaire, encodage cassé) pour la démo."""
     if not text:
         return False
     sample = text.strip()[:400]

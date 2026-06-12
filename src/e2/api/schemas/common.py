@@ -7,7 +7,7 @@ from typing import Annotated
 
 from pydantic import BeforeValidator
 
-# EmailStr rejette .local / .test (RFC special-use) — comptes démo soutenance.
+# EmailStr rejette .local / .test (RFC special-use) — comptes démo locaux.
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 

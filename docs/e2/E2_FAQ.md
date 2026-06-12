@@ -1,4 +1,4 @@
-# E2 - Soutenance (Q&A rapide)
+# E2 — FAQ technique
 
 ## Pitch 60 secondes
 

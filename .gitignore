@@ -143,8 +143,8 @@ validation_report.json
 backups/
 
 # ============================================================
-# Soutenance certification — préparation personnelle (NE PAS versionner)
-# Le jury a accès au dépôt GitHub public : ce dossier reste local uniquement.
+# Notes personnelles de préparation (NE PAS versionner)
 # ============================================================
+docs/soutenance/
 docs/soutenance_code_extraits/
 

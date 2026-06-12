@@ -82,7 +82,7 @@ HUGGINGFACE_API_KEY=<ta_clé>        # facultatif
 OPENWEATHERMAP_API_KEY=<ta_clé>     # sinon fallback Open-Meteo
 INSEE_CLIENT_ID=...                 # facultatif, sinon fallback HTML public
 INSEE_CLIENT_SECRET=...
-ACCESS_TOKEN_EXPIRE_MINUTES=180     # optionnel — soutenance / démo (défaut 30 min, cf. § 6.7)
+ACCESS_TOKEN_EXPIRE_MINUTES=180     # optionnel — démo longue (défaut 30 min, cf. § 6.7)
 ```
 
 `.env` est ignoré par Git (cf. `.gitignore` : `.env*` sauf `.env.example`).
@@ -158,7 +158,7 @@ Pour un run pipeline manuel : `python main.py` (sans tout relancer).
 ### 3.1 Publication quotidienne des rapports sur GitHub
 
 Les fichiers `reports/db_state_*` et `reports/run_summary_*` doivent être **commités et poussés**
-pour que le jury voie les preuves à jour (GitHub trie le dossier par nom de fichier, pas par date :
+pour garder les preuves à jour (GitHub trie le dossier par nom de fichier, pas par date :
 le plus récent est en bas de la liste, ex. `db_state_2026-05-18T062650Z.md`).
 
 **Une commande (pipeline + rapport + push)** :
@@ -193,7 +193,7 @@ Prérequis : `.venv` activable, `git` en PATH, branche `main` suivie par `origin
 | `Too Many Requests` / `Failed to resolve action download info` | Limite interne GitHub (téléchargement des actions) | Attendre **15–60 min**, **Re-run** le job. Les pushes qui ne touchent que `reports/` ou `docs/` **ne déclenchent plus** la CI (paths-ignore). |
 | `Node.js 20 is deprecated` sur checkout/setup-python | Anciennes actions v4/v5 forcées en Node 24 | `actions/checkout@v6`, `actions/setup-python@v6`. |
 | `Node.js 20` sur actions Docker (build job) | Anciennes `docker/*@v3`–`v5` | `setup-buildx@v4`, `login@v4`, `metadata@v6`, `build-push@v7` (Node 24 natif). |
-| CI rouge mais dépôt OK pour le jury | La soutenance ne dépend pas d’Actions vertes | Les liens `src/`, `docs/`, `reports/` sur GitHub restent valides. |
+| CI rouge mais dépôt OK | Le dépôt reste exploitable hors Actions | Les liens `src/`, `docs/`, `reports/` sur GitHub restent valides. |
 
 Relancer manuellement : onglet **Actions** → workflow **DataSens E1 CI/CD Pipeline** → **Run workflow**.
 
@@ -446,7 +446,7 @@ jour `password_hash` (bcrypt) et `updated_at`.
 > (pas de point, pas d'astérisque). C'est le comportement standard de `getpass`.
 > Tape ton mot de passe au clavier puis Entrée.
 
-> **Si le terminal ne répond pas** (cas Cursor / VSCode integrated, certains
+> **Si le terminal ne répond pas** (cas terminal intégré VS Code, certains
 > conteneurs Docker) : `getpass` peut bloquer car le terminal n'est pas un
 > vrai TTY. **Solution** : ouvrir un PowerShell séparé (`Win+R` → `powershell`),
 > activer le venv, relancer la commande.
@@ -485,12 +485,12 @@ Conserve l'historique d'audit (`user_action_log`) tout en bloquant la connexion.
 L'**API E2 ne mute jamais SILVER** (HTTP 501 par design, isolation E1).
 L'écriture SILVER passe exclusivement par le pipeline E1.
 
-### 6.7 Durée de session JWT (soutenance / démo)
+### 6.7 Durée de session JWT (démo longue)
 
 Par défaut, le token JWT cockpit expire au bout de **30 minutes**
 (`ACCESS_TOKEN_EXPIRE_MINUTES`, défaut dans `src/config.py`).
 
-**Checklist jour J** (soutenance ou démo > 30 min) :
+**Checklist démo longue** (> 30 min) :
 
 1. Dans `.env` :
    ```env
@@ -609,7 +609,7 @@ pip install -r requirements.txt
 scripts\fix_venv.bat
 ```
 
-(Ferme Cursor et tous les terminaux avant : Windows verrouille les `.dll` chargés.)
+(Ferme l'IDE et tous les terminaux avant : Windows verrouille les `.dll` chargés.)
 
 **Migrations de schéma SQLite** : aucune migration automatique, le projet
 applique les `CREATE TABLE IF NOT EXISTS` au démarrage. Si une nouvelle table
@@ -880,7 +880,7 @@ Statut consultable sur https://github.com/ALMAGNUS/PROJET_DATASENS/actions.
 | `HUGGINGFACE_API_KEY` | Settings HuggingFace → revoke + new → `.env` | trimestriel |
 | `MONGO_PASSWORD` | Voir § 12.3 | annuel |
 | `JWT_SECRET_KEY` | `.env` → redémarrer API (invalide tous les tokens) | annuel ou sur incident |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | `.env` → redémarrer API (nouveaux tokens uniquement) | avant soutenance / démo longue (cf. § 6.7) |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `.env` → redémarrer API (nouveaux tokens uniquement) | avant démo longue (cf. § 6.7) |
 | Mots de passe utilisateurs | `python scripts/change_password.py` | sur demande |
 
 ### 12.3 Rotation MongoDB password
@@ -1015,7 +1015,7 @@ ports:
 ### API renvoie 401 malgré login OK
 
 1. Token expiré (défaut **30 min**, variable `ACCESS_TOKEN_EXPIRE_MINUTES` dans
-   `.env`) : se reconnecter au cockpit ou `POST /auth/login`. Pour une soutenance,
+   `.env`) : se reconnecter au cockpit ou `POST /auth/login`. Pour une démo longue,
    passer à `180` et redémarrer l'API (§ 6.7).
 2. Mauvais rôle pour la route : vérifier le RBAC (§ 6.6).
 3. Compte désactivé : `python scripts/change_password.py --list` → `ACTIF: non` ?
@@ -1044,7 +1044,7 @@ ports:
 
 ### `getpass` bloque dans terminal IDE
 
-Sur Cursor / VSCode integrated terminal, `getpass.getpass()` peut ne pas
+Sur terminal intégré VS Code, `getpass.getpass()` peut ne pas
 recevoir les frappes. Solution : ouvrir un PowerShell séparé (`Win+R` →
 `powershell`), activer le venv, relancer la commande. Cf. § 6.3.
 
@@ -1052,7 +1052,7 @@ recevoir les frappes. Solution : ouvrir un PowerShell séparé (`Win+R` →
 
 ## 15. Références
 
-### Carte des emplacements des fichiers (audit, soutenance)
+### Carte des emplacements des fichiers (audit, démo)
 
 Pour répondre à une demande du type *« montrez où se trouvent les fichiers du
 projet »* : partir de la **racine** (`main.py`, `docker-compose.yml`), puis
@@ -1086,7 +1086,7 @@ chemins : montrer **5 dossiers** suffit si chacun a une phrase claire.
 | `docs/` | Dossiers E2–E5, annexes, veille versionnée, schémas (`ARCHITECTURE`, `FLOW_DONNEES`). |
 | `.github/workflows/` | CI : tests, quality gate, build image. |
 | `notebooks/` | Notebook Colab fine-tuning (`colab_finetune_sentiment.ipynb`). |
-| `presentations/` | Supports soutenance au format Marp (sources `.md`). |
+| `presentations/` | Supports de présentation au format Marp (sources `.md`). |
 
 #### MongoDB / GridFS (si on te le demande)
 
@@ -1137,4 +1137,4 @@ Préparer dans l’explorateur ou l’IDE trois favoris : **`data/goldai`**, **`
 
 ---
 
-*Dernière mise à jour : 19 mai 2026 — ajout § 6.7 `ACCESS_TOKEN_EXPIRE_MINUTES` (session JWT soutenance / démo).*
+*Dernière mise à jour : 12 juin 2026 — § 6.7 `ACCESS_TOKEN_EXPIRE_MINUTES` (session JWT démo longue).*

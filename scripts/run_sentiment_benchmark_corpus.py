@@ -1,4 +1,4 @@
-"""Benchmark sentiment — corpus de test soutenance (ac0hik + calibration)."""
+"""Benchmark sentiment — corpus de test de référence (ac0hik + calibration)."""
 
 from __future__ import annotations
 

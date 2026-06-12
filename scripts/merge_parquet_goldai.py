@@ -314,16 +314,21 @@ class GoldAIMerger:
         new_dfs = self.loader.load_gold_dates(new_dates)
         dfs_to_merge.extend(new_dfs)
 
-        # Diagnostics explicites: combien de nouveaux IDs réels apportent les dates du jour
+        # Diagnostics explicites: combien de nouveaux IDs réels apportent les dates du jour.
+        # IMPORTANT: on harmonise l'identifiant (fingerprint > url > title > id) AVANT de
+        # comparer, sinon l'overlap est calculé sur l'`id` brut dont le format a changé
+        # selon les versions de schéma GOLD -> overlap toujours = 0 (faux négatif trompeur).
         if new_dfs:
             new_union = self.merger.union_all(new_dfs)
             new_rows = new_union.count()
-            new_unique_ids = self._distinct_id_count(new_union)
+            new_union_h = self.deduplicator.harmonize_id(new_union)
+            new_unique_ids = self._distinct_id_count(new_union_h)
             print(f"IDs distincts dans les nouvelles dates: {new_unique_ids:,}")
 
-            if existing_df and "id" in existing_df.columns and "id" in new_union.columns:
-                existing_ids = existing_df.select("id").dropDuplicates()
-                new_ids = new_union.select("id").dropDuplicates()
+            if existing_df is not None:
+                existing_h = self.deduplicator.harmonize_id(existing_df)
+                existing_ids = existing_h.select("id").where(col("id").isNotNull()).dropDuplicates()
+                new_ids = new_union_h.select("id").where(col("id").isNotNull()).dropDuplicates()
                 overlap = new_ids.join(existing_ids, on="id", how="inner").count()
                 new_unique_vs_existing = max(new_unique_ids - overlap, 0)
                 print(f"IDs déjà présents dans GoldAI existant: {overlap:,}")
