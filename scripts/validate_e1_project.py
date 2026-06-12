@@ -52,7 +52,11 @@ print("-" * 80)
 
 # Fichiers essentiels
 test("main.py existe", (project_root / "main.py").exists(), "Point d'entrée du pipeline")
-test("src/e1/core.py existe", (project_root / "src" / "e1" / "core.py").exists(), "Extracteurs et modèles")
+test(
+    "src/e1/core.py existe",
+    (project_root / "src" / "e1" / "core.py").exists(),
+    "Extracteurs et modèles",
+)
 test(
     "src/e1/repository.py existe",
     (project_root / "src" / "e1" / "repository.py").exists(),
@@ -76,8 +80,16 @@ test(
     (project_root / "src" / "e1" / "exporter.py").exists(),
     "Export CSV/Parquet",
 )
-test("src/e1/tagger.py existe", (project_root / "src" / "e1" / "tagger.py").exists(), "Tagging topics")
-test("src/e1/analyzer.py existe", (project_root / "src" / "e1" / "analyzer.py").exists(), "Analyse sentiment")
+test(
+    "src/e1/tagger.py existe",
+    (project_root / "src" / "e1" / "tagger.py").exists(),
+    "Tagging topics",
+)
+test(
+    "src/e1/analyzer.py existe",
+    (project_root / "src" / "e1" / "analyzer.py").exists(),
+    "Analyse sentiment",
+)
 
 print("\n[2] VÉRIFICATION BASE DE DONNÉES DataSens")
 print("-" * 80)
@@ -164,7 +176,11 @@ zzdb_csv_paths = [
     project_root / "data" / "raw" / "zzdb_csv" / "zzdb_dataset.csv",
 ]
 zzdb_csv_found = next((p for p in zzdb_csv_paths if p.exists()), None)
-test("Fichier ZZDB CSV", zzdb_csv_found is not None, str(zzdb_csv_found) if zzdb_csv_found else "zzdb/zzdb_dataset.csv non trouvé")
+test(
+    "Fichier ZZDB CSV",
+    zzdb_csv_found is not None,
+    str(zzdb_csv_found) if zzdb_csv_found else "zzdb/zzdb_dataset.csv non trouvé",
+)
 
 print("\n[4] VÉRIFICATION PIPELINE E1")
 print("-" * 80)
@@ -196,7 +212,11 @@ try:
 
         # Vérifier source zzdb_csv
         zzdb_sources = [s for s in config["sources"] if "zzdb" in s.get("source_name", "").lower()]
-        test("Source ZZDB (zzdb_csv) configurée", len(zzdb_sources) > 0, f"{len(zzdb_sources)} source(s)")
+        test(
+            "Source ZZDB (zzdb_csv) configurée",
+            len(zzdb_sources) > 0,
+            f"{len(zzdb_sources)} source(s)",
+        )
 except Exception as e:
     test("sources_config.json valide", False, f"Erreur: {str(e)[:60]}")
 
@@ -300,11 +320,11 @@ try:
 
     # Test avec source zzdb_csv (CSV, pas MongoDB)
     zzdb_url = "zzdb/zzdb_dataset.csv"
-    test_source = Source(
-        source_name="zzdb_csv", acquisition_type="csv", url=zzdb_url
-    )
+    test_source = Source(source_name="zzdb_csv", acquisition_type="csv", url=zzdb_url)
     extractor = create_extractor(test_source)
-    test("Création extractor ZZDB (CSV)", extractor is not None, f"Type: {type(extractor).__name__}")
+    test(
+        "Création extractor ZZDB (CSV)", extractor is not None, f"Type: {type(extractor).__name__}"
+    )
 
     articles = extractor.extract()
     test(

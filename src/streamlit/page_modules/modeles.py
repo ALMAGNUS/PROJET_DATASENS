@@ -84,14 +84,15 @@ def _render_finetune_controls(ctx: PageContext) -> None:
     may_run = can_write()
     may_admin = can_admin()
 
-    st.caption("Backbone + hyperparamètres. Lancez d'abord **Copie IA** (Pilotage) si train.parquet est absent.")
+    st.caption(
+        "Backbone + hyperparamètres. Lancez d'abord **Copie IA** (Pilotage) si train.parquet est absent."
+    )
 
     _bench_for_ft = _load_benchmark_results(PROJECT_ROOT)
     _best_backbone_suggestion = "sentiment_fr"
     if _bench_for_ft:
         _pretrained_only = {
-            k: v for k, v in _bench_for_ft.items()
-            if k != "finetuned_local" and "error" not in v
+            k: v for k, v in _bench_for_ft.items() if k != "finetuned_local" and "error" not in v
         }
         _backbone_map = {
             "bert_multilingual": "bert_multilingual",
@@ -134,7 +135,9 @@ def _render_finetune_controls(ctx: PageContext) -> None:
         ft_mode = st.selectbox(
             "Mode",
             ["quick", "full"],
-            format_func=lambda x: "Quick (1 epoch, ~3000 ex.)" if x == "quick" else "Full (3 epochs)",
+            format_func=lambda x: "Quick (1 epoch, ~3000 ex.)"
+            if x == "quick"
+            else "Full (3 epochs)",
             key="ft_mode_models",
         )
     with ft_col3:
@@ -201,13 +204,13 @@ def _render_finetune_controls(ctx: PageContext) -> None:
             disabled=not may_run,
             key="btn_eval_finetune_models",
         ):
-            _run_command(
-                "eval", [sys.executable, "scripts/finetune_sentiment.py", "--eval-only"]
-            )
+            _run_command("eval", [sys.executable, "scripts/finetune_sentiment.py", "--eval-only"])
 
     finetuned_path = getattr(settings, "sentiment_finetuned_model_path", None)
     if finetuned_path:
-        st.caption(f"Checkpoint .env actif : `{finetuned_path}` (nom unifié : {SENTIMENT_MODEL_DISPLAY_NAME})")
+        st.caption(
+            f"Checkpoint .env actif : `{finetuned_path}` (nom unifié : {SENTIMENT_MODEL_DISPLAY_NAME})"
+        )
     else:
         st.caption(
             "Après fine-tuning, activez le modèle dans **Activation manuelle** "
@@ -233,7 +236,9 @@ def _render_drift_panel(settings) -> None:
         )
 
         col_btn, col_info = st.columns([1, 3])
-        force_refresh = col_btn.button("Rafraîchir drift", use_container_width=True, key="btn_refresh_drift_models")
+        force_refresh = col_btn.button(
+            "Rafraîchir drift", use_container_width=True, key="btn_refresh_drift_models"
+        )
 
         cache = st.session_state.get(cache_key)
         now = time.time()
@@ -298,9 +303,7 @@ def _render_drift_panel(settings) -> None:
             elif score >= 0.5:
                 st.warning("Drift score ≥ 0.5 — à surveiller.")
 
-        st.markdown(
-            f"[Grafana – Métriques & Drift]({grafana_url}/d/datasens-full)"
-        )
+        st.markdown(f"[Grafana – Métriques & Drift]({grafana_url}/d/datasens-full)")
 
 
 # ── Bloc 1 : carte « modèle en production » ─────────────────────────────────
@@ -352,7 +355,9 @@ def _render_production_hero(
 # ── Bloc 2 : tableau comparatif unique ──────────────────────────────────────
 def _render_comparison_table(bench: dict | None, eval_metrics: dict) -> None:
     if not bench:
-        st.info("Aucun benchmark disponible. Lancez-en un dans **Outils avancés → Lancer un benchmark**.")
+        st.info(
+            "Aucun benchmark disponible. Lancez-en un dans **Outils avancés → Lancer un benchmark**."
+        )
         return
 
     rows: list[dict] = []
@@ -420,7 +425,9 @@ def _render_decision_block(gate: dict) -> None:
     c_train, c_inf, c_gate = st.columns(3)
     with c_train:
         st.markdown("**Entraînement (validation)**")
-        st.metric("Modèle de référence", canonical_sentiment_label(gate.get("train_model_name")) or "n/a")
+        st.metric(
+            "Modèle de référence", canonical_sentiment_label(gate.get("train_model_name")) or "n/a"
+        )
         tr_acc = gate.get("train_accuracy")
         tr_f1 = gate.get("train_f1_macro")
         tr_pos = gate.get("train_f1_pos")
@@ -439,7 +446,10 @@ def _render_decision_block(gate: dict) -> None:
         st.caption(
             f"Acc={float(inf_acc):.3f} | F1_macro={float(inf_f1):.3f} | "
             f"F1_pos={float(inf_pos):.3f} | Lat={float(inf_lat):.1f} ms"
-            if inf_acc is not None and inf_f1 is not None and inf_pos is not None and inf_lat is not None
+            if inf_acc is not None
+            and inf_f1 is not None
+            and inf_pos is not None
+            and inf_lat is not None
             else "Métriques inférence incomplètes."
         )
     with c_gate:
@@ -476,7 +486,9 @@ def _render_training_detail(root: Path, trained_models: list[dict]) -> None:
             {
                 "Modèle": m["name"],
                 "Accuracy val.": f"{m['eval_accuracy']:.1%}" if m.get("eval_accuracy") else "—",
-                "F1 macro": f"{f1_macro_display_val:.3f}" if f1_macro_display_val is not None else "—",
+                "F1 macro": f"{f1_macro_display_val:.3f}"
+                if f1_macro_display_val is not None
+                else "—",
                 "F1 positif": f"{f1_pos_ft:.3f}" if f1_pos_ft is not None else "⚠ non calculé",
                 "Epochs": f"{m.get('epochs', '—')}",
                 "Entraîné le": m.get("trained_at", "—"),
@@ -496,7 +508,9 @@ def _render_training_detail(root: Path, trained_models: list[dict]) -> None:
         train_loss = [e["loss"] for e in log if "loss" in e]
         eval_entries = [e for e in log if "eval_loss" in e]
         if train_steps:
-            df_loss = pd.DataFrame({"step": train_steps, "Train Loss": train_loss}).set_index("step")
+            df_loss = pd.DataFrame({"step": train_steps, "Train Loss": train_loss}).set_index(
+                "step"
+            )
             if eval_entries:
                 for ev in eval_entries:
                     step = ev.get("step", train_steps[-1])
@@ -506,13 +520,15 @@ def _render_training_detail(root: Path, trained_models: list[dict]) -> None:
     run_rows = []
     for m in trained_models:
         if m.get("eval_accuracy"):
-            run_rows.append({
-                "Run": m["name"],
-                "Date": m.get("trained_at", "—"),
-                "Accuracy": round(m["eval_accuracy"], 4),
-                "F1": round(m.get("eval_f1") or 0, 4),
-                "Epochs": m.get("epochs", "—"),
-            })
+            run_rows.append(
+                {
+                    "Run": m["name"],
+                    "Date": m.get("trained_at", "—"),
+                    "Accuracy": round(m["eval_accuracy"], 4),
+                    "F1": round(m.get("eval_f1") or 0, 4),
+                    "Epochs": m.get("epochs", "—"),
+                }
+            )
     if len(run_rows) > 1:
         st.caption("**Historique des runs**")
         df_runs = pd.DataFrame(run_rows)
@@ -520,7 +536,6 @@ def _render_training_detail(root: Path, trained_models: list[dict]) -> None:
 
 
 def _render_benchmark_actions(ctx: PageContext) -> None:
-    root = ctx.project_root
     st.caption(
         "Compare les modèles HuggingFace sur votre dataset de test. "
         "**Relancez après chaque grosse collecte** : les métriques évoluent avec les données."
@@ -536,7 +551,9 @@ def _render_benchmark_actions(ctx: PageContext) -> None:
             disabled=not may_run,
             key="btn_bench_quick",
         ):
-            _run_command("benchmark", [sys.executable, "scripts/ai_benchmark.py", "--max-samples", "200"])
+            _run_command(
+                "benchmark", [sys.executable, "scripts/ai_benchmark.py", "--max-samples", "200"]
+            )
     with c2:
         if st.button(
             "Benchmark complet",
@@ -559,7 +576,9 @@ def _render_activation(root: Path, trained_models: list[dict], active_model: str
     }
     for m in trained_models:
         label = (
-            f"{m['name']} — Accuracy {m['eval_accuracy']:.1%}" if m.get("eval_accuracy") else m["name"]
+            f"{m['name']} — Accuracy {m['eval_accuracy']:.1%}"
+            if m.get("eval_accuracy")
+            else m["name"]
         )
         all_model_options[label] = m["path"]
 
@@ -588,25 +607,35 @@ def _render_activation(root: Path, trained_models: list[dict], active_model: str
         ):
             if chosen_path:
                 if _activate_model(root, chosen_path):
-                    st.success(f"Modèle activé : `{canonical_sentiment_label(chosen_path)}`. Redémarrez l'API E2.")
+                    st.success(
+                        f"Modèle activé : `{canonical_sentiment_label(chosen_path)}`. Redémarrez l'API E2."
+                    )
                     st.rerun()
                 else:
                     st.error("Impossible d'écrire dans .env — vérifiez les permissions.")
             else:
                 if _activate_model(root, ""):
-                    st.success(f"Modèle par défaut ({_bench_display_name('sentiment_fr')}) restauré.")
+                    st.success(
+                        f"Modèle par défaut ({_bench_display_name('sentiment_fr')}) restauré."
+                    )
                     st.rerun()
     with col2:
         if trained_models and st.button(
             "Activer le meilleur automatiquement",
             use_container_width=True,
             disabled=not may_admin,
-            help=("Rôle admin requis." if not may_admin else "Active le fine-tuné avec la meilleure accuracy"),
+            help=(
+                "Rôle admin requis."
+                if not may_admin
+                else "Active le fine-tuné avec la meilleure accuracy"
+            ),
             key="btn_activate_best",
         ):
             best = max(trained_models, key=lambda m: m.get("eval_accuracy") or 0)
             if best.get("eval_accuracy") and _activate_model(root, best["path"]):
-                st.success(f"Meilleur modèle activé : `{canonical_sentiment_label(best['path'])}` ({best['eval_accuracy']:.1%}).")
+                st.success(
+                    f"Meilleur modèle activé : `{canonical_sentiment_label(best['path'])}` ({best['eval_accuracy']:.1%})."
+                )
                 st.rerun()
 
 
@@ -639,9 +668,13 @@ def render(ctx: PageContext) -> None:
     # Bloc 3 — Outils avancés (repliés)
     st.divider()
     st.markdown("#### Outils avancés")
-    with st.expander("Comprendre la décision (entraînement vs inférence · Go/No-Go)", expanded=False):
+    with st.expander(
+        "Comprendre la décision (entraînement vs inférence · Go/No-Go)", expanded=False
+    ):
         _render_decision_block(gate)
-    with st.expander("Détail entraînement (validation, courbes de loss, historique)", expanded=False):
+    with st.expander(
+        "Détail entraînement (validation, courbes de loss, historique)", expanded=False
+    ):
         _render_training_detail(root, trained)
     with st.expander("Lancer un benchmark", expanded=False):
         _render_benchmark_actions(ctx)

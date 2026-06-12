@@ -4,7 +4,6 @@ DataSens Streamlit Cockpit
 
 from __future__ import annotations
 
-import os
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -23,15 +22,8 @@ from src.streamlit._cockpit_helpers import (
     ensure_telemetry_session,
     get_api_base,
     render_brand_logo,
-)
-from src.streamlit.cockpit_ux import (
-    inject_cockpit_ux_css,
-    on_ux_mode_change,
-    render_expert_kpi_strip,
-    render_sidebar_status,
-    reset_scroll_on_mode_change,
-    resolve_backend_ok,
-    sync_ux_mode,
+    render_demo_header,
+    render_mode_intro,
 )
 from src.streamlit._cockpit_helpers import (
     inject_css as _inject_css,
@@ -45,17 +37,21 @@ from src.streamlit._cockpit_helpers import (
 from src.streamlit._cockpit_helpers import (
     inject_readability_css as _inject_readability_css,
 )
-from src.streamlit._cockpit_helpers import (
-    render_demo_header,
-    render_mode_intro,
-)
 from src.streamlit.auth_plug import (
     get_user,
-    has_any_role,
     init_session_auth,
     is_logged_in,
     render_login_page,
     render_user_and_logout,
+)
+from src.streamlit.cockpit_ux import (
+    inject_cockpit_ux_css,
+    on_ux_mode_change,
+    render_expert_kpi_strip,
+    render_sidebar_status,
+    reset_scroll_on_mode_change,
+    resolve_backend_ok,
+    sync_ux_mode,
 )
 
 # M6 refactor — helpers de calcul pur extraits dans metrics.py.

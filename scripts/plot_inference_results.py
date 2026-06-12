@@ -24,12 +24,12 @@ PRED_DIR = ROOT / "data" / "goldai" / "predictions"
 FIG_DIR = ROOT / "docs" / "e2" / "figures"
 
 CLASS_COLORS = {
-    "positif":  "#22c55e",
-    "négatif":  "#ef4444",
-    "neutre":   "#64748b",
+    "positif": "#22c55e",
+    "négatif": "#ef4444",
+    "neutre": "#64748b",
     "POSITIVE": "#22c55e",
     "NEGATIVE": "#ef4444",
-    "NEUTRAL":  "#64748b",
+    "NEUTRAL": "#64748b",
 }
 STYLE = {"dpi": 180, "facecolor": "white"}
 
@@ -43,7 +43,9 @@ def _load_predictions() -> pd.DataFrame:
     df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
     # Normalise vers labels FR minuscules
     if "predicted_sentiment" in df.columns:
-        df["sentiment_label"] = df["predicted_sentiment"].map(lambda x: _LABEL_MAP.get(str(x), str(x)))
+        df["sentiment_label"] = df["predicted_sentiment"].map(
+            lambda x: _LABEL_MAP.get(str(x), str(x))
+        )
     elif "label_3c" in df.columns:
         df["sentiment_label"] = df["label_3c"].map(lambda x: _LABEL_MAP.get(str(x), str(x)))
     else:
@@ -65,16 +67,23 @@ def _plot_sentiment_distribution(df: pd.DataFrame) -> None:
     fig.suptitle(
         f"E2 Inférence — Distribution des sentiments prédits\n"
         f"Modèle : ALMAGNUS/datasens-sentiment-fr · {total:,} articles",
-        fontsize=12, fontweight="bold",
+        fontsize=12,
+        fontweight="bold",
     )
 
     # Gauche : bar chart
     ax0 = axes[0]
-    bars = ax0.bar(order, counts.values, color=colors, alpha=0.88, edgecolor="black", linewidth=0.5, width=0.5)
+    bars = ax0.bar(
+        order, counts.values, color=colors, alpha=0.88, edgecolor="black", linewidth=0.5, width=0.5
+    )
     for bar, cnt, pct in zip(bars, counts.values, pcts.values, strict=False):
         ax0.text(
-            bar.get_x() + bar.get_width() / 2, bar.get_height() + total * 0.005,
-            f"{cnt:,}\n({pct}%)", ha="center", fontsize=10, fontweight="bold",
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + total * 0.005,
+            f"{cnt:,}\n({pct}%)",
+            ha="center",
+            fontsize=10,
+            fontweight="bold",
         )
     ax0.set_ylabel("Nombre d'articles")
     ax0.set_title("Décompte par classe", fontsize=11)
@@ -84,8 +93,12 @@ def _plot_sentiment_distribution(df: pd.DataFrame) -> None:
     # Droite : donut
     ax1 = axes[1]
     wedges, texts, autotexts = ax1.pie(
-        counts.values, labels=order, colors=colors,
-        autopct="%1.1f%%", startangle=90, pctdistance=0.75,
+        counts.values,
+        labels=order,
+        colors=colors,
+        autopct="%1.1f%%",
+        startangle=90,
+        pctdistance=0.75,
         wedgeprops={"edgecolor": "white", "linewidth": 2},
     )
     for t in autotexts:
@@ -94,7 +107,16 @@ def _plot_sentiment_distribution(df: pd.DataFrame) -> None:
     # Donut hole
     centre = plt.Circle((0, 0), 0.45, fc="white")
     ax1.add_patch(centre)
-    ax1.text(0, 0, f"{total:,}\narticles", ha="center", va="center", fontsize=9, fontweight="bold", color="#374151")
+    ax1.text(
+        0,
+        0,
+        f"{total:,}\narticles",
+        ha="center",
+        va="center",
+        fontsize=9,
+        fontweight="bold",
+        color="#374151",
+    )
     ax1.set_title("Répartition proportionnelle", fontsize=11)
 
     # Annotation si forte dominance
@@ -104,10 +126,18 @@ def _plot_sentiment_distribution(df: pd.DataFrame) -> None:
         ax0.annotate(
             f"Dominance {dominant_class} ({dominant_pct}%)\n→ vérifier biais corpus ou modèle",
             xy=(order.index(dominant_class), counts[dominant_class]),
-            xytext=(0.65, 0.85), xycoords=("data", "axes fraction"),
+            xytext=(0.65, 0.85),
+            xycoords=("data", "axes fraction"),
             textcoords="axes fraction",
-            fontsize=8, color="#7c3aed", fontweight="bold",
-            bbox={"boxstyle": "round,pad=0.3", "facecolor": "#f3e8ff", "edgecolor": "#7c3aed", "alpha": 0.9},
+            fontsize=8,
+            color="#7c3aed",
+            fontweight="bold",
+            bbox={
+                "boxstyle": "round,pad=0.3",
+                "facecolor": "#f3e8ff",
+                "edgecolor": "#7c3aed",
+                "alpha": 0.9,
+            },
         )
 
     fig.tight_layout()
@@ -127,26 +157,33 @@ def _plot_confidence_by_class(df: pd.DataFrame) -> None:
     fig.suptitle(
         "E2 Inférence — Score de confiance par classe prédite\n"
         "(confiance = max des probabilités : max(p_pos, p_neu, p_neg))",
-        fontsize=12, fontweight="bold",
+        fontsize=12,
+        fontweight="bold",
     )
 
     # Gauche : boxplot
     ax0 = axes[0]
     data_by_class = [df[df["sentiment_label"] == c]["confidence"].dropna().values for c in order]
     bp = ax0.boxplot(
-        data_by_class, tick_labels=order, patch_artist=True,
+        data_by_class,
+        tick_labels=order,
+        patch_artist=True,
         medianprops={"color": "black", "linewidth": 2},
     )
     for patch, color in zip(bp["boxes"], colors, strict=False):
         patch.set_facecolor(color)
         patch.set_alpha(0.75)
-    for mean_val, x_pos, _ in zip([d.mean() for d in data_by_class], range(1, len(order) + 1), order, strict=False):
+    for mean_val, x_pos, _ in zip(
+        [d.mean() for d in data_by_class], range(1, len(order) + 1), order, strict=False
+    ):
         ax0.scatter(x_pos, mean_val, color="black", zorder=5, s=60, marker="D")
         ax0.text(x_pos + 0.07, mean_val, f"moy={mean_val:.3f}", fontsize=8, va="center")
     ax0.set_ylabel("Score de confiance (0 → 1)")
     ax0.set_title("Distribution de confiance", fontsize=11)
     ax0.axhline(0.5, color="#dc2626", linestyle="--", linewidth=1, alpha=0.7)
-    ax0.text(0.7, 0.515, "Seuil 0.5", fontsize=8, color="#7f1d1d", transform=ax0.get_yaxis_transform())
+    ax0.text(
+        0.7, 0.515, "Seuil 0.5", fontsize=8, color="#7f1d1d", transform=ax0.get_yaxis_transform()
+    )
     ax0.grid(axis="y", alpha=0.25)
 
     # Droite : histogramme superposé
@@ -154,14 +191,26 @@ def _plot_confidence_by_class(df: pd.DataFrame) -> None:
     bins = np.linspace(0, 1, 30)
     for c, color in zip(order, colors, strict=False):
         subset = df[df["sentiment_label"] == c]["confidence"].dropna()
-        ax1.hist(subset, bins=bins, alpha=0.55, color=color, label=f"{c} (n={len(subset):,})", edgecolor="none")
+        ax1.hist(
+            subset,
+            bins=bins,
+            alpha=0.55,
+            color=color,
+            label=f"{c} (n={len(subset):,})",
+            edgecolor="none",
+        )
     ax1.set_xlabel("Score de confiance")
     ax1.set_ylabel("Fréquence")
     ax1.set_title("Histogramme par classe", fontsize=11)
     ax1.legend(fontsize=9)
     ax1.grid(alpha=0.2)
-    ax1.axvline(df["confidence"].mean(), color="#7c3aed", linewidth=1.5, linestyle="--",
-                label=f"Moy. globale = {df['confidence'].mean():.3f}")
+    ax1.axvline(
+        df["confidence"].mean(),
+        color="#7c3aed",
+        linewidth=1.5,
+        linestyle="--",
+        label=f"Moy. globale = {df['confidence'].mean():.3f}",
+    )
 
     fig.tight_layout()
     fig.savefig(FIG_DIR / "e2_inference_confidence_by_class.png", **STYLE)
@@ -180,7 +229,8 @@ def _plot_probability_profiles(df: pd.DataFrame) -> None:
     fig.suptitle(
         "E2 Inférence — Profils de probabilité par classe\n"
         "(frontières de décision du modèle ALMAGNUS/datasens-sentiment-fr)",
-        fontsize=12, fontweight="bold",
+        fontsize=12,
+        fontweight="bold",
     )
 
     # Échantillon pour le scatter (max 3000 points pour lisibilité)
@@ -191,8 +241,14 @@ def _plot_probability_profiles(df: pd.DataFrame) -> None:
     ax0 = axes[0]
     for c in order:
         sub = sample[sample["sentiment_label"] == c]
-        ax0.scatter(sub["p_pos"], sub["p_neg"], s=8, alpha=0.35,
-                    color=CLASS_COLORS[c], label=f"{c} (n={len(sub):,})")
+        ax0.scatter(
+            sub["p_pos"],
+            sub["p_neg"],
+            s=8,
+            alpha=0.35,
+            color=CLASS_COLORS[c],
+            label=f"{c} (n={len(sub):,})",
+        )
     ax0.set_xlabel("p(positif)")
     ax0.set_ylabel("p(négatif)")
     ax0.set_title("Espace de décision p_pos vs p_neg", fontsize=11)
@@ -208,9 +264,11 @@ def _plot_probability_profiles(df: pd.DataFrame) -> None:
     for col, label, color in [
         ("p_pos", "p(positif)", CLASS_COLORS["positif"]),
         ("p_neg", "p(négatif)", CLASS_COLORS["négatif"]),
-        ("p_neu", "p(neutre)",  CLASS_COLORS["neutre"]),
+        ("p_neu", "p(neutre)", CLASS_COLORS["neutre"]),
     ]:
-        ax1.hist(df[col].dropna(), bins=bins, alpha=0.45, color=color, label=label, edgecolor="none")
+        ax1.hist(
+            df[col].dropna(), bins=bins, alpha=0.45, color=color, label=label, edgecolor="none"
+        )
     ax1.set_xlabel("Probabilité")
     ax1.set_ylabel("Fréquence")
     ax1.set_title("Distribution marginale des 3 probabilités", fontsize=11)
@@ -237,16 +295,19 @@ def _plot_latency(df: pd.DataFrame) -> None:
     fig.suptitle(
         f"E2 Inférence — Latence d'inférence par article\n"
         f"Modèle : ALMAGNUS/datasens-sentiment-fr · {len(lat):,} prédictions",
-        fontsize=12, fontweight="bold",
+        fontsize=12,
+        fontweight="bold",
     )
 
     # Gauche : histogramme
     ax0 = axes[0]
     ax0.hist(lat, bins=50, color="#60a5fa", alpha=0.80, edgecolor="white", linewidth=0.4)
-    ax0.axvline(p50, color="#16a34a",  linewidth=2, linestyle="-",  label=f"p50 = {p50:.0f} ms")
-    ax0.axvline(p90, color="#ea580c",  linewidth=2, linestyle="--", label=f"p90 = {p90:.0f} ms")
-    ax0.axvline(p99, color="#dc2626",  linewidth=2, linestyle=":",  label=f"p99 = {p99:.0f} ms")
-    ax0.axvline(300, color="#7c3aed",  linewidth=1.5, linestyle="--", alpha=0.7, label="Seuil API 300 ms")
+    ax0.axvline(p50, color="#16a34a", linewidth=2, linestyle="-", label=f"p50 = {p50:.0f} ms")
+    ax0.axvline(p90, color="#ea580c", linewidth=2, linestyle="--", label=f"p90 = {p90:.0f} ms")
+    ax0.axvline(p99, color="#dc2626", linewidth=2, linestyle=":", label=f"p99 = {p99:.0f} ms")
+    ax0.axvline(
+        300, color="#7c3aed", linewidth=1.5, linestyle="--", alpha=0.7, label="Seuil API 300 ms"
+    )
     ax0.set_xlabel("Latence (ms)")
     ax0.set_ylabel("Fréquence")
     ax0.set_title("Distribution de la latence", fontsize=11)
@@ -257,19 +318,24 @@ def _plot_latency(df: pd.DataFrame) -> None:
     ax1 = axes[1]
     ax1.axis("off")
     stats = [
-        ["Métrique",          "Valeur"],
+        ["Métrique", "Valeur"],
         ["Prédictions totales", f"{len(lat):,}"],
-        ["Latence moyenne",   f"{lat.mean():.1f} ms"],
-        ["Latence médiane",   f"{p50:.1f} ms"],
-        ["p90",               f"{p90:.1f} ms"],
-        ["p99",               f"{p99:.1f} ms"],
-        ["Latence max",       f"{lat.max():.1f} ms"],
-        ["Seuil API cible",   "300 ms"],
-        ["% sous seuil",      f"{(lat <= 300).mean() * 100:.1f}%"],
-        ["Modèle",            "ALMAGNUS/datasens-sentiment-fr"],
+        ["Latence moyenne", f"{lat.mean():.1f} ms"],
+        ["Latence médiane", f"{p50:.1f} ms"],
+        ["p90", f"{p90:.1f} ms"],
+        ["p99", f"{p99:.1f} ms"],
+        ["Latence max", f"{lat.max():.1f} ms"],
+        ["Seuil API cible", "300 ms"],
+        ["% sous seuil", f"{(lat <= 300).mean() * 100:.1f}%"],
+        ["Modèle", "ALMAGNUS/datasens-sentiment-fr"],
     ]
-    tbl = ax1.table(cellText=stats[1:], colLabels=stats[0],
-                    cellLoc="center", loc="center", bbox=[0.05, 0.0, 0.9, 1.0])
+    tbl = ax1.table(
+        cellText=stats[1:],
+        colLabels=stats[0],
+        cellLoc="center",
+        loc="center",
+        bbox=[0.05, 0.0, 0.9, 1.0],
+    )
     tbl.auto_set_font_size(False)
     tbl.set_fontsize(9.5)
     for (row, _col), cell in tbl.get_celld().items():

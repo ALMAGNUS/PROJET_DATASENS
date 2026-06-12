@@ -63,7 +63,9 @@ class DataAggregator:
                             )
                             for item in items:
                                 if isinstance(item, dict):
-                                    title = sanitize_text(item.get("title") or item.get("headline") or "")
+                                    title = sanitize_text(
+                                        item.get("title") or item.get("headline") or ""
+                                    )
                                     content = sanitize_text(
                                         item.get("content")
                                         or item.get("text")
@@ -76,7 +78,9 @@ class DataAggregator:
                                             {
                                                 "source": gdelt_dir.name,
                                                 "title": title[:500],
-                                                "content": (content[:2000] if content else title[:2000]),
+                                                "content": (
+                                                    content[:2000] if content else title[:2000]
+                                                ),
                                                 "url": url,
                                                 "collected_at": "",
                                             }

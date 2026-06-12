@@ -149,7 +149,9 @@ class Repository(DatabaseLoader):
     def _migrate_model_output_ml(self):
         """Ajoute colonnes E1+IA : label_3c, confidence, p_pos/neu/neg, sentiment_score, inference_ms."""
         try:
-            self.cursor.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='model_output'")
+            self.cursor.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='model_output'"
+            )
             if not self.cursor.fetchone():
                 return
             self.cursor.execute("PRAGMA table_info(model_output)")

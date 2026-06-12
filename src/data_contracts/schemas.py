@@ -34,4 +34,3 @@ class PredictionOutput(BaseModel):
     model_version: str
     inference_run_id: str
     prediction_timestamp: str
-

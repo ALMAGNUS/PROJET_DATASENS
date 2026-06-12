@@ -36,9 +36,7 @@ def _list_users(db_path: str) -> int:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
-        cur = conn.execute(
-            "SELECT email, role, active, last_login FROM profils ORDER BY email"
-        )
+        cur = conn.execute("SELECT email, role, active, last_login FROM profils ORDER BY email")
         rows = cur.fetchall()
         if not rows:
             print("Aucun utilisateur dans la table profils.")

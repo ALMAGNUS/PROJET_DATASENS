@@ -25,7 +25,10 @@ def canonical_sentiment_label(model_id: str | None) -> str:
     Les autres modèles (backbone ac0hik, camembert…) gardent leur identifiant réel.
     """
     low = (model_id or "").lower()
-    if any(tag in low for tag in ("datasens-sentiment-fr", "sentiment_fr-sentiment-finetuned", "finetuned-colab")):
+    if any(
+        tag in low
+        for tag in ("datasens-sentiment-fr", "sentiment_fr-sentiment-finetuned", "finetuned-colab")
+    ):
         return SENTIMENT_MODEL_DISPLAY_NAME
     return model_id or SENTIMENT_MODEL_DISPLAY_NAME
 
@@ -81,7 +84,9 @@ class Settings(BaseSettings):
         description="FastAPI host (127.0.0.1 en local Windows ; 0.0.0.0 en Docker)",
     )
     fastapi_port: int = Field(default=8001, description="FastAPI port")
-    fastapi_reload: bool = Field(default=False, description="FastAPI auto-reload (false en démo / présentation)")
+    fastapi_reload: bool = Field(
+        default=False, description="FastAPI auto-reload (false en démo / présentation)"
+    )
     api_v1_prefix: str = Field(default="/api/v1", description="API v1 prefix")
     cors_origins: str = Field(
         default="*",
@@ -139,6 +144,7 @@ class Settings(BaseSettings):
     def flaubert_model_path(self) -> str:
         """Deprecated alias kept for backward compatibility — use xlm_roberta_model_path."""
         return self.xlm_roberta_model_path
+
     camembert_model_path: str = Field(
         default="cmarkea/distilcamembert-base-sentiment",
         description="CamemBERT sentiment pré-entraîné FR (recommandé CPU)",
@@ -193,6 +199,7 @@ class Settings(BaseSettings):
     environment: str = Field(
         default="development", description="Environment (development/staging/production)"
     )
+
 
 # Singleton instance
 _settings: Settings | None = None

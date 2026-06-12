@@ -29,11 +29,11 @@ from src.streamlit._cockpit_helpers import (
 from src.streamlit._cockpit_helpers import (
     run_summary_history as _run_summary_history,
 )
+from src.streamlit.cockpit_ux import render_section_title
 from src.streamlit.data_lineage import render_row_trace
 from src.streamlit.metrics import (
     build_enrichment_table as _build_enrichment_table,
 )
-from src.streamlit.cockpit_ux import render_section_title
 from src.streamlit.pipeline_proof import (
     render_article_journey,
     render_last_run_proof_full,
@@ -143,30 +143,38 @@ def _bar_chart(
             ),
             tooltip=tooltips,
         )
-    labels_in = base.mark_text(
-        align="right",
-        baseline="middle",
-        dx=-10,
-        fontSize=13,
-        fontWeight=700,
-        color="#ffffff",
-    ).encode(
-        x=x_enc,
-        text="Label:N",
-    ).transform_filter(alt.datum.Lignes >= label_threshold)
-    layers: list[alt.Chart] = [bars, labels_in]
-    if not labels_inside_only:
-        labels_out = base.mark_text(
-            align="left",
+    labels_in = (
+        base.mark_text(
+            align="right",
             baseline="middle",
-            dx=8,
+            dx=-10,
             fontSize=13,
             fontWeight=700,
-            color="#f1f5f9",
-        ).encode(
+            color="#ffffff",
+        )
+        .encode(
             x=x_enc,
             text="Label:N",
-        ).transform_filter(alt.datum.Lignes < label_threshold)
+        )
+        .transform_filter(alt.datum.Lignes >= label_threshold)
+    )
+    layers: list[alt.Chart] = [bars, labels_in]
+    if not labels_inside_only:
+        labels_out = (
+            base.mark_text(
+                align="left",
+                baseline="middle",
+                dx=8,
+                fontSize=13,
+                fontWeight=700,
+                color="#f1f5f9",
+            )
+            .encode(
+                x=x_enc,
+                text="Label:N",
+            )
+            .transform_filter(alt.datum.Lignes < label_threshold)
+        )
         layers.append(labels_out)
     chart = alt.layer(*layers).properties(
         title=title,
@@ -213,9 +221,7 @@ def _render_run_du_jour(project_root: Path, merged_path: Path) -> None:
         run_status = "—"
         n_sources = 0
 
-    goldai_total = (
-        _parquet_row_count_cached(str(merged_path)) if merged_path.exists() else 0
-    )
+    goldai_total = _parquet_row_count_cached(str(merged_path)) if merged_path.exists() else 0
 
     def _pct(num: int, denom: int) -> str:
         if denom <= 0:
@@ -224,7 +230,11 @@ def _render_run_du_jour(project_root: Path, merged_path: Path) -> None:
 
     journey_steps = [
         {"etape": "1. Extraits", "lignes": extracted, "lecture": f"{n_sources} sources"},
-        {"etape": "2. Validés", "lignes": cleaned, "lecture": f"nettoyage {_pct(cleaned, extracted)}"},
+        {
+            "etape": "2. Validés",
+            "lignes": cleaned,
+            "lecture": f"nettoyage {_pct(cleaned, extracted)}",
+        },
         {
             "etape": "3. Nouveaux (loaded)",
             "lignes": loaded,
@@ -274,7 +284,7 @@ def _render_run_history(project_root: Path) -> None:
         if status == "PASS":
             pass_count += 1
         kpi = item.get("kpis", {}) if isinstance(item, dict) else {}
-        reasons_item = item.get("reasons", []) if isinstance(item, dict) else []
+        item.get("reasons", []) if isinstance(item, dict) else []
         rows.append(
             {
                 "Fichier": item.get("_file", "—"),
@@ -303,7 +313,9 @@ def _render_fusion_block(
 
     dates_in_goldai: list = []
     if meta_path.exists():
-        dates_in_goldai = json.loads(meta_path.read_text(encoding="utf-8")).get("dates_included", [])
+        dates_in_goldai = json.loads(meta_path.read_text(encoding="utf-8")).get(
+            "dates_included", []
+        )
 
     gold_dates = (
         sorted(
@@ -321,14 +333,27 @@ def _render_fusion_block(
         st.info("Aucune partition GOLD — lancez d'abord le pipeline E1.")
         return
 
-    selected_date = st.select_slider("Date GOLD à fusionner", options=gold_dates, value=gold_dates[0])
+    selected_date = st.select_slider(
+        "Date GOLD à fusionner", options=gold_dates, value=gold_dates[0]
+    )
     already_merged = selected_date in set(dates_in_goldai)
     gold_file = gold_dir / f"date={selected_date}" / "articles.parquet"
 
     cols_min = ("id", "fingerprint", "url", "title", "source", "collected_at", "sentiment")
-    cols_goldai = ("id", "fingerprint", "url", "title", "source", "collected_at", "sentiment", "raw_data_id")
+    cols_goldai = (
+        "id",
+        "fingerprint",
+        "url",
+        "title",
+        "source",
+        "collected_at",
+        "sentiment",
+        "raw_data_id",
+    )
     df_gold = _read_parquet_cached(str(gold_file), cols_min) if gold_file.exists() else None
-    df_goldai = _read_parquet_cached(str(merged_path), cols_goldai) if merged_path.exists() else None
+    df_goldai = (
+        _read_parquet_cached(str(merged_path), cols_goldai) if merged_path.exists() else None
+    )
     n_gold = _parquet_row_count_cached(str(gold_file)) if gold_file.exists() else 0
     n_goldai = _parquet_row_count_cached(str(merged_path)) if merged_path.exists() else 0
 
@@ -341,16 +366,18 @@ def _render_fusion_block(
             s = df["url"]
         else:
             s = pd.Series([None] * len(df), index=df.index, dtype="object")
-        return s.astype("string").str.strip().fillna("").replace({"<NA>": "", "nan": "", "None": ""})
+        return (
+            s.astype("string").str.strip().fillna("").replace({"<NA>": "", "nan": "", "None": ""})
+        )
 
-    n_new, df_new, n_overlap = 0, None, 0
+    n_new, df_new, _n_overlap = 0, None, 0
     ids: set = set()
     if df_gold is not None and df_goldai is not None:
         keys_gold = _stable_keys_local(df_gold)
         keys_goldai = _stable_keys_local(df_goldai)
         ids = set(keys_goldai[keys_goldai != ""])
         keys_gold_set = set(keys_gold[keys_gold != ""])
-        n_overlap = len(keys_gold_set.intersection(ids))
+        len(keys_gold_set.intersection(ids))
         df_new = df_gold[(keys_gold != "") & (~keys_gold.isin(ids))]
         n_new = len(df_new)
 
@@ -366,7 +393,9 @@ def _render_fusion_block(
     elif n_new > 0:
         st.success(f"Prévision : **{n_new:,}** ligne(s) à ajouter.")
 
-    if st.button("Fusionner GoldAI", type="primary", use_container_width=True, key="fusion_goldai_btn"):
+    if st.button(
+        "Fusionner GoldAI", type="primary", use_container_width=True, key="fusion_goldai_btn"
+    ):
         with st.spinner("Fusion en cours…"):
             proc = subprocess.run(
                 [sys.executable, "scripts/merge_parquet_goldai.py"],
@@ -395,15 +424,21 @@ def _render_fusion_block(
         with tab_new:
             if df_new is not None and not df_new.empty:
                 cols = [c for c in ["id", "title", "source", "sentiment"] if c in df_new.columns]
-                st.dataframe(df_new[cols].head(80) if cols else df_new.head(80), use_container_width=True)
+                st.dataframe(
+                    df_new[cols].head(80) if cols else df_new.head(80), use_container_width=True
+                )
             else:
                 st.caption("Aucune ligne nouvelle.")
         with tab_gold:
             cols = [c for c in ["id", "title", "source", "collected_at"] if c in df_gold.columns]
-            st.dataframe(df_gold[cols].head(80) if cols else df_gold.head(80), use_container_width=True)
+            st.dataframe(
+                df_gold[cols].head(80) if cols else df_gold.head(80), use_container_width=True
+            )
         with tab_goldai:
             cols = [c for c in ["id", "title", "source", "sentiment"] if c in df_goldai.columns]
-            st.dataframe(df_goldai[cols].head(80) if cols else df_goldai.head(80), use_container_width=True)
+            st.dataframe(
+                df_goldai[cols].head(80) if cols else df_goldai.head(80), use_container_width=True
+            )
 
 
 def render(ctx: PageContext) -> None:
@@ -448,9 +483,7 @@ def render(ctx: PageContext) -> None:
 
     with st.expander("Fusion GOLD → GoldAI", expanded=False):
         st.caption("Compare le lot GOLD sélectionné au stock consolidé et lance la fusion.")
-        _render_fusion_block(
-            PROJECT_ROOT, gold_dir, merged_path, meta_path, show_advanced
-        )
+        _render_fusion_block(PROJECT_ROOT, gold_dir, merged_path, meta_path, show_advanced)
 
     if not show_advanced:
         return
@@ -522,9 +555,7 @@ def render(ctx: PageContext) -> None:
                     "Couverture sentiment": f"{p['sentiment_coverage']:.0%}"
                     if p["has_sentiment"]
                     else "—",
-                    "Couverture topics": f"{p['topic_coverage']:.0%}"
-                    if p["has_topic"]
-                    else "—",
+                    "Couverture topics": f"{p['topic_coverage']:.0%}" if p["has_topic"] else "—",
                     "Ce que compte la ligne": meta.get("explain", "—"),
                     "_lignes": int(p["lignes"]),
                     "_group": meta.get("group", "stock"),
@@ -534,9 +565,7 @@ def render(ctx: PageContext) -> None:
             prev_cols = set(p["cols_list"])
             prev_count = p["lignes"]
 
-        df_display = pd.DataFrame(display_rows).drop(
-            columns=["_lignes", "_group", "_key_cols"]
-        )
+        df_display = pd.DataFrame(display_rows).drop(columns=["_lignes", "_group", "_key_cols"])
         st.dataframe(df_display, use_container_width=True, hide_index=True)
 
         run_chart_rows = [r for r in display_rows if r["_group"] == "run"]

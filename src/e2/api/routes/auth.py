@@ -10,7 +10,11 @@ from fastapi import APIRouter, HTTPException, Request, status
 
 from src.config import get_settings
 from src.e2.api.middleware.audit import log_login
-from src.e2.api.middleware.prometheus import record_auth_failure, record_auth_success, record_active_user
+from src.e2.api.middleware.prometheus import (
+    record_active_user,
+    record_auth_failure,
+    record_auth_success,
+)
 from src.e2.api.schemas.auth import LoginRequest, LoginResponse
 from src.e2.api.schemas.token import TokenData
 from src.e2.api.services.user_service import get_user_service

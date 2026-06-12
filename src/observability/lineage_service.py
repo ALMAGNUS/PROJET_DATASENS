@@ -326,4 +326,3 @@ class LineageService:
             }
         finally:
             conn.close()
-

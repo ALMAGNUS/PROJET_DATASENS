@@ -38,6 +38,13 @@ from src.streamlit._cockpit_helpers import (
 from src.streamlit._cockpit_helpers import (
     run_command as _run_command,
 )
+from src.streamlit.auth_plug import can_admin
+from src.streamlit.cockpit_ux import (
+    lazy_panel,
+    render_monitoring_date_filter,
+    render_section_title,
+    run_summary_history_cached,
+)
 from src.streamlit.metrics import (
     chrono_data as _chrono_data,
 )
@@ -50,13 +57,6 @@ from src.streamlit.metrics import (
 from src.streamlit.metrics import (
     stage_time_range as _stage_time_range,
 )
-from src.streamlit.cockpit_ux import (
-    lazy_panel,
-    render_monitoring_date_filter,
-    render_section_title,
-    run_summary_history_cached,
-)
-from src.streamlit.auth_plug import can_admin
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
@@ -122,7 +122,7 @@ def _render_user_audit_journal(ctx: PageContext) -> None:
         "ip_address": "IP",
         "details": "Détail",
     }
-    show_cols = [c for c in rename.keys() if c in df.columns]
+    show_cols = [c for c in rename if c in df.columns]
     df = df[show_cols].rename(columns=rename)
     st.dataframe(df, use_container_width=True, hide_index=True)
 
@@ -144,11 +144,7 @@ def render(ctx: PageContext) -> None:
     if filter_date:
         render_section_title(f"Quality gate — {filter_date}")
         hist = run_summary_history_cached(str(PROJECT_ROOT), limit=40)
-        day_runs = [
-            h
-            for h in hist
-            if str(h.get("generated_at_utc", ""))[:10] == filter_date
-        ]
+        day_runs = [h for h in hist if str(h.get("generated_at_utc", ""))[:10] == filter_date]
         if day_runs:
             rows_qg = []
             for item in day_runs:
@@ -172,7 +168,12 @@ def render(ctx: PageContext) -> None:
         ("RAW", PROJECT_ROOT / "data" / "raw", ["*.json", "*.csv"], "raw"),
         ("SILVER", PROJECT_ROOT / "data" / "silver", ["*.parquet", "*.csv"], "silver"),
         ("GOLD", PROJECT_ROOT / "data" / "gold", ["*.parquet", "*.csv"], "gold"),
-        ("GoldAI", PROJECT_ROOT / "data" / "goldai", ["merged_all_dates.parquet", "*.parquet"], "goldai"),
+        (
+            "GoldAI",
+            PROJECT_ROOT / "data" / "goldai",
+            ["merged_all_dates.parquet", "*.parquet"],
+            "goldai",
+        ),
         ("Copie IA", PROJECT_ROOT / "data" / "goldai" / "ia", ["*.parquet"], "ia"),
     ]
     trace_rows: list[dict] = []
@@ -204,7 +205,9 @@ def render(ctx: PageContext) -> None:
     uptime_kuma_url = os.getenv("UPTIME_KUMA_URL", "http://localhost:3001")
 
     render_section_title("État MLOps live")
-    st.caption("Vérification en direct des briques observabilité (API, Prometheus, Grafana, Uptime Kuma).")
+    st.caption(
+        "Vérification en direct des briques observabilité (API, Prometheus, Grafana, Uptime Kuma)."
+    )
 
     def _check_url(url: str, timeout: int = 3) -> tuple[str, str]:
         try:
@@ -218,23 +221,48 @@ def render(ctx: PageContext) -> None:
     status_rows = []
     api_health_status, api_health_msg = _check_url(f"{api_base}/health")
     status_rows.append(
-        {"Service": "API E2 /health", "URL": f"{api_base}/health", "Statut": api_health_status, "Détail": api_health_msg}
+        {
+            "Service": "API E2 /health",
+            "URL": f"{api_base}/health",
+            "Statut": api_health_status,
+            "Détail": api_health_msg,
+        }
     )
     api_metrics_status, api_metrics_msg = _check_url(f"{api_base}/metrics")
     status_rows.append(
-        {"Service": "API E2 /metrics", "URL": f"{api_base}/metrics", "Statut": api_metrics_status, "Détail": api_metrics_msg}
+        {
+            "Service": "API E2 /metrics",
+            "URL": f"{api_base}/metrics",
+            "Statut": api_metrics_status,
+            "Détail": api_metrics_msg,
+        }
     )
     prom_status, prom_msg = _check_url(f"{prometheus_url}/-/ready")
     status_rows.append(
-        {"Service": "Prometheus", "URL": f"{prometheus_url}/-/ready", "Statut": prom_status, "Détail": prom_msg}
+        {
+            "Service": "Prometheus",
+            "URL": f"{prometheus_url}/-/ready",
+            "Statut": prom_status,
+            "Détail": prom_msg,
+        }
     )
     graf_status, graf_msg = _check_url(f"{grafana_url}/api/health")
     status_rows.append(
-        {"Service": "Grafana", "URL": f"{grafana_url}/api/health", "Statut": graf_status, "Détail": graf_msg}
+        {
+            "Service": "Grafana",
+            "URL": f"{grafana_url}/api/health",
+            "Statut": graf_status,
+            "Détail": graf_msg,
+        }
     )
     kuma_status, kuma_msg = _check_url(uptime_kuma_url)
     status_rows.append(
-        {"Service": "Uptime Kuma", "URL": uptime_kuma_url, "Statut": kuma_status, "Détail": kuma_msg}
+        {
+            "Service": "Uptime Kuma",
+            "URL": uptime_kuma_url,
+            "Statut": kuma_status,
+            "Détail": kuma_msg,
+        }
     )
 
     st.dataframe(pd.DataFrame(status_rows), use_container_width=True, hide_index=True)
@@ -299,7 +327,9 @@ def render(ctx: PageContext) -> None:
                                 }
                             )
                         if rows:
-                            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                            st.dataframe(
+                                pd.DataFrame(rows), use_container_width=True, hide_index=True
+                            )
                         else:
                             st.caption("Aucune target active remontée par Prometheus.")
                     else:
@@ -346,8 +376,11 @@ def render(ctx: PageContext) -> None:
             with st.spinner("Connexion MongoDB..."):
                 st.session_state.mongo_status_cache = _mongo_status(PROJECT_ROOT)
     with col_mongo2:
-        if st.button("Backup Parquet → MongoDB", use_container_width=True,
-                     help="Sauvegarde GOLD + GoldAI dans GridFS. Docker MongoDB doit être démarré."):
+        if st.button(
+            "Backup Parquet → MongoDB",
+            use_container_width=True,
+            help="Sauvegarde GOLD + GoldAI dans GridFS. Docker MongoDB doit être démarré.",
+        ):
             _run_command(
                 "backup MongoDB",
                 [sys.executable, "scripts/backup_parquet_to_mongo.py"],
@@ -363,12 +396,17 @@ def render(ctx: PageContext) -> None:
             )
             if mongo["files"]:
                 df_mongo = pd.DataFrame(mongo["files"])
-                df_mongo = df_mongo.rename(columns={
-                    "filename": "Fichier", "logical_name": "Nom logique",
-                    "partition_date": "Date partition", "stored_at": "Stocké le",
-                    "upload_date": "Upload Mongo",
-                    "size_bytes": "Taille", "sha256": "SHA256",
-                })
+                df_mongo = df_mongo.rename(
+                    columns={
+                        "filename": "Fichier",
+                        "logical_name": "Nom logique",
+                        "partition_date": "Date partition",
+                        "stored_at": "Stocké le",
+                        "upload_date": "Upload Mongo",
+                        "size_bytes": "Taille",
+                        "sha256": "SHA256",
+                    }
+                )
                 df_mongo["Taille"] = df_mongo["Taille"].apply(_fmt_size)
                 if "Upload Mongo" in df_mongo.columns:
                     ts = pd.to_datetime(df_mongo["Upload Mongo"], errors="coerce")
@@ -395,10 +433,14 @@ def render(ctx: PageContext) -> None:
                         c_m2.metric("Période GOLD couverte", "—")
                     c_m3.metric(
                         "Dernier backup Mongo",
-                        latest_backup.strftime("%Y-%m-%d %H:%M") if pd.notna(latest_backup) else "—",
+                        latest_backup.strftime("%Y-%m-%d %H:%M")
+                        if pd.notna(latest_backup)
+                        else "—",
                     )
                     if has_legacy_gold:
-                        st.caption("Note: entrée legacy `gold_articles` détectée (ancien format, remplacé par `gold_articles_YYYY-MM-DD`).")
+                        st.caption(
+                            "Note: entrée legacy `gold_articles` détectée (ancien format, remplacé par `gold_articles_YYYY-MM-DD`)."
+                        )
 
                     st.markdown("**Trace de persistance SQLite -> Parquet -> GridFS**")
                     st.caption(
@@ -433,7 +475,11 @@ def render(ctx: PageContext) -> None:
                         else "—"
                     )
                     latest_gold_path_j = (
-                        PROJECT_ROOT / "data" / "gold" / f"date={latest_gold_date_j}" / "articles.parquet"
+                        PROJECT_ROOT
+                        / "data"
+                        / "gold"
+                        / f"date={latest_gold_date_j}"
+                        / "articles.parquet"
                         if latest_gold_date_j != "—"
                         else None
                     )
@@ -442,13 +488,17 @@ def render(ctx: PageContext) -> None:
                         if latest_gold_path_j and latest_gold_path_j.exists()
                         else 0
                     )
-                    goldai_merged_path_j = PROJECT_ROOT / "data" / "goldai" / "merged_all_dates.parquet"
+                    goldai_merged_path_j = (
+                        PROJECT_ROOT / "data" / "goldai" / "merged_all_dates.parquet"
+                    )
                     goldai_merged_rows_j = (
                         _parquet_row_count_cached(str(goldai_merged_path_j))
                         if goldai_merged_path_j.exists()
                         else 0
                     )
-                    mongo_logicals_j = set(df_mongo["Nom logique"].astype("string").fillna("").tolist())
+                    mongo_logicals_j = set(
+                        df_mongo["Nom logique"].astype("string").fillna("").tolist()
+                    )
                     has_gold_daily_j = (
                         f"gold_articles_{latest_gold_date_j}" in mongo_logicals_j
                         if latest_gold_date_j != "—"
@@ -516,7 +566,9 @@ def render(ctx: PageContext) -> None:
                         if goldai_merged_rows_j == 0:
                             missing.append("GoldAI consolidé absent")
                         if not has_gold_daily_j:
-                            missing.append(f"backup GridFS `gold_articles_{latest_gold_date_j}` manquant")
+                            missing.append(
+                                f"backup GridFS `gold_articles_{latest_gold_date_j}` manquant"
+                            )
                         if not has_goldai_merged_j:
                             missing.append("backup GridFS `goldai_merged` manquant")
                         st.warning(
@@ -529,7 +581,9 @@ def render(ctx: PageContext) -> None:
                         .drop_duplicates(subset=["Nom logique"], keep="first")
                         .drop(columns=["_upload_ts"])
                     )
-                    st.caption("Vue compacte datasets : dernier état par nom logique (GOLD/GoldAI/IA).")
+                    st.caption(
+                        "Vue compacte datasets : dernier état par nom logique (GOLD/GoldAI/IA)."
+                    )
                     st.dataframe(df_latest, use_container_width=True, hide_index=True)
                     st.markdown("**Inspection GridFS (lecture directe d'un fichier archivé)**")
                     preview_choices = (
@@ -553,29 +607,50 @@ def render(ctx: PageContext) -> None:
                         if selected_file_id:
                             col_prev, col_dl = st.columns([1, 1])
                             with col_prev:
-                                if st.button("Afficher aperçu (100 lignes)", use_container_width=True, key="mongo_preview_btn"):
+                                if st.button(
+                                    "Afficher aperçu (100 lignes)",
+                                    use_container_width=True,
+                                    key="mongo_preview_btn",
+                                ):
                                     with st.spinner("Lecture GridFS..."):
-                                        df_preview = _mongo_read_parquet_preview(PROJECT_ROOT, selected_file_id, limit=100)
+                                        df_preview = _mongo_read_parquet_preview(
+                                            PROJECT_ROOT, selected_file_id, limit=100
+                                        )
                                     if df_preview.empty:
-                                        st.warning("Aperçu indisponible (fichier non parquet ou lecture impossible).")
+                                        st.warning(
+                                            "Aperçu indisponible (fichier non parquet ou lecture impossible)."
+                                        )
                                     else:
-                                        st.success(f"Aperçu chargé: {len(df_preview):,} lignes affichées.")
-                                        st.dataframe(df_preview, use_container_width=True, hide_index=True)
+                                        st.success(
+                                            f"Aperçu chargé: {len(df_preview):,} lignes affichées."
+                                        )
+                                        st.dataframe(
+                                            df_preview, use_container_width=True, hide_index=True
+                                        )
                             with col_dl:
-                                payload, meta, filename = _mongo_get_file_bytes(PROJECT_ROOT, selected_file_id)
+                                payload, meta, filename = _mongo_get_file_bytes(
+                                    PROJECT_ROOT, selected_file_id
+                                )
                                 if payload:
                                     logical = (meta or {}).get("logical_name", "mongo_file")
                                     download_name = f"{logical}.parquet"
                                     st.download_button(
                                         "Télécharger ce fichier",
                                         data=payload,
-                                        file_name=download_name if logical else (filename or "mongo_file.parquet"),
+                                        file_name=download_name
+                                        if logical
+                                        else (filename or "mongo_file.parquet"),
                                         mime="application/octet-stream",
                                         use_container_width=True,
                                         key="mongo_download_btn",
                                     )
                                 else:
-                                    st.button("Télécharger ce fichier", disabled=True, use_container_width=True, key="mongo_download_btn_disabled")
+                                    st.button(
+                                        "Télécharger ce fichier",
+                                        disabled=True,
+                                        use_container_width=True,
+                                        key="mongo_download_btn_disabled",
+                                    )
                     with st.expander("Historique complet datasets", expanded=False):
                         st.dataframe(
                             df_dataset.drop(columns=["_upload_ts"]),
@@ -593,6 +668,7 @@ def render(ctx: PageContext) -> None:
                                 hide_index=True,
                             )
                     with st.expander("Historique complet GridFS (brut)", expanded=False):
+
                         def _load_gridfs_full() -> None:
                             st.dataframe(
                                 df_mongo.drop(columns=["_upload_ts"]),
@@ -606,6 +682,7 @@ def render(ctx: PageContext) -> None:
                             label="Charger l'historique GridFS complet",
                         )
                     st.markdown("**Trace de persistance SQLite -> Parquet -> GridFS**")
+
                     def _resolve_db_path_local() -> Path:
                         db_candidate = os.getenv("DB_PATH")
                         if db_candidate and Path(db_candidate).exists():
@@ -634,7 +711,11 @@ def render(ctx: PageContext) -> None:
                         else "—"
                     )
                     latest_gold_path = (
-                        PROJECT_ROOT / "data" / "gold" / f"date={latest_gold_date}" / "articles.parquet"
+                        PROJECT_ROOT
+                        / "data"
+                        / "gold"
+                        / f"date={latest_gold_date}"
+                        / "articles.parquet"
                         if latest_gold_date != "—"
                         else None
                     )
@@ -643,13 +724,17 @@ def render(ctx: PageContext) -> None:
                         if latest_gold_path and latest_gold_path.exists()
                         else 0
                     )
-                    goldai_merged_path = PROJECT_ROOT / "data" / "goldai" / "merged_all_dates.parquet"
+                    goldai_merged_path = (
+                        PROJECT_ROOT / "data" / "goldai" / "merged_all_dates.parquet"
+                    )
                     goldai_merged_rows = (
                         _parquet_row_count_cached(str(goldai_merged_path))
                         if goldai_merged_path.exists()
                         else 0
                     )
-                    mongo_logicals = set(df_mongo["Nom logique"].astype("string").fillna("").tolist())
+                    mongo_logicals = set(
+                        df_mongo["Nom logique"].astype("string").fillna("").tolist()
+                    )
                     has_gold_daily_mongo = (
                         f"gold_articles_{latest_gold_date}" in mongo_logicals
                         if latest_gold_date != "—"
@@ -673,14 +758,18 @@ def render(ctx: PageContext) -> None:
                         },
                         {
                             "Étape": "Mongo backup GOLD du jour",
-                            "Preuve Mongo": f"gold_articles_{latest_gold_date}" if latest_gold_date != "—" else "—",
+                            "Preuve Mongo": f"gold_articles_{latest_gold_date}"
+                            if latest_gold_date != "—"
+                            else "—",
                             "Volume (lignes)": "n/a",
                             "État": "OK" if has_gold_daily_mongo else "NON SAUVEGARDÉ",
                         },
                         {
                             "Étape": "Parquet GoldAI consolidé",
                             "Preuve locale": "data/goldai/merged_all_dates.parquet",
-                            "Volume (lignes)": f"{goldai_merged_rows:,}" if goldai_merged_rows else "0",
+                            "Volume (lignes)": f"{goldai_merged_rows:,}"
+                            if goldai_merged_rows
+                            else "0",
                             "État": "OK" if goldai_merged_rows > 0 else "ABSENT",
                         },
                         {
@@ -690,7 +779,9 @@ def render(ctx: PageContext) -> None:
                             "État": "OK" if has_goldai_merged_mongo else "NON SAUVEGARDÉ",
                         },
                     ]
-                    st.dataframe(pd.DataFrame(transfer_rows), use_container_width=True, hide_index=True)
+                    st.dataframe(
+                        pd.DataFrame(transfer_rows), use_container_width=True, hide_index=True
+                    )
                     st.caption(
                         "Chaîne de persistance complète: stockage opérationnel SQLite -> "
                         "Parquet métiers -> sauvegarde GridFS MongoDB."
@@ -704,30 +795,56 @@ def render(ctx: PageContext) -> None:
                             else pd.DataFrame()
                         )
                         if not mongo_gold_row.empty:
-                            mongo_gold_file_id = str(mongo_gold_row.iloc[0].get("file_id", "") or "")
+                            mongo_gold_file_id = str(
+                                mongo_gold_row.iloc[0].get("file_id", "") or ""
+                            )
                             local_preview = _read_parquet_cached(
                                 str(latest_gold_path),
                                 ("id", "title", "source", "collected_at", "sentiment"),
                             ).head(20)
                             mongo_preview = (
-                                _mongo_read_parquet_preview(PROJECT_ROOT, mongo_gold_file_id, limit=20)
+                                _mongo_read_parquet_preview(
+                                    PROJECT_ROOT, mongo_gold_file_id, limit=20
+                                )
                                 if mongo_gold_file_id
                                 else pd.DataFrame()
                             )
                             if not mongo_preview.empty:
-                                keep_cols = [c for c in ["id", "title", "source", "collected_at", "sentiment"] if c in mongo_preview.columns]
+                                keep_cols = [
+                                    c
+                                    for c in ["id", "title", "source", "collected_at", "sentiment"]
+                                    if c in mongo_preview.columns
+                                ]
                                 if keep_cols:
                                     mongo_preview = mongo_preview[keep_cols].copy()
-                            st.caption(f"GOLD local (`data/gold/date={latest_gold_date}/articles.parquet`) — 20 lignes")
-                            st.dataframe(local_preview, use_container_width=True, hide_index=True, height=320)
+                            st.caption(
+                                f"GOLD local (`data/gold/date={latest_gold_date}/articles.parquet`) — 20 lignes"
+                            )
+                            st.dataframe(
+                                local_preview, use_container_width=True, hide_index=True, height=320
+                            )
                             st.caption(f"MongoDB GridFS (`{mongo_gold_logical}`) — 20 lignes")
                             if mongo_preview.empty:
                                 st.warning("Impossible de lire l'aperçu Mongo pour ce fichier.")
                             else:
-                                st.dataframe(mongo_preview, use_container_width=True, hide_index=True, height=320)
-                            if not local_preview.empty and not mongo_preview.empty and "id" in local_preview.columns and "id" in mongo_preview.columns:
-                                local_ids = set(local_preview["id"].astype("string").fillna("").tolist())
-                                mongo_ids = set(mongo_preview["id"].astype("string").fillna("").tolist())
+                                st.dataframe(
+                                    mongo_preview,
+                                    use_container_width=True,
+                                    hide_index=True,
+                                    height=320,
+                                )
+                            if (
+                                not local_preview.empty
+                                and not mongo_preview.empty
+                                and "id" in local_preview.columns
+                                and "id" in mongo_preview.columns
+                            ):
+                                local_ids = set(
+                                    local_preview["id"].astype("string").fillna("").tolist()
+                                )
+                                mongo_ids = set(
+                                    mongo_preview["id"].astype("string").fillna("").tolist()
+                                )
                                 overlap = len(local_ids.intersection(mongo_ids))
                                 st.caption(
                                     f"Contrôle rapide (échantillon 20 lignes): {overlap}/"
@@ -739,7 +856,9 @@ def render(ctx: PageContext) -> None:
                                 "Lancez d'abord le backup Parquet -> MongoDB."
                             )
                     else:
-                        st.info("Aucune partition GOLD du jour détectée pour la comparaison côte à côte.")
+                        st.info(
+                            "Aucune partition GOLD du jour détectée pour la comparaison côte à côte."
+                        )
                 else:
                     st.dataframe(df_mongo, use_container_width=True, hide_index=True)
             else:
@@ -778,9 +897,7 @@ def render(ctx: PageContext) -> None:
             clicks = snap.get("clicks") or {}
             if clicks:
                 df_clicks = (
-                    pd.DataFrame(
-                        [{"action": k, "clics": v} for k, v in clicks.items()]
-                    )
+                    pd.DataFrame([{"action": k, "clics": v} for k, v in clicks.items()])
                     .sort_values("clics", ascending=False)
                     .reset_index(drop=True)
                 )

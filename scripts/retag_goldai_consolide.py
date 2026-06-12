@@ -72,7 +72,9 @@ def _source_rule(source_name: str) -> tuple[str, float] | None:
     return None
 
 
-def _tag_row(title: str, content: str, source_name: str) -> tuple[str, str | None, float, float | None]:
+def _tag_row(
+    title: str, content: str, source_name: str
+) -> tuple[str, str | None, float, float | None]:
     """Retourne (topic_1, topic_2, score_1, score_2). topic_2 peut être None."""
     scores = _score_topics(title, content)
     rule = _source_rule(source_name)
@@ -110,7 +112,9 @@ def _pick_column(df: pd.DataFrame, candidates: list[str]) -> str | None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--limit", type=int, default=0, help="Limiter à N lignes pour tester (0 = tout).")
+    parser.add_argument(
+        "--limit", type=int, default=0, help="Limiter à N lignes pour tester (0 = tout)."
+    )
     parser.add_argument("--dry-run", action="store_true", help="Ne réécrit pas le parquet.")
     args = parser.parse_args()
 
@@ -148,7 +152,9 @@ def main() -> int:
         return 1
     if content_col is None:
         print("WARNING: aucune colonne de contenu détectée, scoring sur titre uniquement.")
-    print(f"[goldai-retag] colonnes utilisées : title={title_col}, content={content_col}, source={source_col}")
+    print(
+        f"[goldai-retag] colonnes utilisées : title={title_col}, content={content_col}, source={source_col}"
+    )
 
     n_iter = min(n_total, args.limit) if args.limit > 0 else n_total
     topic_1_list: list[str] = [""] * n_iter
@@ -178,7 +184,13 @@ def main() -> int:
     print(f"[goldai-retag] scoring terminé en {time.time() - t0:.1f}s")
 
     # Distribution avant / après (sur la partie re-taggée)
-    old_t1 = df[_pick_column(df, ["topic_1"]) or "topic_1"].head(n_iter).astype(str).str.strip().str.lower()
+    old_t1 = (
+        df[_pick_column(df, ["topic_1"]) or "topic_1"]
+        .head(n_iter)
+        .astype(str)
+        .str.strip()
+        .str.lower()
+    )
     new_t1 = pd.Series(topic_1_list).astype(str).str.strip().str.lower()
 
     print()

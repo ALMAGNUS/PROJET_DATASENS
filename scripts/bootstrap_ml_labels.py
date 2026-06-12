@@ -104,6 +104,7 @@ def main() -> int:
         if args.run_inference:
             print("\nAucune prediction trouvee. Lancement de l'inference ML...")
             from scripts.run_inference_pipeline import main as run_infer
+
             sys.argv = ["run_inference_pipeline.py", "--limit", str(args.inference_limit or 0)]
             ret = run_infer()
             if ret != 0:
@@ -128,13 +129,19 @@ def main() -> int:
     print(f"\n  Distribution predictions (toutes confiances): {pred_dist}")
 
     conf_dist = pred_df["confidence"].describe()
-    print(f"  Confiance — min:{conf_dist['min']:.3f} mean:{conf_dist['mean']:.3f} max:{conf_dist['max']:.3f}")
+    print(
+        f"  Confiance — min:{conf_dist['min']:.3f} mean:{conf_dist['mean']:.3f} max:{conf_dist['max']:.3f}"
+    )
 
     # 2. Filtrer sur la confiance
     high_conf = pred_df[pred_df["confidence"] >= args.confidence_min].copy()
     low_conf = pred_df[pred_df["confidence"] < args.confidence_min]
-    print(f"\n  Predictions confiance >= {args.confidence_min}: {len(high_conf):,} ({len(high_conf)/len(pred_df)*100:.1f}%)")
-    print(f"  Predictions confiance <  {args.confidence_min}: {len(low_conf):,} ({len(low_conf)/len(pred_df)*100:.1f}%) -> labels lexicaux conserves")
+    print(
+        f"\n  Predictions confiance >= {args.confidence_min}: {len(high_conf):,} ({len(high_conf)/len(pred_df)*100:.1f}%)"
+    )
+    print(
+        f"  Predictions confiance <  {args.confidence_min}: {len(low_conf):,} ({len(low_conf)/len(pred_df)*100:.1f}%) -> labels lexicaux conserves"
+    )
 
     high_conf_dist = high_conf["predicted_sentiment"].value_counts().to_dict()
     print(f"  Distribution predictions haute confiance: {high_conf_dist}")
@@ -162,7 +169,9 @@ def main() -> int:
     # Table de substitution: id -> predicted_sentiment normalisé (haute confiance seulement)
     # On normalise pour aligner avec les labels existants (negatif sans accent)
     high_conf = high_conf.copy()
-    high_conf["predicted_sentiment"] = high_conf["predicted_sentiment"].apply(normalize_sentiment_label)
+    high_conf["predicted_sentiment"] = high_conf["predicted_sentiment"].apply(
+        normalize_sentiment_label
+    )
     sub_map = high_conf.set_index(id_col_pred)["predicted_sentiment"].to_dict()
 
     # Copie du labelled_df avec substitution
@@ -185,7 +194,11 @@ def main() -> int:
     print(f"  Labels lexicaux conserves (faible confiance ou ID absent): {n_kept_lexical:,}")
 
     new_dist = new_df["sentiment_label"].value_counts().to_dict()
-    old_dist = labelled_df["sentiment_label"].value_counts().to_dict() if "sentiment_label" in labelled_df.columns else {}
+    old_dist = (
+        labelled_df["sentiment_label"].value_counts().to_dict()
+        if "sentiment_label" in labelled_df.columns
+        else {}
+    )
     print(f"\n  Distribution AVANT (lexical): {old_dist}")
     print(f"  Distribution APRES (ML+lexical): {new_dist}")
 
@@ -198,6 +211,7 @@ def main() -> int:
     # Backup de l'ancien
     backup_path = goldai_base / "ia" / "gold_ia_labelled_lexical_backup.parquet"
     import shutil
+
     if labelled_path.exists() and not backup_path.exists():
         shutil.copy2(labelled_path, backup_path)
         print(f"\n  Backup labels lexicaux: {backup_path.name}")
@@ -208,6 +222,7 @@ def main() -> int:
     # 6. Regenerer les splits
     print("\n  Regeneration des splits train/val/test...")
     import subprocess
+
     ret = subprocess.run(
         [sys.executable, str(project_root / "scripts" / "create_ia_copy.py")],
         capture_output=True,

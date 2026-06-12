@@ -103,7 +103,9 @@ def load_dataset(path: Path) -> list[dict]:
         try:
             import pandas as pd
         except Exception as e:
-            raise RuntimeError("Lecture parquet impossible: pandas non disponible dans cet environnement.") from e
+            raise RuntimeError(
+                "Lecture parquet impossible: pandas non disponible dans cet environnement."
+            ) from e
 
         df = pd.read_parquet(parquet_path)
         possible_text_cols = ["content", "text", "cleaned", "title"]
@@ -112,7 +114,9 @@ def load_dataset(path: Path) -> list[dict]:
         text_col = next((c for c in possible_text_cols if c in df.columns), None)
         label_col = next((c for c in possible_label_cols if c in df.columns), None)
         if not text_col or not label_col:
-            raise RuntimeError(f"Colonnes manquantes dans {parquet_path}. Colonnes disponibles: {list(df.columns)}")
+            raise RuntimeError(
+                f"Colonnes manquantes dans {parquet_path}. Colonnes disponibles: {list(df.columns)}"
+            )
 
         rows: list[dict] = []
         for _, row in df.iterrows():
@@ -231,12 +235,18 @@ def evaluate_model(model_name: str, dataset: list[dict], max_length: int) -> dic
     }
 
 
-def write_report(docs_dir: Path, results: dict, dataset_path: Path, class_counts: dict[str, int]) -> None:
+def write_report(
+    docs_dir: Path, results: dict, dataset_path: Path, class_counts: dict[str, int]
+) -> None:
     bench_path = docs_dir / "AI_BENCHMARK.md"
     reqs_path = docs_dir / "AI_REQUIREMENTS.md"
     raw_json_path = docs_dir / "AI_BENCHMARK_RESULTS.json"
 
-    ranked = sorted(results.items(), key=lambda x: (x[1].get("f1_macro", 0), x[1].get("accuracy", 0)), reverse=True)
+    ranked = sorted(
+        results.items(),
+        key=lambda x: (x[1].get("f1_macro", 0), x[1].get("accuracy", 0)),
+        reverse=True,
+    )
     winner = ranked[0][0] if ranked else "n/a"
 
     bench = [
@@ -296,7 +306,9 @@ def write_report(docs_dir: Path, results: dict, dataset_path: Path, class_counts
         }
         for key, metrics in results.items()
     }
-    raw_json_path.write_text(json.dumps(public_results, ensure_ascii=False, indent=2), encoding="utf-8")
+    raw_json_path.write_text(
+        json.dumps(public_results, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     print(f"OK Benchmark: {bench_path}")
     print(f"OK Exigences: {reqs_path}")
     print(f"OK Résultats bruts: {raw_json_path}")
@@ -309,9 +321,16 @@ def parse_args() -> argparse.Namespace:
         default="data/goldai/ia/test.parquet",
         help="Chemin vers dataset CSV ou Parquet.",
     )
-    parser.add_argument("--max-samples", type=int, default=0, help="Limiter le nombre d'échantillons (0 = tous).")
+    parser.add_argument(
+        "--max-samples", type=int, default=0, help="Limiter le nombre d'échantillons (0 = tous)."
+    )
     parser.add_argument("--max-length", type=int, default=256, help="Longueur max tokenization.")
-    parser.add_argument("--per-class", type=int, default=120, help="Nombre max d'échantillons par classe (0 = pas d'équilibrage).")
+    parser.add_argument(
+        "--per-class",
+        type=int,
+        default=120,
+        help="Nombre max d'échantillons par classe (0 = pas d'équilibrage).",
+    )
     parser.add_argument(
         "--models",
         nargs="*",
@@ -326,6 +345,7 @@ def get_available_models(project_root: Path) -> dict[str, str]:
     # Priorité : config .env > sentiment_fr (meilleur bench) > camembert
     try:
         from src.config import get_settings
+
         cfg = get_settings()
         if cfg.sentiment_finetuned_model_path:
             p = Path(cfg.sentiment_finetuned_model_path)
@@ -373,10 +393,7 @@ def main() -> None:
             "sentiment_fr": "sentiment_fr",
             "finetuned_local": "finetuned_local",
         }
-        wanted = {
-            alias_to_key.get(m, m)
-            for m in args.models
-        }
+        wanted = {alias_to_key.get(m, m) for m in args.models}
         selected_models = {k: v for k, v in available_models.items() if k in wanted}
     else:
         selected_models = available_models

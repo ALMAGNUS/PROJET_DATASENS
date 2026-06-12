@@ -206,7 +206,9 @@ def run_script(args: list[str]) -> None:
         check=False,
     )
     if result.returncode != 0:
-        raise SystemExit(f"[retag] échec de la commande : {' '.join(args)} (code {result.returncode})")
+        raise SystemExit(
+            f"[retag] échec de la commande : {' '.join(args)} (code {result.returncode})"
+        )
 
 
 def refresh_ia_labelled_source(goldai_dir: Path) -> None:

@@ -32,6 +32,7 @@ def _setup_cpu_env() -> None:
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
     try:
         import torch
+
         if not torch.cuda.is_available():
             n = getattr(settings, "torch_num_threads", 6)
             torch.set_num_threads(n)
@@ -245,21 +246,30 @@ def run_sentiment_inference(
             if j < len(outs) and isinstance(outs[j], list) and outs[j]:
                 out = _scores_to_output(outs[j], model_id)
             else:
-                out = {"label_3c": "NEUTRAL", "confidence": 0.5, "p_pos": 0.33, "p_neu": 0.34, "p_neg": 0.33, "sentiment_score": 0.0}
-            results.append({
-                "id": aid,
-                "title": title[:100],
-                "sentiment_ml": _label_3c_to_fr(out["label_3c"]),
-                "label_3c": out["label_3c"],
-                "confidence": out["confidence"],
-                "p_pos": out["p_pos"],
-                "p_neu": out["p_neu"],
-                "p_neg": out["p_neg"],
-                "sentiment_score": out["sentiment_score"],
-                "score": out["confidence"],
-                "inference_ms": per_ms,
-                "model_id": model_id,
-            })
+                out = {
+                    "label_3c": "NEUTRAL",
+                    "confidence": 0.5,
+                    "p_pos": 0.33,
+                    "p_neu": 0.34,
+                    "p_neg": 0.33,
+                    "sentiment_score": 0.0,
+                }
+            results.append(
+                {
+                    "id": aid,
+                    "title": title[:100],
+                    "sentiment_ml": _label_3c_to_fr(out["label_3c"]),
+                    "label_3c": out["label_3c"],
+                    "confidence": out["confidence"],
+                    "p_pos": out["p_pos"],
+                    "p_neu": out["p_neu"],
+                    "p_neg": out["p_neg"],
+                    "sentiment_score": out["sentiment_score"],
+                    "score": out["confidence"],
+                    "inference_ms": per_ms,
+                    "model_id": model_id,
+                }
+            )
 
         done = len(results)
         elapsed_total = time.perf_counter() - t_global
@@ -299,6 +309,7 @@ def write_inference_to_model_output(
     db_path = db_path or settings.db_path
     try:
         import sqlite3
+
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
         cur.execute("PRAGMA table_info(model_output)")
@@ -333,13 +344,32 @@ def write_inference_to_model_output(
                     """INSERT INTO model_output (raw_data_id, model_name, model_id, label, label_3c,
                        confidence, score, p_pos, p_neu, p_neg, sentiment_score, inference_ms, created_at)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (raw_id_int, model_name, model_id, label, label_3c, confidence, confidence,
-                     p_pos, p_neu, p_neg, sentiment_score, inference_ms, datetime.now().isoformat()),
+                    (
+                        raw_id_int,
+                        model_name,
+                        model_id,
+                        label,
+                        label_3c,
+                        confidence,
+                        confidence,
+                        p_pos,
+                        p_neu,
+                        p_neg,
+                        sentiment_score,
+                        inference_ms,
+                        datetime.now().isoformat(),
+                    ),
                 )
             else:
                 cur.execute(
                     "INSERT INTO model_output (raw_data_id, model_name, label, score, created_at) VALUES (?, ?, ?, ?, ?)",
-                    (raw_id_int, model_name, label, round(confidence, 3), datetime.now().isoformat()),
+                    (
+                        raw_id_int,
+                        model_name,
+                        label,
+                        round(confidence, 3),
+                        datetime.now().isoformat(),
+                    ),
                 )
             count += 1
         conn.commit()
@@ -399,7 +429,9 @@ def write_predictions_parquet(
     if not root.is_absolute():
         root = Path(__file__).resolve().parents[3] / root
 
-    run_id = inference_run_id or f"infer_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}"
+    run_id = (
+        inference_run_id or f"infer_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}"
+    )
     model_ver = canonical_sentiment_label(
         model_version or settings.sentiment_finetuned_model_path or settings.camembert_model_path
     )

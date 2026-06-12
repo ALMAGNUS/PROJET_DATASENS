@@ -65,7 +65,9 @@ def upsert_account(password: str) -> None:
     try:
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='profils'")
         if not cursor.fetchone():
-            print("ERREUR: Table profils absente. Lancer d'abord `python scripts/init_profils_table.py`.")
+            print(
+                "ERREUR: Table profils absente. Lancer d'abord `python scripts/init_profils_table.py`."
+            )
             sys.exit(1)
 
         password_hash = security.hash_password(password)

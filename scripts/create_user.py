@@ -31,9 +31,13 @@ if not db_path.startswith("/") and not db_path.startswith("C:"):
 def main() -> None:
     parser = argparse.ArgumentParser(description="Cree ou met a jour un utilisateur PROFILS")
     parser.add_argument("email", nargs="?", help="Email de l'utilisateur")
-    parser.add_argument("password", nargs="?", help="Mot de passe (eviter de le mettre en clair en prod)")
+    parser.add_argument(
+        "password", nargs="?", help="Mot de passe (eviter de le mettre en clair en prod)"
+    )
     parser.add_argument("--role", default="admin", choices=["reader", "writer", "deleter", "admin"])
-    parser.add_argument("--username", default=None, help="Username unique (defaut: derive de l'email)")
+    parser.add_argument(
+        "--username", default=None, help="Username unique (defaut: derive de l'email)"
+    )
     parser.add_argument("--firstname", default="", help="Prenom")
     parser.add_argument("--lastname", default="", help="Nom")
     args = parser.parse_args()
@@ -54,7 +58,9 @@ def main() -> None:
     try:
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='profils'")
         if not cursor.fetchone():
-            print("ERREUR: Table profils absente. Lancez d'abord le pipeline E1 ou init_profils_table.py")
+            print(
+                "ERREUR: Table profils absente. Lancez d'abord le pipeline E1 ou init_profils_table.py"
+            )
             sys.exit(1)
 
         password_hash = security.hash_password(password)

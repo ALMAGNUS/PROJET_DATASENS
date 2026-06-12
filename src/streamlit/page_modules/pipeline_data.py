@@ -27,9 +27,7 @@ def render(ctx: PageContext) -> None:
         "Synthèse du run, preuves et fusion. "
         "Pour ouvrir fichier par fichier → sous-onglet **Explorer les fichiers**."
     )
-    sub_run, sub_explore = st.tabs(
-        ["Synthèse & run", "Explorer les fichiers"]
-    )
+    sub_run, sub_explore = st.tabs(["Synthèse & run", "Explorer les fichiers"])
     with sub_run:
         render_expert_breadcrumb("Pipeline", "Synthèse & run")
         page_pipeline.render(ctx)

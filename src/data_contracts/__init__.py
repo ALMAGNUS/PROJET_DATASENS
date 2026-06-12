@@ -13,4 +13,3 @@ __all__ = [
     "assert_no_target_leakage",
     "assert_training_label_present",
 ]
-

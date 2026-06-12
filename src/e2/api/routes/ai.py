@@ -6,6 +6,7 @@ inférence ML sur GoldAI, predict LocalHF, et insights assistant.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from loguru import logger
 from pydantic import BaseModel, Field
 
 from src.config import get_settings
@@ -16,8 +17,8 @@ from src.e2.api.schemas.ai import (
     InsightRequest,
     InsightResponse,
 )
-from src.insights.builder import build_insight_pack
 from src.e3.mistral import get_mistral_service
+from src.insights.builder import build_insight_pack
 
 router = APIRouter(prefix="/ai", tags=["AI - Mistral & ML"])
 
@@ -25,32 +26,38 @@ router = APIRouter(prefix="/ai", tags=["AI - Mistral & ML"])
 # --- Schemas Mistral (chat, summarize, sentiment) ---
 class ChatRequest(BaseModel):
     """Requête chat"""
+
     message: str = Field(..., min_length=1, max_length=5000, description="Message utilisateur")
 
 
 class ChatResponse(BaseModel):
     """Réponse chat"""
+
     response: str
 
 
 class SummarizeRequest(BaseModel):
     """Requête résumé"""
+
     text: str = Field(..., min_length=1, max_length=10000)
     max_length: int = Field(default=200, ge=50, le=500, description="Longueur max cible")
 
 
 class SummarizeResponse(BaseModel):
     """Réponse résumé"""
+
     summary: str
 
 
 class SentimentRequest(BaseModel):
     """Requête analyse sentiment"""
+
     text: str = Field(..., min_length=1, max_length=5000)
 
 
 class SentimentResponse(BaseModel):
     """Réponse sentiment"""
+
     sentiment: str
     label: str = Field(description="positif, négatif ou neutre")
 
@@ -72,10 +79,7 @@ async def ai_status(current_user=Depends(require_reader)):
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(
-    body: ChatRequest,
-    current_user=Depends(require_reader)
-):
+async def chat(body: ChatRequest, current_user=Depends(require_reader)):
     """
     Chat avec Mistral AI.
 
@@ -85,28 +89,21 @@ async def chat(
     if not service.is_available():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Mistral API not configured. Set MISTRAL_API_KEY in .env."
+            detail="Mistral API not configured. Set MISTRAL_API_KEY in .env.",
         )
     try:
         response = service.chat(body.message)
         return ChatResponse(response=response)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Mistral API error: {e!s}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Mistral API error: {e!s}"
         )
 
 
 @router.post("/summarize", response_model=SummarizeResponse)
-async def summarize(
-    body: SummarizeRequest,
-    current_user=Depends(require_reader)
-):
+async def summarize(body: SummarizeRequest, current_user=Depends(require_reader)):
     """
     Résume un texte avec Mistral AI.
     """
@@ -114,23 +111,19 @@ async def summarize(
     if not service.is_available():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Mistral API not configured. Set MISTRAL_API_KEY in .env."
+            detail="Mistral API not configured. Set MISTRAL_API_KEY in .env.",
         )
     try:
         summary = service.summarize(body.text, max_length=body.max_length)
         return SummarizeResponse(summary=summary)
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Mistral API error: {e!s}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Mistral API error: {e!s}"
         )
 
 
 @router.post("/sentiment", response_model=SentimentResponse)
-async def analyze_sentiment(
-    body: SentimentRequest,
-    current_user=Depends(require_reader)
-):
+async def analyze_sentiment(body: SentimentRequest, current_user=Depends(require_reader)):
     """
     Analyse le sentiment d'un texte (positif/négatif/neutre).
     """
@@ -138,15 +131,14 @@ async def analyze_sentiment(
     if not service.is_available():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Mistral API not configured. Set MISTRAL_API_KEY in .env."
+            detail="Mistral API not configured. Set MISTRAL_API_KEY in .env.",
         )
     try:
         sentiment = service.analyze_sentiment(body.text)
         return SentimentResponse(sentiment=sentiment, label=sentiment)
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Mistral API error: {e!s}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Mistral API error: {e!s}"
         )
 
 
@@ -154,7 +146,7 @@ async def analyze_sentiment(
 async def ml_sentiment_goldai(
     limit: int = Query(50, ge=1, le=500, description="Nombre d'articles GoldAI"),
     persist: bool = Query(False, description="Écrire dans MODEL_OUTPUT (label, score)"),
-    current_user=Depends(require_reader)
+    current_user=Depends(require_reader),
 ):
     """
     Inférence sentiment ML sur GoldAI. Optimisé CPU (batch=8, max_length=256).
@@ -166,6 +158,7 @@ async def ml_sentiment_goldai(
             write_inference_to_model_output,
             write_predictions_parquet,
         )
+
         results = run_sentiment_inference(limit=limit, use_merged=True)
         persisted = 0
         predictions_path = None
@@ -181,25 +174,44 @@ async def ml_sentiment_goldai(
     except FileNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"GoldAI not found. Run: python scripts/merge_parquet_goldai.py - {e!s}"
+            detail=f"GoldAI not found. Run: python scripts/merge_parquet_goldai.py - {e!s}",
         )
     except ImportError as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"ML dependencies required: {e!s}"
+            detail=f"ML dependencies required: {e!s}",
         )
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"ML inference error: {e!s}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"ML inference error: {e!s}"
         )
 
 
 # --- Local HF + Insights (Cockpit Streamlit) ---
 
 _THEME_KEYWORDS = {
-    "politique": ["politiqu", "gouvern", "election", "president", "parti", "senat", "assemblee", "ministre"],
-    "financier": ["financ", "economie", "econom", "bourse", "marche", "inflation", "bce", "fed", "taux", "banque"],
+    "politique": [
+        "politiqu",
+        "gouvern",
+        "election",
+        "president",
+        "parti",
+        "senat",
+        "assemblee",
+        "ministre",
+    ],
+    "financier": [
+        "financ",
+        "economie",
+        "econom",
+        "bourse",
+        "marche",
+        "inflation",
+        "bce",
+        "fed",
+        "taux",
+        "banque",
+    ],
     "utilisateurs": [],
 }
 
@@ -235,12 +247,24 @@ def _load_goldai_theme_df(theme: str):
             app_df = app_df.copy()
             pred_df = pred_df.copy()
             app_df["id"] = (
-                app_df["id"].astype("string").str.strip().fillna("").replace({"<NA>": "", "nan": "", "None": ""})
+                app_df["id"]
+                .astype("string")
+                .str.strip()
+                .fillna("")
+                .replace({"<NA>": "", "nan": "", "None": ""})
             )
             pred_df["id"] = (
-                pred_df["id"].astype("string").str.strip().fillna("").replace({"<NA>": "", "nan": "", "None": ""})
+                pred_df["id"]
+                .astype("string")
+                .str.strip()
+                .fillna("")
+                .replace({"<NA>": "", "nan": "", "None": ""})
             )
-            pred_cols = [c for c in ["id", "predicted_sentiment", "predicted_sentiment_score"] if c in pred_df.columns]
+            pred_cols = [
+                c
+                for c in ["id", "predicted_sentiment", "predicted_sentiment_score"]
+                if c in pred_df.columns
+            ]
             pred_df = pred_df[pred_cols].drop_duplicates(subset=["id"], keep="last")
             df = app_df.merge(pred_df, on="id", how="left")
             pred_coverage = (
@@ -251,7 +275,9 @@ def _load_goldai_theme_df(theme: str):
             if pred_coverage < 0.3:
                 legacy_path = goldai_root / "merged_all_dates.parquet"
                 if legacy_path.exists():
-                    legacy_df = pd.read_parquet(legacy_path, columns=["id", "sentiment", "sentiment_score"])
+                    legacy_df = pd.read_parquet(
+                        legacy_path, columns=["id", "sentiment", "sentiment_score"]
+                    )
                     if "id" in legacy_df.columns:
                         legacy_df = legacy_df.copy()
                         legacy_df["id"] = (
@@ -275,7 +301,9 @@ def _load_goldai_theme_df(theme: str):
                 if "predicted_sentiment" in df.columns:
                     df["sentiment"] = df["predicted_sentiment"].fillna(df.get("sentiment_legacy"))
                 if "predicted_sentiment_score" in df.columns:
-                    df["sentiment_score"] = df["predicted_sentiment_score"].fillna(df.get("sentiment_score_legacy"))
+                    df["sentiment_score"] = df["predicted_sentiment_score"].fillna(
+                        df.get("sentiment_score_legacy")
+                    )
                 data_label = (
                     f"Gold app input + predictions (coverage={pred_coverage:.1%}) + legacy fallback"
                 )
@@ -420,8 +448,7 @@ def _build_data_context(theme: str) -> str:
 
         if facts.get("sentiment_counts"):
             sv_parts = [
-                f"{k}: {v['count']} ({v['pct']:.0%})"
-                for k, v in facts["sentiment_counts"].items()
+                f"{k}: {v['count']} ({v['pct']:.0%})" for k, v in facts["sentiment_counts"].items()
             ]
             context_lines.append(f"Répartition sentiment : {' | '.join(sv_parts)}")
             context_lines.append(
@@ -464,7 +491,9 @@ def _build_data_context(theme: str) -> str:
     except Exception as exc:
         context_lines.append(f"(Contexte données partiellement disponible : {exc!s})")
 
-    return "\n".join(context_lines) if context_lines else "Aucune donnée disponible dans le dataset."
+    return (
+        "\n".join(context_lines) if context_lines else "Aucune donnée disponible dans le dataset."
+    )
 
 
 def _insight_reply(theme: str, message: str) -> str:
@@ -580,8 +609,6 @@ def predict(payload: AIPredictRequest, _user=Depends(require_reader)):
     Inférence locale HF (CamemBERT/sentiment_fr).
     Sentiment: label 3 classes (POSITIVE/NEUTRAL/NEGATIVE) + confidence + sentiment_score ∈ [-1,+1].
     """
-    from loguru import logger
-
     from src.ml.inference.local_hf_service import LocalHFService
     from src.ml.inference.sentiment_postprocess import finalize_sentiment
 

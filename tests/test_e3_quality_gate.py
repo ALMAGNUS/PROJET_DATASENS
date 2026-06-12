@@ -4,10 +4,10 @@ E3 Quality Gate Tests (C9-C13 support)
 Tests ciblés pour sécuriser l'exposition API IA et la résilience MLOps.
 """
 
-from pathlib import Path
 import re
 import sys
 import types
+from pathlib import Path
 
 import pandas as pd
 from fastapi.testclient import TestClient
@@ -132,7 +132,11 @@ def test_ai_predict_endpoint_contract_with_stubbed_local_model(monkeypatch):
     client = _build_test_client()
     response = client.post(
         "/api/v1/ai/predict",
-        json={"text": "Le marché progresse fortement", "model": "sentiment_fr", "task": "sentiment-analysis"},
+        json={
+            "text": "Le marché progresse fortement",
+            "model": "sentiment_fr",
+            "task": "sentiment-analysis",
+        },
         headers={"Authorization": "Bearer test-token"},
     )
 
@@ -180,4 +184,3 @@ def test_metrics_expose_drift_gauge_after_drift_call(tmp_path, monkeypatch):
     metrics_text = metrics_response.text
     assert "datasens_drift_score" in metrics_text
     assert re.search(r"^datasens_drift_articles_total\s+4(\.0+)?$", metrics_text, re.MULTILINE)
-

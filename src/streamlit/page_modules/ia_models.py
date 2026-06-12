@@ -12,8 +12,8 @@ import streamlit as st
 
 from src.streamlit._cockpit_helpers import PageContext, cockpit_tab_is_active
 from src.streamlit.cockpit_ux import render_expert_breadcrumb
-from src.streamlit.page_modules import ia as page_ia
 from src.streamlit.page_modules import dataset_quality as page_dataset_quality
+from src.streamlit.page_modules import ia as page_ia
 from src.streamlit.page_modules import modeles as page_modeles
 
 

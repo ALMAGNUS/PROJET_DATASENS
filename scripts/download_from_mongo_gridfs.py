@@ -34,7 +34,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--list", action="store_true", help="List files only (no download)")
     p.add_argument("--logical-name", type=str, default="", help="Exact logical_name filter")
     p.add_argument("--prefix", type=str, default="", help="Prefix filter on logical_name")
-    p.add_argument("--output-dir", type=str, default="exports/mongo_gridfs", help="Destination directory")
+    p.add_argument(
+        "--output-dir", type=str, default="exports/mongo_gridfs", help="Destination directory"
+    )
     p.add_argument("--limit", type=int, default=0, help="Max files to download/list (0 = no limit)")
     return p
 
@@ -84,7 +86,9 @@ def main() -> int:
             file_id = d["_id"]
             meta = d.get("metadata", {}) or {}
             logical = meta.get("logical_name") or d.get("filename") or str(file_id)
-            safe_name = "".join(ch if ch.isalnum() or ch in ("-", "_", ".") else "_" for ch in logical)
+            safe_name = "".join(
+                ch if ch.isalnum() or ch in ("-", "_", ".") else "_" for ch in logical
+            )
             target = out_dir / f"{safe_name}.parquet"
             gf = fs.get(file_id)
             target.write_bytes(gf.read())

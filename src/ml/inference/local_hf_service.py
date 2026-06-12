@@ -21,6 +21,7 @@ def _setup_cpu_optimization() -> None:
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
     try:
         import torch
+
         if not torch.cuda.is_available():
             n = getattr(get_settings(), "torch_num_threads", 8)
             torch.set_num_threads(n)  # 6-8 pour i7, 4-6 pour i5
@@ -36,7 +37,11 @@ class LocalHFService:
     def __post_init__(self) -> None:
         _setup_cpu_optimization()
         settings = get_settings()
-        device = 0 if (settings.model_device == "cuda" and __import__("torch").cuda.is_available()) else -1
+        device = (
+            0
+            if (settings.model_device == "cuda" and __import__("torch").cuda.is_available())
+            else -1
+        )
         self._max_length = getattr(settings, "inference_max_length", 256)
         self._batch_size = getattr(settings, "inference_batch_size", 4)
         self._pipe = pipeline(

@@ -22,4 +22,6 @@ def render(ctx: PageContext) -> None:
         """
     )
     if ctx.ux_mode == "Expert":
-        st.caption("Mode Expert : onglets Pilotage et exploration complète du pipeline disponibles.")
+        st.caption(
+            "Mode Expert : onglets Pilotage et exploration complète du pipeline disponibles."
+        )

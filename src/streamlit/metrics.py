@@ -303,9 +303,7 @@ def enrich_profile(df: pd.DataFrame, stage: str) -> dict:
     profile["sentiment_coverage"] = (
         float(df["sentiment"].notna().mean()) if "sentiment" in col_set else 0.0
     )
-    profile["topic_coverage"] = (
-        float(df["topic_1"].notna().mean()) if "topic_1" in col_set else 0.0
-    )
+    profile["topic_coverage"] = float(df["topic_1"].notna().mean()) if "topic_1" in col_set else 0.0
     profile["cols_list"] = sorted(col_set)
     return profile
 
@@ -460,7 +458,9 @@ def sentiment_benchmark_diagnosis(root: Path) -> pd.DataFrame:
             {
                 "model_key": model,
                 "model": _MODEL_META.get(model, {}).get("display", model),
-                "backbone": _MODEL_META.get(model, {}).get("backbone", str(m.get("model_name", ""))),
+                "backbone": _MODEL_META.get(model, {}).get(
+                    "backbone", str(m.get("model_name", ""))
+                ),
                 "family": _MODEL_META.get(model, {}).get("family", "n/a"),
                 "type": _MODEL_META.get(model, {}).get("type", "n/a"),
                 "accuracy": float(m.get("accuracy", 0.0)),
@@ -476,14 +476,25 @@ def sentiment_benchmark_diagnosis(root: Path) -> pd.DataFrame:
         return pd.DataFrame()
     df = pd.DataFrame(rows).sort_values(["f1_macro", "accuracy"], ascending=False)
     ordered_cols = [
-        "model", "family", "type", "backbone",
-        "accuracy", "f1_macro", "latency_ms",
-        "f1_neg", "f1_neu", "f1_pos", "f1_gap_max", "model_key",
+        "model",
+        "family",
+        "type",
+        "backbone",
+        "accuracy",
+        "f1_macro",
+        "latency_ms",
+        "f1_neg",
+        "f1_neu",
+        "f1_pos",
+        "f1_gap_max",
+        "model_key",
     ]
     return df[[c for c in ordered_cols if c in df.columns]]
 
 
-def _active_inference_benchmark_key(active_model: str | None, bench_results: dict | None) -> str | None:
+def _active_inference_benchmark_key(
+    active_model: str | None, bench_results: dict | None
+) -> str | None:
     """Résout la clé benchmark correspondant au modèle d'inférence actif."""
     if not bench_results:
         return None
@@ -510,15 +521,16 @@ def go_no_go_snapshot(
     """
     trained_ranked = sorted(
         trained_models,
-        key=lambda m: (m.get("eval_f1_macro") or m.get("eval_f1") or 0, m.get("eval_accuracy") or 0),
+        key=lambda m: (
+            m.get("eval_f1_macro") or m.get("eval_f1") or 0,
+            m.get("eval_accuracy") or 0,
+        ),
         reverse=True,
     )
     active_name = Path(active_model).name if active_model else None
     best_trained = None
     if active_name:
-        best_trained = next(
-            (m for m in trained_models if m.get("name") == active_name), None
-        )
+        best_trained = next((m for m in trained_models if m.get("name") == active_name), None)
     if best_trained is None:
         best_trained = trained_ranked[0] if trained_ranked else None
 
@@ -600,9 +612,7 @@ def scan_trained_models(root: Path) -> list[dict]:
                 entry["best_metric"] = state.get("best_metric")
                 entry["epochs"] = state.get("epoch")
                 log = state.get("log_history", [])
-                last_eval = next(
-                    (e for e in reversed(log) if "eval_accuracy" in e), None
-                )
+                last_eval = next((e for e in reversed(log) if "eval_accuracy" in e), None)
                 if last_eval:
                     entry["eval_accuracy"] = last_eval.get("eval_accuracy")
                     entry["eval_f1"] = last_eval.get("eval_f1")

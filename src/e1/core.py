@@ -192,7 +192,16 @@ def _insee_json_items(payload: object) -> list[dict]:
     if isinstance(payload, list):
         return [x for x in payload[:60] if isinstance(x, dict)]
     if isinstance(payload, dict):
-        for key in ("data", "datasets", "items", "series", "results", "_embedded", "value", "content"):
+        for key in (
+            "data",
+            "datasets",
+            "items",
+            "series",
+            "results",
+            "_embedded",
+            "value",
+            "content",
+        ):
             v = payload.get(key)
             if isinstance(v, list):
                 return [x for x in v[:60] if isinstance(x, dict)]
@@ -218,10 +227,7 @@ def _insee_dict_to_article(item: dict, source_name: str, tag: str) -> Article | 
     if len(title) < 4:
         return None
     desc = (
-        item.get("description")
-        or item.get("abstract")
-        or item.get("resume")
-        or item.get("comment")
+        item.get("description") or item.get("abstract") or item.get("resume") or item.get("comment")
     )
     if desc:
         body = BeautifulSoup(str(desc), "html.parser").get_text(separator=" ", strip=True)[:2000]
@@ -255,7 +261,8 @@ def _insee_fallback_public_pages(source_name: str) -> list[Article]:
                 continue
             href = (link.get("href") or "").strip()
             if not any(
-                p in href for p in ("/actualites/", "/information/", "/statistiques/", "/fr/statistiques/")
+                p in href
+                for p in ("/actualites/", "/information/", "/statistiques/", "/fr/statistiques/")
             ):
                 continue
             if href in seen_href:
@@ -266,7 +273,9 @@ def _insee_fallback_public_pages(source_name: str) -> list[Article]:
                 if href.startswith("http")
                 else f"https://www.insee.fr{href if href.startswith('/') else '/' + href}"
             )
-            a = Article(title=f"[INSEE] {t[:500]}", content=t[:2000], url=full, source_name=source_name)
+            a = Article(
+                title=f"[INSEE] {t[:500]}", content=t[:2000], url=full, source_name=source_name
+            )
             if a.is_valid():
                 articles.append(a)
             if len(articles) >= 35:
@@ -383,7 +392,10 @@ class APIExtractor(BaseExtractor):
             for siren in siren_values
         ]
         insee_core_endpoints = [
-            ((os.getenv("INSEE_METADONNEES_URL") or "https://api.insee.fr/metadonnees").strip(), "Métadonnées"),
+            (
+                (os.getenv("INSEE_METADONNEES_URL") or "https://api.insee.fr/metadonnees").strip(),
+                "Métadonnées",
+            ),
             ((os.getenv("INSEE_MELODI_URL") or "https://api.insee.fr/melodi").strip(), "Melodi"),
             ((os.getenv("INSEE_BDM_URL") or "https://api.insee.fr/series/BDM").strip(), "BDM"),
         ]
@@ -459,9 +471,7 @@ class APIExtractor(BaseExtractor):
                     """Repli RSS : l'API JSON publique renvoie 403 (anti-bot Reddit), le flux .rss reste ouvert."""
                     added = 0
                     try:
-                        feed = feedparser.parse(
-                            f"https://www.reddit.com/r/{sr}/top/.rss?t=week"
-                        )
+                        feed = feedparser.parse(f"https://www.reddit.com/r/{sr}/top/.rss?t=week")
                         for entry in feed.entries[:reddit_posts_per_sub]:
                             title = (entry.get("title") or "").strip()
                             link = entry.get("link") or ""
@@ -592,9 +602,7 @@ class APIExtractor(BaseExtractor):
                         )
                         return a if a.is_valid() else None
                     except Exception as e:
-                        logger.warning(
-                            "Meteo Open-Meteo ({}) echec: {}", city, str(e)[:120]
-                        )
+                        logger.warning("Meteo Open-Meteo ({}) echec: {}", city, str(e)[:120])
                         return None
 
                 def _article_openweathermap(city: str, api_key: str) -> Article | None:
@@ -644,9 +652,7 @@ class APIExtractor(BaseExtractor):
                         )
                         return a if a.is_valid() else None
                     except Exception as e:
-                        logger.warning(
-                            "OpenWeatherMap ({}) echec: {}", city, str(e)[:120]
-                        )
+                        logger.warning("OpenWeatherMap ({}) echec: {}", city, str(e)[:120])
                         return None
 
                 for city in cities:
@@ -762,9 +768,7 @@ class ScrapingExtractor(BaseExtractor):
                 soup = None
                 for u in urls_try:
                     # IFOP : site souvent hostile aux bots ; 1 tentative, logs discrets (cadence annuelle)
-                    resp = _http_get_with_retries(
-                        u, timeout=18, attempts=1, log_failures=False
-                    )
+                    resp = _http_get_with_retries(u, timeout=18, attempts=1, log_failures=False)
                     if resp:
                         soup = BeautifulSoup(resp.text, "html.parser")
                         break
@@ -840,7 +844,9 @@ class ScrapingExtractor(BaseExtractor):
                     if link in seen:
                         return
                     seen.add(link)
-                    title_clean = title_text.strip().split(". ")[0][:300] or title_text.strip()[:300]
+                    title_clean = (
+                        title_text.strip().split(". ")[0][:300] or title_text.strip()[:300]
+                    )
                     a = Article(
                         title=f"[MONAVIS] {title_clean}"[:500],
                         content=(content_text or title_text)[:2000],
@@ -885,7 +891,9 @@ class ScrapingExtractor(BaseExtractor):
                         if payload and payload.get("status") == 200:
                             return soupify(payload.get("text", ""))
                     except Exception as e:
-                        logger.warning("Botasaurus request failed for {}: {}", self.name, str(e)[:40])
+                        logger.warning(
+                            "Botasaurus request failed for {}: {}", self.name, str(e)[:40]
+                        )
                     try:
                         import time as _time
 
@@ -903,7 +911,9 @@ class ScrapingExtractor(BaseExtractor):
                         if html:
                             return BeautifulSoup(html, "html.parser")
                     except Exception as e:
-                        logger.warning("Botasaurus browser failed for {}: {}", self.name, str(e)[:40])
+                        logger.warning(
+                            "Botasaurus browser failed for {}: {}", self.name, str(e)[:40]
+                        )
                     return None
 
                 soup = _fetch_soup(listing_url)
@@ -1125,9 +1135,18 @@ class CSVExtractor(BaseExtractor):
             if csv_path is None:
                 # CSV path - emplacements standards (zzdb, data/raw/)
                 possible_paths = [
-                    Path(__file__).parent.parent.parent / "data" / "raw" / "zzdb_csv" / "zzdb_dataset.csv",
+                    Path(__file__).parent.parent.parent
+                    / "data"
+                    / "raw"
+                    / "zzdb_csv"
+                    / "zzdb_dataset.csv",
                     Path.cwd() / "data" / "raw" / "zzdb_csv" / "zzdb_dataset.csv",
-                    Path.home() / "datasens_project" / "data" / "raw" / "zzdb_csv" / "zzdb_dataset.csv",
+                    Path.home()
+                    / "datasens_project"
+                    / "data"
+                    / "raw"
+                    / "zzdb_csv"
+                    / "zzdb_dataset.csv",
                     Path(__file__).parent.parent.parent / "zzdb" / "export" / "zzdb_dataset.csv",
                     Path(__file__).parent.parent.parent / "zzdb" / "zzdb_dataset.csv",
                     Path.cwd() / "zzdb" / "export" / "zzdb_dataset.csv",

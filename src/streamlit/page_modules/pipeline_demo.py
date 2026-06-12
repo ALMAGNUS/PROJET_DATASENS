@@ -204,7 +204,6 @@ def _pipeline_snapshot(ctx: PageContext, db_state: dict | None, kpis: dict) -> d
     }
 
 
-
 def _chart_consolidated_stocks(snapshot: dict) -> alt.Chart:
     rows = [
         ("RAW (SQLite)", int(snapshot["raw_cumulative"]), "Stock historique en base"),
@@ -335,11 +334,7 @@ def _build_runs_history_df(
         if iso in by_day:
             info = by_day[iso]
             loaded = int(info["loaded"])
-            alertes = (
-                " · ".join(info["reasons"])
-                if info["reasons"]
-                else "Aucune alerte"
-            )
+            alertes = " · ".join(info["reasons"]) if info["reasons"] else "Aucune alerte"
             if info["run_count"] > 1:
                 alertes = f"{info['run_count']} runs ce jour · {alertes}"
             if prev_absent and loaded > 0:
@@ -520,12 +515,7 @@ def render(ctx: PageContext) -> None:
             catch_up_n = 0
             if hist_df is not None and not hist_df.empty:
                 absent_n = int((hist_df["Statut"] == "ABSENT").sum())
-                catch_up_n = int(
-                    hist_df["Alertes"]
-                    .astype(str)
-                    .str.startswith("Rattrapage")
-                    .sum()
-                )
+                catch_up_n = int(hist_df["Alertes"].astype(str).str.startswith("Rattrapage").sum())
             st.caption(
                 f"Période {hist_df['Ordre'].min()} → {hist_df['Ordre'].max()} · "
                 f"{counts['PASS']} PASS · {counts['WARN']} WARN · {counts['FAIL']} FAIL · "

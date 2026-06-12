@@ -88,10 +88,7 @@ def main() -> None:
     correct = sum(1 for r in rows if r["is_correct"])
     by_group: dict[str, dict[str, int]] = {}
     for r in rows:
-        if r["id"].startswith("NE"):
-            g = "NE"
-        else:
-            g = r["id"][0]
+        g = "NE" if r["id"].startswith("NE") else r["id"][0]
         by_group.setdefault(g, {"ok": 0, "n": 0})
         by_group[g]["n"] += 1
         if r["is_correct"]:
@@ -102,7 +99,9 @@ def main() -> None:
         "total": total,
         "correct": correct,
         "accuracy_pct": round(100 * correct / total, 1),
-        "by_prefix": {k: {**v, "accuracy_pct": round(100 * v["ok"] / v["n"], 1)} for k, v in by_group.items()},
+        "by_prefix": {
+            k: {**v, "accuracy_pct": round(100 * v["ok"] / v["n"], 1)} for k, v in by_group.items()
+        },
         "errors": [r for r in rows if not r["is_correct"]],
     }
     json_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -115,7 +114,9 @@ def main() -> None:
     if summary["errors"]:
         print("\nErreurs:")
         for r in summary["errors"]:
-            print(f"  {r['id']}: attendu={r['label_expected']} pred={r['label_predicted']} conf={r['confidence_score']}")
+            print(
+                f"  {r['id']}: attendu={r['label_expected']} pred={r['label_predicted']} conf={r['confidence_score']}"
+            )
 
 
 if __name__ == "__main__":

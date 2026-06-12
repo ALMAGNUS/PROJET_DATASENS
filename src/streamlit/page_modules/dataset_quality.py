@@ -6,8 +6,6 @@ Affiché dans l'onglet **IA → Modèles**, pas dans Pilotage (infra / Mongo).
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pandas as pd
 import streamlit as st
 
@@ -27,9 +25,7 @@ def render_dataset_quality(ctx: PageContext) -> None:
     )
     ia = _ia_metrics_from_parquet(project_root)
     if ia is None:
-        st.warning(
-            "Aucune donnée Parquet (GOLD/GoldAI). Lancez le pipeline puis la fusion GoldAI."
-        )
+        st.warning("Aucune donnée Parquet (GOLD/GoldAI). Lancez le pipeline puis la fusion GoldAI.")
         return
 
     c1, c2, c3 = st.columns(3)
@@ -94,9 +90,7 @@ def render_dataset_quality(ctx: PageContext) -> None:
         id_missing = int(ia.get("id_missing", 0))
         id_duplicates = int(ia.get("id_duplicates", 0))
         if id_missing or id_duplicates:
-            st.caption(
-                f"IDs manquants : {id_missing:,} · doublons : {id_duplicates:,}."
-            )
+            st.caption(f"IDs manquants : {id_missing:,} · doublons : {id_duplicates:,}.")
 
     with st.expander("Distribution des topics", expanded=False):
         full_topics = ia.get("topic_distribution_full") or ia.get("topic_distribution")

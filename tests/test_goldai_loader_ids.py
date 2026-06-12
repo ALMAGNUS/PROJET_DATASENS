@@ -45,4 +45,3 @@ def test_get_goldai_texts_fallbacks_to_id_when_raw_data_id_missing() -> None:
     rows = get_goldai_texts(df)
     assert len(rows) == 1
     assert rows[0][0] == "stable-abc"
-

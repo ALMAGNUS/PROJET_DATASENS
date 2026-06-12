@@ -117,7 +117,9 @@ def _sample_recent_raw(db_path: str, sample_size: int, _cache_buster: int = 0) -
 
 
 @st.cache_data(ttl=120, show_spinner=False)
-def _filter_parquet(path: str, fingerprints: tuple[str, ...], columns: tuple[str, ...]) -> pd.DataFrame:
+def _filter_parquet(
+    path: str, fingerprints: tuple[str, ...], columns: tuple[str, ...]
+) -> pd.DataFrame:
     """Lit le parquet, filtre sur fingerprint, retourne les colonnes demandées."""
     if not path or not Path(path).exists():
         return pd.DataFrame()
@@ -205,7 +207,12 @@ def render_row_trace(ctx: PageContext, default_sample: int = 5) -> None:
     col_a, col_b, col_c = st.columns([1, 1, 2])
     with col_a:
         sample_size = st.slider(
-            "Articles à tracer", min_value=3, max_value=15, value=default_sample, step=1, key="row_trace_n"
+            "Articles à tracer",
+            min_value=3,
+            max_value=15,
+            value=default_sample,
+            step=1,
+            key="row_trace_n",
         )
     with col_b:
         cache_buster = st.session_state.get("row_trace_buster", 0)
@@ -224,7 +231,9 @@ def render_row_trace(ctx: PageContext, default_sample: int = 5) -> None:
         return
 
     fingerprints = tuple(raw_df["fingerprint"].astype(str).tolist())
-    st.caption(f"Échantillon : `{len(fingerprints)}` fingerprints — clé universelle conservée à toutes les étapes.")
+    st.caption(
+        f"Échantillon : `{len(fingerprints)}` fingerprints — clé universelle conservée à toutes les étapes."
+    )
 
     gold_path, gold_partition = _resolve_latest_gold_parquet(project_root)
     goldai_path = project_root / "data" / "goldai" / "merged_all_dates.parquet"
@@ -290,7 +299,9 @@ def render_row_trace(ctx: PageContext, default_sample: int = 5) -> None:
             f"Source : `{db_path}` — table `raw_data` — colonnes brutes. "
             "Aucun enrichissement à ce stade."
         )
-        st.dataframe(_format_dataframe(raw_df, _RAW_COLUMNS), use_container_width=True, hide_index=True)
+        st.dataframe(
+            _format_dataframe(raw_df, _RAW_COLUMNS), use_container_width=True, hide_index=True
+        )
 
     with tabs[1]:
         if gold_path:
@@ -300,7 +311,9 @@ def render_row_trace(ctx: PageContext, default_sample: int = 5) -> None:
             )
         else:
             st.warning("Aucun Parquet GOLD partitionné disponible. Lancez `python main.py`.")
-        st.dataframe(_format_dataframe(gold_df, _GOLD_COLUMNS), use_container_width=True, hide_index=True)
+        st.dataframe(
+            _format_dataframe(gold_df, _GOLD_COLUMNS), use_container_width=True, hide_index=True
+        )
 
     with tabs[2]:
         if goldai_path:
@@ -310,7 +323,9 @@ def render_row_trace(ctx: PageContext, default_sample: int = 5) -> None:
             )
         else:
             st.warning("Stock GoldAI consolidé absent. Lancez `scripts/merge_parquet_goldai.py`.")
-        st.dataframe(_format_dataframe(goldai_df, _GOLDAI_COLUMNS), use_container_width=True, hide_index=True)
+        st.dataframe(
+            _format_dataframe(goldai_df, _GOLDAI_COLUMNS), use_container_width=True, hide_index=True
+        )
 
     with tabs[3]:
         if not mongo_connected:
@@ -342,7 +357,9 @@ def render_row_trace(ctx: PageContext, default_sample: int = 5) -> None:
             "depuis SQLite jusqu'au fichier physique archivé dans GridFS."
         )
     elif gold_df.shape[0] and goldai_df.shape[0]:
-        common = set(raw_df["fingerprint"]) & set(gold_df["fingerprint"]) & set(goldai_df["fingerprint"])
+        common = (
+            set(raw_df["fingerprint"]) & set(gold_df["fingerprint"]) & set(goldai_df["fingerprint"])
+        )
         st.info(
             f"Lineage local validé : {len(common)}/{len(fingerprints)} `fingerprint` "
             "retrouvés sur les 3 couches locales (la 4ème étape GridFS est facultative)."

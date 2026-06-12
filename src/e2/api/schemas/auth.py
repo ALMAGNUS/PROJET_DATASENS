@@ -5,6 +5,7 @@ Modèles pour authentification
 """
 
 from pydantic import BaseModel, Field
+
 from src.e2.api.schemas.common import DemoSafeEmail
 
 

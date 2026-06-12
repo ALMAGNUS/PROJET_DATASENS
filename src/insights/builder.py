@@ -8,16 +8,6 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 from src.insights.cross_context import build_cross_context_block
-from src.insights.macro_narrative import (
-    narrate_crisis,
-    narrate_economy,
-    narrate_risk,
-    narrate_sport,
-    narrate_weather_cross,
-    parse_weather_conditions,
-    scan_sport_signals,
-)
-from src.insights.mistral_synthesis import mistral_cross_analysis
 from src.insights.goldai_data import (
     _ECONOMIC_SOURCES,
     _MEDIA_SOURCES,
@@ -31,6 +21,16 @@ from src.insights.goldai_data import (
     mean_score,
     sentiment_distribution,
 )
+from src.insights.macro_narrative import (
+    narrate_crisis,
+    narrate_economy,
+    narrate_risk,
+    narrate_sport,
+    narrate_weather_cross,
+    parse_weather_conditions,
+    scan_sport_signals,
+)
+from src.insights.mistral_synthesis import mistral_cross_analysis
 
 
 @dataclass
@@ -40,7 +40,9 @@ class InsightPack:
     data_label: str = ""
 
 
-def _card(card_id: str, card_type: str, title: str, summary: str, facts: dict | None = None) -> dict:
+def _card(
+    card_id: str, card_type: str, title: str, summary: str, facts: dict | None = None
+) -> dict:
     return {
         "id": card_id,
         "type": card_type,
@@ -121,7 +123,9 @@ def _weather_cross(df_full: pd.DataFrame, df_theme: pd.DataFrame) -> dict | None
                 if tw_score is not None:
                     overlap_note = f"Sentiment thème sur 7j (avec météo récente) : {tw_score:+.2f}"
 
-    latest_titles = weather["title"].astype(str).head(5).tolist() if "title" in weather.columns else []
+    latest_titles = (
+        weather["title"].astype(str).head(5).tolist() if "title" in weather.columns else []
+    )
 
     return {
         "weather_count": len(weather),
@@ -153,21 +157,83 @@ def _compose_reply(cards: list[dict], message: str) -> str:
     return "\n".join(lines)
 
 
-def _curate_cards(cards: list[dict], theme: str, question: str, *, max_cards: int = 6) -> list[dict]:
+def _curate_cards(
+    cards: list[dict], theme: str, question: str, *, max_cards: int = 6
+) -> list[dict]:
     """Priorise les cartes à forte valeur métier (6 bulles + 1 synthèse Mistral)."""
     q = question.lower()
     if any(w in q for w in ("source", "contenu", "utilisateur")):
-        order = ("sources", "sources_bias", "sentiment", "crisis", "weather", "sport", "economy", "risk", "trend")
+        order = (
+            "sources",
+            "sources_bias",
+            "sentiment",
+            "crisis",
+            "weather",
+            "sport",
+            "economy",
+            "risk",
+            "trend",
+        )
     elif any(w in q for w in ("meteo", "météo", "weather", "canicule", "climat")):
-        order = ("weather", "crisis", "sentiment", "sport", "economy", "risk", "sources", "sources_bias", "trend")
+        order = (
+            "weather",
+            "crisis",
+            "sentiment",
+            "sport",
+            "economy",
+            "risk",
+            "sources",
+            "sources_bias",
+            "trend",
+        )
     elif any(w in q for w in ("sport", "psg", "coupe", "football")):
-        order = ("sport", "economy", "sentiment", "weather", "crisis", "risk", "sources", "sources_bias", "trend")
+        order = (
+            "sport",
+            "economy",
+            "sentiment",
+            "weather",
+            "crisis",
+            "risk",
+            "sources",
+            "sources_bias",
+            "trend",
+        )
     elif any(w in q for w in ("risque", "alerte")):
-        order = ("risk", "crisis", "sentiment", "weather", "economy", "sport", "sources", "sources_bias", "trend")
+        order = (
+            "risk",
+            "crisis",
+            "sentiment",
+            "weather",
+            "economy",
+            "sport",
+            "sources",
+            "sources_bias",
+            "trend",
+        )
     elif theme == "financier":
-        order = ("economy", "weather", "sport", "crisis", "sentiment", "risk", "trend", "sources", "sources_bias")
+        order = (
+            "economy",
+            "weather",
+            "sport",
+            "crisis",
+            "sentiment",
+            "risk",
+            "trend",
+            "sources",
+            "sources_bias",
+        )
     else:
-        order = ("crisis", "weather", "sport", "economy", "sentiment", "risk", "trend", "sources", "sources_bias")
+        order = (
+            "crisis",
+            "weather",
+            "sport",
+            "economy",
+            "sentiment",
+            "risk",
+            "trend",
+            "sources",
+            "sources_bias",
+        )
 
     rank = {t: i for i, t in enumerate(order)}
     sorted_cards = sorted(cards, key=lambda c: (rank.get(c.get("type"), 99), c.get("id", "")))
@@ -200,9 +266,13 @@ def build_insight_pack(theme: str, message: str, *, include_mistral: bool = True
     sport_signals = scan_sport_signals(df_full)
     cards: list[dict] = []
 
-    dist_txt = " · ".join(f"{k} {v['pct']:.0%}" for k, v in sorted(dist.items(), key=lambda x: -x[1]["count"])[:3])
+    dist_txt = " · ".join(
+        f"{k} {v['pct']:.0%}" for k, v in sorted(dist.items(), key=lambda x: -x[1]["count"])[:3]
+    )
     score_txt = f" Score {m_score:+.2f}." if m_score is not None else ""
-    sentiment_summary = f"{total:,} articles — {dom} dominant ({dom_pct:.0%}). {dist_txt}.{score_txt}"
+    sentiment_summary = (
+        f"{total:,} articles — {dom} dominant ({dom_pct:.0%}). {dist_txt}.{score_txt}"
+    )
     if neg >= 0.4:
         sentiment_summary += " Climat défiant, au-dessus du simple bruit médiatique."
     cards.append(
@@ -211,7 +281,13 @@ def build_insight_pack(theme: str, message: str, *, include_mistral: bool = True
             "sentiment",
             f"Sentiment {label}",
             sentiment_summary,
-            {"total": total, "dominant": dom, "dominant_pct": dom_pct, "mean_score": m_score, "distribution": dist},
+            {
+                "total": total,
+                "dominant": dom,
+                "dominant_pct": dom_pct,
+                "mean_score": m_score,
+                "distribution": dist,
+            },
         )
     )
 
@@ -261,7 +337,9 @@ def build_insight_pack(theme: str, message: str, *, include_mistral: bool = True
                 "economic_cross",
                 "economy",
                 "Signal économique",
-                narrate_economy(len(eco_df), eco_dom, eco_pct, theme, neg if theme == "politique" else None),
+                narrate_economy(
+                    len(eco_df), eco_dom, eco_pct, theme, neg if theme == "politique" else None
+                ),
                 {"total": len(eco_df), "dominant": eco_dom, "dominant_pct": eco_pct},
             )
         )
@@ -283,7 +361,11 @@ def build_insight_pack(theme: str, message: str, *, include_mistral: bool = True
         m_score_media = mean_score(media)
         p_pct = len(part) / total if total else 0
         m_pct = len(media) / total if total else 0
-        p_txt = f"participatif {p_pct:.0%} (score {p_score:+.2f})" if p_score is not None else f"participatif {p_pct:.0%}"
+        p_txt = (
+            f"participatif {p_pct:.0%} (score {p_score:+.2f})"
+            if p_score is not None
+            else f"participatif {p_pct:.0%}"
+        )
         m_txt = (
             f"médias {m_pct:.0%} (score {m_score_media:+.2f})"
             if m_score_media is not None

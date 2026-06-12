@@ -85,6 +85,7 @@ def record_active_user(profil_id: str | int) -> None:
     _active_user_sessions[str(profil_id)] = time()
     api_active_users.set(len(_active_user_sessions))
 
+
 # Gauges - Drift (mis a jour par l’endpoint /api/v1/analytics/drift-metrics)
 drift_sentiment_entropy = Gauge(
     "datasens_drift_sentiment_entropy",

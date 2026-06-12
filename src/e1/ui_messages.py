@@ -91,9 +91,7 @@ class UiMessages:
 
     @staticmethod
     def topics_distribution_note() -> str:
-        return (
-            "   Base : liaisons document_topic (≤ 2 par article) ; les pourcentages portent sur ces liaisons."
-        )
+        return "   Base : liaisons document_topic (≤ 2 par article) ; les pourcentages portent sur ces liaisons."
 
     @staticmethod
     def sentiment_distribution_title() -> str:

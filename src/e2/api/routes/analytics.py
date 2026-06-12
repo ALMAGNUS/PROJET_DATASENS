@@ -371,7 +371,9 @@ def _compute_drift_sync(
 
 @router.get("/drift-metrics", response_model=DriftMetricsResponse)
 async def get_drift_metrics(
-    target_date: date | None = Query(None, description="Date (optionnel, défaut: dernière partition)"),
+    target_date: date | None = Query(
+        None, description="Date (optionnel, défaut: dernière partition)"
+    ),
     all_dates: bool = Query(
         False,
         description="Si true, agrège toutes les partitions GOLD (lourd — éviter en démo live)",

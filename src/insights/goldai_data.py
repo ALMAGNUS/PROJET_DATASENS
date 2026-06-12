@@ -7,12 +7,37 @@ from pathlib import Path
 import pandas as pd
 
 _THEME_KEYWORDS = {
-    "politique": ["politiqu", "gouvern", "election", "president", "parti", "senat", "assemblee", "ministre"],
-    "financier": ["financ", "economie", "econom", "bourse", "marche", "inflation", "bce", "fed", "taux", "banque"],
+    "politique": [
+        "politiqu",
+        "gouvern",
+        "election",
+        "president",
+        "parti",
+        "senat",
+        "assemblee",
+        "ministre",
+    ],
+    "financier": [
+        "financ",
+        "economie",
+        "econom",
+        "bourse",
+        "marche",
+        "inflation",
+        "bce",
+        "fed",
+        "taux",
+        "banque",
+    ],
     "utilisateurs": [],
 }
 
-_PARTICIPATORY_SOURCES = {"reddit_france", "trustpilot_reviews", "monavis_citoyen", "agora_consultations"}
+_PARTICIPATORY_SOURCES = {
+    "reddit_france",
+    "trustpilot_reviews",
+    "monavis_citoyen",
+    "agora_consultations",
+}
 _MEDIA_SOURCES = {"rss_french_news", "google_news_rss", "yahoo_finance", "gdelt_events"}
 _ECONOMIC_SOURCES = {"yahoo_finance", "insee_indicators", "datagouv_datasets"}
 _WEATHER_SOURCES = {"openweather_api", "open_meteo"}
@@ -52,7 +77,11 @@ def _normalize_ids(df: pd.DataFrame, col: str = "id") -> pd.DataFrame:
         return df
     out = df.copy()
     out[col] = (
-        out[col].astype("string").str.strip().fillna("").replace({"<NA>": "", "nan": "", "None": ""})
+        out[col]
+        .astype("string")
+        .str.strip()
+        .fillna("")
+        .replace({"<NA>": "", "nan": "", "None": ""})
     )
     return out
 
@@ -69,7 +98,11 @@ def load_enriched_goldai() -> tuple[pd.DataFrame, str]:
     app_input_path = goldai_root / "app" / "gold_app_input.parquet"
     pred_dir = goldai_root / "predictions"
     pred_candidates = (
-        sorted(pred_dir.glob("date=*/run=*/predictions.parquet"), key=lambda p: p.stat().st_mtime, reverse=True)
+        sorted(
+            pred_dir.glob("date=*/run=*/predictions.parquet"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
         if pred_dir.exists()
         else []
     )
@@ -79,25 +112,43 @@ def load_enriched_goldai() -> tuple[pd.DataFrame, str]:
     if app_input_path.exists() and latest_pred_path is not None:
         df = _normalize_ids(pd.read_parquet(app_input_path))
         pred_df = _normalize_ids(pd.read_parquet(latest_pred_path))
-        pred_cols = [c for c in ["id", "predicted_sentiment", "predicted_sentiment_score", "confidence"] if c in pred_df.columns]
+        pred_cols = [
+            c
+            for c in ["id", "predicted_sentiment", "predicted_sentiment_score", "confidence"]
+            if c in pred_df.columns
+        ]
         pred_df = pred_df[pred_cols].drop_duplicates(subset=["id"], keep="last")
         df = df.merge(pred_df, on="id", how="left")
-        coverage = float(df["predicted_sentiment"].notna().mean()) if "predicted_sentiment" in df.columns else 0.0
+        coverage = (
+            float(df["predicted_sentiment"].notna().mean())
+            if "predicted_sentiment" in df.columns
+            else 0.0
+        )
         if coverage < 0.3:
             legacy_path = goldai_root / "merged_all_dates.parquet"
-            if legacy_path.exists() and "id" in pd.read_parquet(legacy_path, columns=["id"]).columns:
+            if (
+                legacy_path.exists()
+                and "id" in pd.read_parquet(legacy_path, columns=["id"]).columns
+            ):
                 legacy_df = _normalize_ids(
                     pd.read_parquet(legacy_path, columns=["id", "sentiment", "sentiment_score"])
                 ).drop_duplicates(subset=["id"], keep="last")
                 df = df.merge(
-                    legacy_df.rename(columns={"sentiment": "sentiment_legacy", "sentiment_score": "sentiment_score_legacy"}),
+                    legacy_df.rename(
+                        columns={
+                            "sentiment": "sentiment_legacy",
+                            "sentiment_score": "sentiment_score_legacy",
+                        }
+                    ),
                     on="id",
                     how="left",
                 )
             if "predicted_sentiment" in df.columns:
                 df["sentiment"] = df["predicted_sentiment"].fillna(df.get("sentiment_legacy"))
             if "predicted_sentiment_score" in df.columns:
-                df["sentiment_score"] = df["predicted_sentiment_score"].fillna(df.get("sentiment_score_legacy"))
+                df["sentiment_score"] = df["predicted_sentiment_score"].fillna(
+                    df.get("sentiment_score_legacy")
+                )
             data_label = f"GoldAI app + predictions ({coverage:.0%}) + legacy"
         else:
             if "predicted_sentiment" in df.columns:

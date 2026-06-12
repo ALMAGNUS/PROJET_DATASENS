@@ -31,8 +31,8 @@ from src.config import get_settings
 HF_MODELS = {
     "sentiment_fr": "ac0hik/Sentiment_Analysis_French",  # MEILLEUR benchmark FR — recommandé
     "bert_multilingual": "nlptown/bert-base-multilingual-uncased-sentiment",  # BERT 5★, pas CamemBERT
-    "camembert": "cmarkea/distilcamembert-base",         # Léger, rapide, bon sur CPU
-    "flaubert": "flaubert/flaubert_base_uncased",       # FlauBERT français
+    "camembert": "cmarkea/distilcamembert-base",  # Léger, rapide, bon sur CPU
+    "flaubert": "flaubert/flaubert_base_uncased",  # FlauBERT français
 }
 
 LABEL2ID = {"negatif": 0, "neutre": 1, "positif": 2}
@@ -45,6 +45,7 @@ def normalize_sentiment_label(value: object) -> str | None:
     Retourne None si le label est inconnu (ligne ignoree a l'entrainement).
     """
     import unicodedata
+
     s = str(value or "").strip()
     folded = "".join(
         c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c)
@@ -60,11 +61,14 @@ def normalize_sentiment_label(value: object) -> str | None:
         return "neutre"
     return None
 
+
 def load_ia_dataset(ia_dir: Path, split: str) -> pd.DataFrame:
     """Charge train, val ou test depuis data/goldai/ia/."""
     path = ia_dir / f"{split}.parquet"
     if not path.exists():
-        raise FileNotFoundError(f"Copie IA introuvable: {path}. Lancez: python scripts/create_ia_copy.py")
+        raise FileNotFoundError(
+            f"Copie IA introuvable: {path}. Lancez: python scripts/create_ia_copy.py"
+        )
     return pd.read_parquet(path)
 
 
@@ -137,14 +141,24 @@ def rebalance_positive_class(
         return texts, labels, {"applied": False, "reason": "no_positive_examples"}
 
     # x = (r*N - P) / (1-r), where only positives are added.
-    desired_extra = int(np.ceil(((target_pos_ratio * n_total) - n_pos) / max(1e-9, (1 - target_pos_ratio))))
+    desired_extra = int(
+        np.ceil(((target_pos_ratio * n_total) - n_pos) / max(1e-9, (1 - target_pos_ratio)))
+    )
     if desired_extra <= 0:
-        return texts, labels, {"applied": False, "reason": "already_above_target", "before_ratio": n_pos / n_total}
+        return (
+            texts,
+            labels,
+            {"applied": False, "reason": "already_above_target", "before_ratio": n_pos / n_total},
+        )
 
     max_extra = int(np.floor((max_multiplier - 1.0) * n_pos))
     extra = min(desired_extra, max_extra)
     if extra <= 0:
-        return texts, labels, {"applied": False, "reason": "capped_to_zero", "before_ratio": n_pos / n_total}
+        return (
+            texts,
+            labels,
+            {"applied": False, "reason": "capped_to_zero", "before_ratio": n_pos / n_total},
+        )
 
     pos_rows = pairs[pairs["label"] == pos_id]
     extra_rows = pos_rows.sample(n=extra, replace=True, random_state=seed)
@@ -256,12 +270,18 @@ def main() -> int:
             n_train_before, n_val_before = len(train_df), len(val_df)
             train_df = _filter_by_topics(train_df, topics_list)
             val_df = _filter_by_topics(val_df, topics_list)
-            print(f"  Filtre topics [{', '.join(topics_list)}]: train {n_train_before:,}→{len(train_df):,}, val {n_val_before:,}→{len(val_df):,}")
+            print(
+                f"  Filtre topics [{', '.join(topics_list)}]: train {n_train_before:,}→{len(train_df):,}, val {n_val_before:,}→{len(val_df):,}"
+            )
 
     train_texts, train_labels = prepare_text(train_df)
     val_texts, val_labels = prepare_text(val_df)
 
-    if args.max_train_samples and args.max_train_samples > 0 and len(train_texts) > args.max_train_samples:
+    if (
+        args.max_train_samples
+        and args.max_train_samples > 0
+        and len(train_texts) > args.max_train_samples
+    ):
         train_pairs = list(zip(train_texts, train_labels, strict=False))
         train_pairs = pd.DataFrame(train_pairs, columns=["text", "label"]).sample(
             n=args.max_train_samples, random_state=42
@@ -323,7 +343,9 @@ def main() -> int:
     class_weights_np = raw_weights
     dist = {ID2LABEL[c]: int((label_array == c).sum()) for c in classes}
     print(f"\nDistribution classes (train): {dist}")
-    print(f"Class weights auto: {[f'{ID2LABEL[i]}={w:.2f}' for i, w in enumerate(class_weights_np)]}")
+    print(
+        f"Class weights auto: {[f'{ID2LABEL[i]}={w:.2f}' for i, w in enumerate(class_weights_np)]}"
+    )
 
     model_name = HF_MODELS[args.model]
     output_dir = args.output_dir or f"models/{args.model}-sentiment-finetuned"
@@ -387,10 +409,13 @@ def main() -> int:
                     eval_path = fb
                     break
         if not (eval_path / "config.json").exists():
-            print("Modèle fine-tuné introuvable. Vérifiez SENTIMENT_FINETUNED_MODEL_PATH ou lancez le fine-tuning.")
+            print(
+                "Modèle fine-tuné introuvable. Vérifiez SENTIMENT_FINETUNED_MODEL_PATH ou lancez le fine-tuning."
+            )
             return 1
         output_path = eval_path
         from transformers import pipeline
+
         device = 0 if torch.cuda.is_available() else -1
         pipe = pipeline(
             "text-classification",
@@ -401,15 +426,24 @@ def main() -> int:
         preds = []
         for t in val_texts[:500]:
             out = pipe(t[:256], truncation=True, max_length=args.max_length)
-            lbl = out[0]["label"].lower().replace("positive", "positif").replace("negative", "négatif")
+            lbl = (
+                out[0]["label"]
+                .lower()
+                .replace("positive", "positif")
+                .replace("negative", "négatif")
+            )
             preds.append(LABEL2ID.get(lbl, 1))
         n_eval = min(500, len(val_labels))
         acc = accuracy_score(val_labels[:n_eval], preds)
         f1_w = f1_score(val_labels[:n_eval], preds, average="weighted")
         f1_m = f1_score(val_labels[:n_eval], preds, average="macro")
         f1_pc = f1_score(val_labels[:n_eval], preds, average=None, labels=[0, 1, 2])
-        print(f"Val accuracy ({n_eval} ex.): {acc:.2%} | F1 weighted: {f1_w:.4f} | F1 macro: {f1_m:.4f}")
-        print(f"F1 per class: négatif={f1_pc[0]:.3f}, neutre={f1_pc[1]:.3f}, positif={f1_pc[2]:.3f}")
+        print(
+            f"Val accuracy ({n_eval} ex.): {acc:.2%} | F1 weighted: {f1_w:.4f} | F1 macro: {f1_m:.4f}"
+        )
+        print(
+            f"F1 per class: négatif={f1_pc[0]:.3f}, neutre={f1_pc[1]:.3f}, positif={f1_pc[2]:.3f}"
+        )
         return 0
 
     training_args = TrainingArguments(
@@ -453,6 +487,7 @@ def main() -> int:
 
     class WeightedTrainer(Trainer):
         """Trainer avec CrossEntropyLoss pondérée par classe."""
+
         def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
             labels = inputs.get("labels")
             outputs = model(**inputs)
@@ -472,7 +507,9 @@ def main() -> int:
         compute_metrics=compute_metrics,
     )
 
-    print(f"\nDémarrage fine-tuning ({args.model} | {args.epochs} epochs | class weights actifs)...")
+    print(
+        f"\nDémarrage fine-tuning ({args.model} | {args.epochs} epochs | class weights actifs)..."
+    )
     trainer.train()
 
     print("\nSauvegarde modèle...")
@@ -485,7 +522,9 @@ def main() -> int:
     f1m = eval_res.get("eval_f1_macro", 0)
     f1w = eval_res.get("eval_f1", 0)
     f1p = eval_res.get("eval_f1_pos", 0)
-    print(f"\nRésultats val: accuracy={acc:.2%} | F1 macro={f1m:.4f} | F1 weighted={f1w:.4f} | F1 positif={f1p:.4f}")
+    print(
+        f"\nRésultats val: accuracy={acc:.2%} | F1 macro={f1m:.4f} | F1 weighted={f1w:.4f} | F1 positif={f1p:.4f}"
+    )
     print(f"Modèle sauvegardé: {output_path.absolute()}")
 
     # Écriture TRAINING_RESULTS.json pour plot_e2_results.py (quick ou full)
@@ -502,6 +541,7 @@ def main() -> int:
     train_sps = float(getattr(state, "train_samples_per_second", 0) or 0)
     train_stps = float(getattr(state, "train_steps_per_second", 0) or 0)
     from datetime import datetime
+
     results_json = {
         "run_date": datetime.now().strftime("%Y-%m-%d"),
         "mode": mode,

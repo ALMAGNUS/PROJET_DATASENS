@@ -20,12 +20,14 @@ class AIPredictResponse(BaseModel):
 
 class InsightRequest(BaseModel):
     """Requete pour le chat insights (utilisateurs, financier, politique)."""
+
     theme: str  # "utilisateurs" | "financier" | "politique"
     message: str
 
 
 class InsightCard(BaseModel):
     """Carte insight métier (croisement GoldAI)."""
+
     id: str
     type: str
     title: str
@@ -35,6 +37,7 @@ class InsightCard(BaseModel):
 
 class InsightResponse(BaseModel):
     """Réponse insights : synthèse + cartes multiples."""
+
     reply: str
     theme: str
     insights: list[InsightCard] = Field(default_factory=list)

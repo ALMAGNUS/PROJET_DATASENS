@@ -40,9 +40,10 @@ def test_build_prediction_frame_schema() -> None:
 
 def test_write_predictions_parquet(tmp_path: Path) -> None:
     results = [{"id": 1, "sentiment_ml": "neutre", "sentiment_score": 0.0, "confidence": 0.5}]
-    out = write_predictions_parquet(results, base_dir=tmp_path, model_version="m1", inference_run_id="run-test")
+    out = write_predictions_parquet(
+        results, base_dir=tmp_path, model_version="m1", inference_run_id="run-test"
+    )
     assert out.exists()
     df = pd.read_parquet(out)
     assert len(df) == 1
     assert df.iloc[0]["inference_run_id"] == "run-test"
-

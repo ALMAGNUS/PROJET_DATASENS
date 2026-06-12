@@ -122,7 +122,9 @@ def main() -> int:
     print(f"\n{'='*60}")
     print(f"INFERENCE PIPELINE  run_id={run_id}")
     print(f"{'='*60}")
-    print(f"  limit={effective_limit:,}  checkpoint_every={args.checkpoint_every:,}  resume={args.resume}")
+    print(
+        f"  limit={effective_limit:,}  checkpoint_every={args.checkpoint_every:,}  resume={args.resume}"
+    )
 
     # Checkpoint / reprise
     already_done: list[dict] = []
@@ -144,9 +146,13 @@ def main() -> int:
     def _on_sigint(sig, frame):
         nonlocal interrupted
         interrupted = True
-        print(f"\n\n  Interruption detectee. Sauvegarde checkpoint ({len(all_results):,} resultats)...")
+        print(
+            f"\n\n  Interruption detectee. Sauvegarde checkpoint ({len(all_results):,} resultats)..."
+        )
         _save_checkpoint(run_id, all_results)
-        print(f"  Pour reprendre: python scripts/run_inference_pipeline.py --run-id {run_id} --resume --limit {effective_limit}")
+        print(
+            f"  Pour reprendre: python scripts/run_inference_pipeline.py --run-id {run_id} --resume --limit {effective_limit}"
+        )
         sys.exit(130)
 
     signal.signal(signal.SIGINT, _on_sigint)
@@ -156,7 +162,9 @@ def main() -> int:
 
     print("\nInference sur GOLD_APP_INPUT...")
     if skip_n > 0:
-        print(f"  {skip_n:,} articles deja traites (checkpoint), inférence depuis l'article {skip_n+1}.")
+        print(
+            f"  {skip_n:,} articles deja traites (checkpoint), inférence depuis l'article {skip_n+1}."
+        )
 
     try:
         new_results = run_sentiment_inference(

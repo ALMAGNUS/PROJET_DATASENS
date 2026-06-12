@@ -36,9 +36,7 @@ def render(ctx: PageContext) -> None:
     show_advanced = ctx.show_advanced
 
     if show_advanced:
-        st.caption(
-            "Actions opérationnelles : run pipeline, fusion, copie IA, API et backups."
-        )
+        st.caption("Actions opérationnelles : run pipeline, fusion, copie IA, API et backups.")
 
     def _resolve_db_path() -> str:
         db = os.getenv("DB_PATH")
@@ -70,9 +68,7 @@ def render(ctx: PageContext) -> None:
         )
     b1, b2, b3 = st.columns(3)
     with b1:
-        if st.button(
-            "Pipeline E1", type="primary", use_container_width=True, disabled=not may_run
-        ):
+        if st.button("Pipeline E1", type="primary", use_container_width=True, disabled=not may_run):
             env = {"FORCE_ZZDB_REIMPORT": "false"}
             _run_command("pipeline", [sys.executable, "main.py"], extra_env=env)
     with b2:
@@ -91,9 +87,7 @@ def render(ctx: PageContext) -> None:
                 "Mode slice métier activé : utile pour test rapide, mais à éviter pour le modèle principal. "
                 "Bonne pratique : entraîner global, puis filtrer au niveau des insights."
             )
-        if st.button(
-            "Copie IA", type="primary", use_container_width=True, disabled=not may_run
-        ):
+        if st.button("Copie IA", type="primary", use_container_width=True, disabled=not may_run):
             cmd = [sys.executable, "scripts/create_ia_copy.py"]
             if copie_ia_topics:
                 cmd += ["--topics", "finance,politique,meteo"]
@@ -142,9 +136,8 @@ def render(ctx: PageContext) -> None:
         ):
             if csv_file:
                 import tempfile
-                with tempfile.NamedTemporaryFile(
-                    suffix=".csv", delete=False, mode="wb"
-                ) as tmp:
+
+                with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="wb") as tmp:
                     tmp.write(csv_file.getvalue())
                     tmp_path = tmp.name
                 try:

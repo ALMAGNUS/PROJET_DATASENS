@@ -27,7 +27,9 @@ def assert_no_target_leakage(columns: Iterable[str]) -> None:
         )
 
 
-def assert_training_label_present(columns: Iterable[str], label_col: str = "sentiment_label") -> None:
+def assert_training_label_present(
+    columns: Iterable[str], label_col: str = "sentiment_label"
+) -> None:
     """
     Ensure the training branch contains the expected supervised label.
     """
@@ -36,4 +38,3 @@ def assert_training_label_present(columns: Iterable[str], label_col: str = "sent
         raise ValueError(
             f"Training dataset must contain `{label_col}` but columns are: {sorted(cols)}"
         )
-

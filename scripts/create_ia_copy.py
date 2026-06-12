@@ -134,7 +134,9 @@ def main() -> int:
         lens = df[text_col].fillna("").astype(str).str.len()
         df = df[lens >= args.min_chars].reset_index(drop=True)
         n_drop = n_before - len(df)
-        print(f"  Filtre min_chars>={args.min_chars} ({text_col}): {n_drop:,} lignes retirees ({n_drop/max(1,n_before)*100:.1f}%)")
+        print(
+            f"  Filtre min_chars>={args.min_chars} ({text_col}): {n_drop:,} lignes retirees ({n_drop/max(1,n_before)*100:.1f}%)"
+        )
 
     # Deduplication AVANT split: empeche la fuite train<->test (mesuree a 7.6%).
     # Cle prioritaire: fingerprint (hash metier stable), fallback url, fallback content.
@@ -153,7 +155,9 @@ def main() -> int:
         if text_col:
             df = df.drop_duplicates(subset=[text_col], keep="first").reset_index(drop=True)
         n_drop = n_before - len(df)
-        print(f"  Deduplication (fingerprint > url > {text_col}): {n_drop:,} doublons supprimes ({n_drop/max(1,n_before)*100:.1f}%)")
+        print(
+            f"  Deduplication (fingerprint > url > {text_col}): {n_drop:,} doublons supprimes ({n_drop/max(1,n_before)*100:.1f}%)"
+        )
 
     # Filtre par topics (finance, politique) pour veille ciblee
     if args.topics:
@@ -169,7 +173,9 @@ def main() -> int:
             n_after = len(df)
             print(f"  Filtre topics [{', '.join(topics_list)}]: {n_before:,} -> {n_after:,} lignes")
             if n_after < 100:
-                print(f"  ATTENTION: Peu d'exemples ({n_after}). Verifiez que topic_1/topic_2 existent.")
+                print(
+                    f"  ATTENTION: Peu d'exemples ({n_after}). Verifiez que topic_1/topic_2 existent."
+                )
 
     ia_dir.mkdir(parents=True, exist_ok=True)
 
@@ -203,7 +209,11 @@ def main() -> int:
         split_mode = f"temporel (colonne '{date_col}')"
     else:
         df_sorted = df.sample(frac=1, random_state=42).reset_index(drop=True)
-        split_mode = "aléatoire (pas de colonne date trouvée)" if date_col is None else "aléatoire (--no-temporal)"
+        split_mode = (
+            "aléatoire (pas de colonne date trouvée)"
+            if date_col is None
+            else "aléatoire (--no-temporal)"
+        )
     print(f"  Split mode: {split_mode}")
 
     n_train = int(n * args.train)

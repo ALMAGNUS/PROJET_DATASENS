@@ -69,7 +69,9 @@ def get_goldai_texts(df: pd.DataFrame) -> list[tuple[str, str, str]]:
     Returns:
         Liste de (id, title, content)
     """
-    id_candidates = [c for c in ("raw_data_id", "id", "fingerprint", "url", "title") if c in df.columns]
+    id_candidates = [
+        c for c in ("raw_data_id", "id", "fingerprint", "url", "title") if c in df.columns
+    ]
     if not id_candidates:
         id_candidates = [df.columns[0]]
     title_col = "title" if "title" in df.columns else "headline"

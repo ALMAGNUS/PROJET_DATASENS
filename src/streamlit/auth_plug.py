@@ -14,18 +14,15 @@ import base64
 import json
 import os
 import time
-from typing import Any
-
 from pathlib import Path
+from typing import Any
 
 import requests
 import streamlit as st
 
 from src.config import get_settings
 from src.streamlit._cockpit_helpers import (
-    PageContext,
     get_api_base,
-    probe_http_get,
     render_brand_logo,
 )
 from src.streamlit.cockpit_ux import prefetch_backend_ok
@@ -39,6 +36,7 @@ def _api_base() -> str:
 
 def _auth_prefix() -> str:
     from src.config import get_settings
+
     return get_settings().api_v1_prefix
 
 
@@ -210,7 +208,11 @@ def login(email: str, password: str) -> tuple[bool, str]:
         return False, _login_network_error_message(e)
 
     if r.status_code != 200:
-        detail = (r.json().get("detail") if r.headers.get("content-type", "").startswith("application/json") else None) or r.text
+        detail = (
+            r.json().get("detail")
+            if r.headers.get("content-type", "").startswith("application/json")
+            else None
+        ) or r.text
         return False, str(detail)[:200]
 
     data = r.json()
@@ -300,7 +302,9 @@ def render_login_page(project_root: Path | None = None) -> bool:
         with st.form("auth_login_main", clear_on_submit=False):
             email = st.text_input("Email", placeholder="vous@exemple.com")
             password = st.text_input("Mot de passe", type="password")
-            submitted = st.form_submit_button("Se connecter", type="primary", use_container_width=True)
+            submitted = st.form_submit_button(
+                "Se connecter", type="primary", use_container_width=True
+            )
         if submitted and email and password:
             ok, msg = login(email.strip(), password)
             if ok:
@@ -424,5 +428,3 @@ def require_auth(show_message: bool = True) -> bool:
         st.warning("Cette section nécessite une connexion. Connectez-vous dans la barre latérale.")
     st.stop()
     return False
-
-

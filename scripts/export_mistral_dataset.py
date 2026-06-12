@@ -26,15 +26,17 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 PRED_DIR = ROOT / "data" / "goldai" / "predictions"
-OUT_DIR  = ROOT / "data" / "goldai"
+OUT_DIR = ROOT / "data" / "goldai"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 def find_latest_predictions() -> Path:
     files = sorted(PRED_DIR.rglob("predictions.parquet"), key=lambda f: f.stat().st_mtime)
     if not files:
-        raise FileNotFoundError(f"Aucun predictions.parquet dans {PRED_DIR}\n"
-                                "Lance d'abord : python scripts/run_inference_pipeline.py")
+        raise FileNotFoundError(
+            f"Aucun predictions.parquet dans {PRED_DIR}\n"
+            "Lance d'abord : python scripts/run_inference_pipeline.py"
+        )
     latest = files[-1]
     print(f"[OK] Dernier run d'inférence : {latest.parent.name} ({latest.parent.parent.name})")
     return latest
@@ -50,17 +52,21 @@ def load_and_filter(path: Path, min_confidence: float, topic: str | None) -> pd.
         df_app = pd.read_parquet(app_input)
         # Normalise la colonne id pour la jointure
         id_col_pred = "id" if "id" in df_pred.columns else None
-        id_col_app  = "id" if "id" in df_app.columns else None
+        id_col_app = "id" if "id" in df_app.columns else None
         if id_col_pred and id_col_app:
             df_pred["id"] = df_pred["id"].astype(str).str.strip()
-            df_app["id"]  = df_app["id"].astype(str).str.strip()
+            df_app["id"] = df_app["id"].astype(str).str.strip()
             # Garde les colonnes de gold_app_input qui n'existent pas déjà dans predictions
             extra_cols = [c for c in df_app.columns if c not in df_pred.columns]
             df = df_pred.merge(df_app[["id", *extra_cols]], on="id", how="left")
-            print(f"[OK] Jointure predictions ({total_pred}) + gold_app_input ({len(df_app)}) → {len(df)} lignes")
+            print(
+                f"[OK] Jointure predictions ({total_pred}) + gold_app_input ({len(df_app)}) → {len(df)} lignes"
+            )
         else:
             df = df_pred
-            print("[WARN] Jointure impossible (colonne id manquante), utilisation de predictions seul")
+            print(
+                "[WARN] Jointure impossible (colonne id manquante), utilisation de predictions seul"
+            )
     else:
         df = df_pred
         print("[WARN] gold_app_input.parquet absent — run build_gold_branches.py d'abord")
@@ -76,8 +82,22 @@ def load_and_filter(path: Path, min_confidence: float, topic: str | None) -> pd.
 
 
 def build_mistral_input(df: pd.DataFrame, out_path: Path) -> list[dict]:
-    keep = [c for c in ["title", "content", "predicted_sentiment", "confidence",
-                         "p_pos", "p_neu", "p_neg", "topic_1", "source", "published_at"] if c in df.columns]
+    keep = [
+        c
+        for c in [
+            "title",
+            "content",
+            "predicted_sentiment",
+            "confidence",
+            "p_pos",
+            "p_neu",
+            "p_neg",
+            "topic_1",
+            "source",
+            "published_at",
+        ]
+        if c in df.columns
+    ]
     records = df[keep].to_dict(orient="records")
     out_path.write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[OK] {len(records):,} articles exportés → {out_path.relative_to(ROOT)}")
@@ -89,8 +109,8 @@ def build_prompt(records: list[dict], topic: str | None) -> str:
     sujet = f"sur le thème **{topic}**" if topic else "toutes thématiques confondues"
     lines = []
     for r in records[:80]:  # max 80 articles pour rester dans la fenêtre de contexte
-        sent  = r.get("predicted_sentiment", "?")
-        conf  = r.get("confidence", 0)
+        sent = r.get("predicted_sentiment", "?")
+        conf = r.get("confidence", 0)
         title = str(r.get("title", "")).strip()[:120]
         lines.append(f"- [{sent} {conf:.0%}] {title}")
     context = "\n".join(lines)
@@ -124,6 +144,7 @@ Donne un score de risque de 1 (calme) à 10 (crise) avec une justification en 2-
 
 def call_mistral(prompt: str, api_key: str) -> str:
     from mistralai import Mistral  # type: ignore
+
     client = Mistral(api_key=api_key)
     response = client.chat.complete(
         model="mistral-large-latest",
@@ -149,12 +170,17 @@ def save_insights(insights: str, out_path: Path, meta: dict) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 def main() -> None:
     parser = argparse.ArgumentParser(description="Export prédictions + insights Mistral")
-    parser.add_argument("--export-only", action="store_true",
-                        help="Prépare mistral_input.json sans appeler l'API Mistral")
-    parser.add_argument("--topic", default=None,
-                        help="Filtrer sur un topic (ex: politique, finance)")
-    parser.add_argument("--min-confidence", type=float, default=0.6,
-                        help="Seuil de confiance minimum (défaut: 0.6)")
+    parser.add_argument(
+        "--export-only",
+        action="store_true",
+        help="Prépare mistral_input.json sans appeler l'API Mistral",
+    )
+    parser.add_argument(
+        "--topic", default=None, help="Filtrer sur un topic (ex: politique, finance)"
+    )
+    parser.add_argument(
+        "--min-confidence", type=float, default=0.6, help="Seuil de confiance minimum (défaut: 0.6)"
+    )
     args = parser.parse_args()
 
     # Étape 1 — Préparer le fichier d'entrée
@@ -171,7 +197,9 @@ def main() -> None:
 
     if args.export_only:
         print("\nFichier prêt. Pour appeler Mistral, relance sans --export-only.")
-        print("  Ajoute MISTRAL_API_KEY dans ton .env puis : python scripts/export_mistral_dataset.py")
+        print(
+            "  Ajoute MISTRAL_API_KEY dans ton .env puis : python scripts/export_mistral_dataset.py"
+        )
         return
 
     # Étape 2 — Appeler Mistral

@@ -57,9 +57,7 @@ def mistral_cross_analysis(context: str, question: str, theme_label: str) -> str
         "- Ne recopie pas toutes les cartes : apporte une lecture croisée."
     )
     user_msg = (
-        f"Thème : {theme_label}\n"
-        f"Question : {question}\n\n"
-        f"FAITS GOLDAI :\n{context[:5500]}"
+        f"Thème : {theme_label}\n" f"Question : {question}\n\n" f"FAITS GOLDAI :\n{context[:5500]}"
     )
     try:
         raw = service.chat(

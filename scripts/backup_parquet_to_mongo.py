@@ -232,10 +232,14 @@ def main() -> int:
             model_name = model_dir.name
             for fname in required_model_files:
                 fp = model_dir / fname
-                _backup(fp, f"model_{model_name}_{fname}", {
-                    "model_name": model_name,
-                    "file_type": "model_artifact",
-                })
+                _backup(
+                    fp,
+                    f"model_{model_name}_{fname}",
+                    {
+                        "model_name": model_name,
+                        "file_type": "model_artifact",
+                    },
+                )
             for fname in optional_model_files:
                 fp = model_dir / fname
                 _backup(
@@ -251,7 +255,9 @@ def main() -> int:
     finally:
         store.close()
 
-    print(f"\nBackup terminé — stockés: {stored}  |  déjà présents: {skipped}  |  erreurs: {errors}")
+    print(
+        f"\nBackup terminé — stockés: {stored}  |  déjà présents: {skipped}  |  erreurs: {errors}"
+    )
     return 0 if errors == 0 else 1
 
 

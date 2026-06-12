@@ -64,7 +64,9 @@ def _probs_3c(scores: list[dict]) -> list[float]:
     return [acc["neg"], acc["neu"], acc["pos"]]
 
 
-def _infer_probabilities(model_name: str, dataset: list[dict], max_length: int) -> tuple[np.ndarray, np.ndarray]:
+def _infer_probabilities(
+    model_name: str, dataset: list[dict], max_length: int
+) -> tuple[np.ndarray, np.ndarray]:
     """Retourne (y_true_idx [n], proba [n,3]) ordre [neg, neu, pos]."""
     try:
         import torch
@@ -82,11 +84,16 @@ def _infer_probabilities(model_name: str, dataset: list[dict], max_length: int) 
     y_true: list[int] = []
     probs: list[list[float]] = []
     for i, sample in enumerate(dataset, 1):
-        inputs = tokenizer(sample["text"], return_tensors="pt", truncation=True, max_length=max_length)
+        inputs = tokenizer(
+            sample["text"], return_tensors="pt", truncation=True, max_length=max_length
+        )
         with torch.no_grad():
             logits = model(**inputs).logits[0]
         soft = torch.softmax(logits, dim=-1).tolist()
-        scores = [{"label": str(id2label.get(j, f"LABEL_{j}")), "score": float(p)} for j, p in enumerate(soft)]
+        scores = [
+            {"label": str(id2label.get(j, f"LABEL_{j}")), "score": float(p)}
+            for j, p in enumerate(soft)
+        ]
         probs.append(_probs_3c(scores))
         y_true.append(LABEL2IDX[sample["label"]])
         if i % 100 == 0:
@@ -154,7 +161,9 @@ def _compute_metrics(y_true: np.ndarray, proba: np.ndarray) -> dict:
             "f1": round(float(f1[c]), 4),
             "specificity": round(float(specificity[c]), 4),
             "fpr": round(float(fpr_rate[c]), 4),
-            "roc_auc": (round(roc_auc_per_class[key], 4) if roc_auc_per_class[key] is not None else None),
+            "roc_auc": (
+                round(roc_auc_per_class[key], 4) if roc_auc_per_class[key] is not None else None
+            ),
             "support": int(cm[c, :].sum()),
         }
 
@@ -187,29 +196,43 @@ def _plot_confusion(model_key: str, metrics: dict) -> None:
     fig, axes = plt.subplots(1, 2, figsize=(13, 5.5))
     fig.suptitle(
         f"E2 Évaluation — Matrice de confusion · {model_key}\n({metrics['samples']:,} exemples test étiquetés)",
-        fontsize=12, fontweight="bold",
+        fontsize=12,
+        fontweight="bold",
     )
 
     for ax, mat, title, fmt in (
         (axes[0], cm, "Effectifs bruts", "{:.0f}"),
         (axes[1], cm_norm, "Normalisée par ligne (recall)", "{:.2f}"),
     ):
-        im = ax.imshow(mat, cmap="Blues", vmin=0, vmax=(mat.max() if title == "Effectifs bruts" else 1.0))
-        ax.set_xticks(range(3)); ax.set_xticklabels(names)
-        ax.set_yticks(range(3)); ax.set_yticklabels(names)
-        ax.set_xlabel("Prédit"); ax.set_ylabel("Réel")
+        im = ax.imshow(
+            mat, cmap="Blues", vmin=0, vmax=(mat.max() if title == "Effectifs bruts" else 1.0)
+        )
+        ax.set_xticks(range(3))
+        ax.set_xticklabels(names)
+        ax.set_yticks(range(3))
+        ax.set_yticklabels(names)
+        ax.set_xlabel("Prédit")
+        ax.set_ylabel("Réel")
         ax.set_title(title, fontsize=11)
         thresh = mat.max() / 2.0 if mat.max() else 0.5
         for r in range(3):
             for cc in range(3):
-                ax.text(cc, r, fmt.format(mat[r, cc]), ha="center", va="center",
-                        color="white" if mat[r, cc] > thresh else "#1e293b",
-                        fontsize=11, fontweight="bold")
+                ax.text(
+                    cc,
+                    r,
+                    fmt.format(mat[r, cc]),
+                    ha="center",
+                    va="center",
+                    color="white" if mat[r, cc] > thresh else "#1e293b",
+                    fontsize=11,
+                    fontweight="bold",
+                )
         fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
 
     fig.tight_layout()
     out = FIG_DIR / f"e2_eval_confusion_{model_key}.png"
-    fig.savefig(out, **STYLE); plt.close(fig)
+    fig.savefig(out, **STYLE)
+    plt.close(fig)
     print(f"  OK {out.name}")
 
 
@@ -222,20 +245,29 @@ def _plot_roc(model_key: str, metrics: dict) -> None:
     fig, ax = plt.subplots(figsize=(8, 7))
     fig.suptitle(
         f"E2 Évaluation — Courbes ROC (TPR vs FPR) · {model_key}\none-vs-rest par classe",
-        fontsize=12, fontweight="bold",
+        fontsize=12,
+        fontweight="bold",
     )
 
     for c in LABELS:
         curve = metrics["_roc_curves"][c]
         auc = metrics["per_class"][c]["roc_auc"]
         auc_txt = f"AUC={auc:.3f}" if auc is not None else "AUC=n/a"
-        ax.plot(curve["fpr"], curve["tpr"], linewidth=2.2, color=CLASS_COLORS[c],
-                label=f"{DISPLAY[c]} ({auc_txt})")
+        ax.plot(
+            curve["fpr"],
+            curve["tpr"],
+            linewidth=2.2,
+            color=CLASS_COLORS[c],
+            label=f"{DISPLAY[c]} ({auc_txt})",
+        )
 
-    ax.plot([0, 1], [0, 1], color="#94a3b8", linestyle="--", linewidth=1.2, label="Aléatoire (AUC=0.5)")
+    ax.plot(
+        [0, 1], [0, 1], color="#94a3b8", linestyle="--", linewidth=1.2, label="Aléatoire (AUC=0.5)"
+    )
     macro = metrics.get("roc_auc_macro")
     macro_txt = f"{macro:.3f}" if macro is not None else "n/a"
-    ax.set_xlim(0, 1); ax.set_ylim(0, 1.02)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1.02)
     ax.set_xlabel("Taux de faux positifs (FPR = 1 − specificity)", fontsize=10)
     ax.set_ylabel("Taux de vrais positifs (TPR = recall)", fontsize=10)
     ax.set_title(f"ROC-AUC macro = {macro_txt}", fontsize=10, style="italic")
@@ -244,7 +276,8 @@ def _plot_roc(model_key: str, metrics: dict) -> None:
 
     fig.tight_layout()
     out = FIG_DIR / f"e2_eval_roc_{model_key}.png"
-    fig.savefig(out, **STYLE); plt.close(fig)
+    fig.savefig(out, **STYLE)
+    plt.close(fig)
     print(f"  OK {out.name}")
 
 
@@ -259,36 +292,60 @@ def _plot_metrics_table(model_key: str, metrics: dict) -> None:
     for c in LABELS:
         m = metrics["per_class"][c]
         auc = f"{m['roc_auc']:.3f}" if m["roc_auc"] is not None else "n/a"
-        rows.append([DISPLAY[c], f"{m['precision']:.3f}", f"{m['recall']:.3f}", f"{m['f1']:.3f}",
-                     f"{m['specificity']:.3f}", f"{m['fpr']:.3f}", auc, f"{m['support']:,}"])
+        rows.append(
+            [
+                DISPLAY[c],
+                f"{m['precision']:.3f}",
+                f"{m['recall']:.3f}",
+                f"{m['f1']:.3f}",
+                f"{m['specificity']:.3f}",
+                f"{m['fpr']:.3f}",
+                auc,
+                f"{m['support']:,}",
+            ]
+        )
     macro_auc = f"{metrics['roc_auc_macro']:.3f}" if metrics["roc_auc_macro"] is not None else "n/a"
-    rows.append(["MACRO", f"{metrics['precision_macro']:.3f}", f"{metrics['recall_macro']:.3f}",
-                 f"{metrics['f1_macro']:.3f}", f"{metrics['specificity_macro']:.3f}",
-                 f"{metrics['fpr_macro']:.3f}", macro_auc, f"{metrics['samples']:,}"])
+    rows.append(
+        [
+            "MACRO",
+            f"{metrics['precision_macro']:.3f}",
+            f"{metrics['recall_macro']:.3f}",
+            f"{metrics['f1_macro']:.3f}",
+            f"{metrics['specificity_macro']:.3f}",
+            f"{metrics['fpr_macro']:.3f}",
+            macro_auc,
+            f"{metrics['samples']:,}",
+        ]
+    )
 
     fig, ax = plt.subplots(figsize=(12, 4.2))
     fig.suptitle(
         f"E2 Évaluation — Synthèse métriques · {model_key}\nAccuracy = {metrics['accuracy']:.3f} "
         f"({metrics['accuracy']:.1%}) · {metrics['samples']:,} exemples",
-        fontsize=12, fontweight="bold",
+        fontsize=12,
+        fontweight="bold",
     )
     ax.axis("off")
-    tbl = ax.table(cellText=rows, colLabels=cols, cellLoc="center", loc="center",
-                   bbox=[0.0, 0.0, 1.0, 0.9])
+    tbl = ax.table(
+        cellText=rows, colLabels=cols, cellLoc="center", loc="center", bbox=[0.0, 0.0, 1.0, 0.9]
+    )
     tbl.auto_set_font_size(False)
     tbl.set_fontsize(10)
     for (r, _c), cell in tbl.get_celld().items():
         if r == 0:
-            cell.set_facecolor("#1e3a5f"); cell.set_text_props(color="white", fontweight="bold")
+            cell.set_facecolor("#1e3a5f")
+            cell.set_text_props(color="white", fontweight="bold")
         elif r == len(rows):  # ligne MACRO
-            cell.set_facecolor("#fef3c7"); cell.set_text_props(fontweight="bold")
+            cell.set_facecolor("#fef3c7")
+            cell.set_text_props(fontweight="bold")
         elif r % 2 == 0:
             cell.set_facecolor("#f0f4f8")
         cell.set_edgecolor("#cbd5e1")
 
     fig.tight_layout()
     out = FIG_DIR / f"e2_eval_metrics_table_{model_key}.png"
-    fig.savefig(out, **STYLE); plt.close(fig)
+    fig.savefig(out, **STYLE)
+    plt.close(fig)
     print(f"  OK {out.name}")
 
 
@@ -335,12 +392,24 @@ def _write_markdown(results: dict, dataset_path: Path) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Évaluation complète des métriques de classification (E2).")
-    p.add_argument("--dataset", default="data/goldai/ia/test.parquet", help="Dataset de test étiqueté.")
-    p.add_argument("--models", nargs="*", default=["finetuned_local", "sentiment_fr"],
-                   help="Modèles à évaluer (clés get_available_models).")
-    p.add_argument("--per-class", type=int, default=200,
-                   help="Échantillons max par classe (équilibrage). 0 = tout le test set.")
+    p = argparse.ArgumentParser(
+        description="Évaluation complète des métriques de classification (E2)."
+    )
+    p.add_argument(
+        "--dataset", default="data/goldai/ia/test.parquet", help="Dataset de test étiqueté."
+    )
+    p.add_argument(
+        "--models",
+        nargs="*",
+        default=["finetuned_local", "sentiment_fr"],
+        help="Modèles à évaluer (clés get_available_models).",
+    )
+    p.add_argument(
+        "--per-class",
+        type=int,
+        default=200,
+        help="Échantillons max par classe (équilibrage). 0 = tout le test set.",
+    )
     p.add_argument("--max-length", type=int, default=256, help="Longueur max tokenization.")
     return p.parse_args()
 
@@ -362,7 +431,9 @@ def main() -> int:
         dataset = ai_benchmark.balanced_sample(dataset, per_class=args.per_class)
 
     counts = {c: sum(1 for r in dataset if r["label"] == c) for c in LABELS}
-    print(f"Dataset éval : {len(dataset):,} exemples (neg={counts['neg']}, neu={counts['neu']}, pos={counts['pos']})")
+    print(
+        f"Dataset éval : {len(dataset):,} exemples (neg={counts['neg']}, neu={counts['neu']}, pos={counts['pos']})"
+    )
 
     available = ai_benchmark.get_available_models(PROJECT_ROOT)
     results: dict = {}
@@ -374,9 +445,13 @@ def main() -> int:
         print(f"\n=== {key} ({model_name}) ===")
         y_true, proba = _infer_probabilities(model_name, dataset, args.max_length)
         metrics = _compute_metrics(y_true, proba)
-        macro_auc = f"{metrics['roc_auc_macro']:.4f}" if metrics["roc_auc_macro"] is not None else "n/a"
-        print(f"  accuracy={metrics['accuracy']:.4f} | F1 macro={metrics['f1_macro']:.4f} | "
-              f"ROC-AUC macro={macro_auc} | specificity macro={metrics['specificity_macro']:.4f}")
+        macro_auc = (
+            f"{metrics['roc_auc_macro']:.4f}" if metrics["roc_auc_macro"] is not None else "n/a"
+        )
+        print(
+            f"  accuracy={metrics['accuracy']:.4f} | F1 macro={metrics['f1_macro']:.4f} | "
+            f"ROC-AUC macro={macro_auc} | specificity macro={metrics['specificity_macro']:.4f}"
+        )
         _plot_confusion(key, metrics)
         _plot_roc(key, metrics)
         _plot_metrics_table(key, metrics)

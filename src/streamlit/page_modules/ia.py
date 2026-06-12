@@ -13,6 +13,9 @@ import time
 import requests
 import streamlit as st
 
+from src.config import SENTIMENT_MODEL_DISPLAY_NAME
+from src.insights.builder import build_insight_pack
+from src.insights.goldai_data import load_enriched_goldai
 from src.ml.inference.sentiment_postprocess import finalize_sentiment
 from src.streamlit._cockpit_helpers import (
     PageContext,
@@ -20,9 +23,6 @@ from src.streamlit._cockpit_helpers import (
     record_click,
     record_run,
 )
-from src.config import SENTIMENT_MODEL_DISPLAY_NAME
-from src.insights.goldai_data import load_enriched_goldai
-from src.insights.builder import build_insight_pack
 from src.streamlit.auth_plug import (
     get_token,
 )
@@ -56,7 +56,7 @@ _DEMO_EXAMPLES = [
 ]
 
 _EXAMPLE_LABELS = ["Texte libre"] + [label for label, _ in _DEMO_EXAMPLES]
-_EXAMPLE_TEXTS = {label: text for label, text in _DEMO_EXAMPLES}
+_EXAMPLE_TEXTS = dict(_DEMO_EXAMPLES)
 
 _INSIGHT_EXAMPLES = {
     "Politique": "Quel sentiment domine en politique ?",
@@ -64,7 +64,11 @@ _INSIGHT_EXAMPLES = {
     "Utilisateurs": "Quelles sources dominent dans le corpus ?",
 }
 
-_THEME_OPTIONS = {"Politique": "politique", "Financier": "financier", "Utilisateurs": "utilisateurs"}
+_THEME_OPTIONS = {
+    "Politique": "politique",
+    "Financier": "financier",
+    "Utilisateurs": "utilisateurs",
+}
 
 _TONE_COLORS = {
     "Positif": "#66bb6a",
@@ -142,7 +146,11 @@ def _render_sentiment_result(last: dict | None, *, demo_mode: bool = False) -> N
 
 
 def _render_model_chip() -> None:
-    suffix = "fine-tuné maison · inférence locale" if _DEMO_MODEL_LABEL == SENTIMENT_MODEL_DISPLAY_NAME else "inférence locale"
+    suffix = (
+        "fine-tuné maison · inférence locale"
+        if _DEMO_MODEL_LABEL == SENTIMENT_MODEL_DISPLAY_NAME
+        else "inférence locale"
+    )
     st.markdown(
         f'<span class="ds-chip">{html.escape(_DEMO_MODEL_LABEL)} · {suffix}</span>',
         unsafe_allow_html=True,
@@ -200,7 +208,9 @@ def _clear_sentiment_result() -> None:
     st.session_state.pop("ia_last_resolved_model", None)
 
 
-def _render_sentiment_examples(*, ctx: PageContext, text_key: str, ex_label_key: str, demo_mode: bool) -> None:
+def _render_sentiment_examples(
+    *, ctx: PageContext, text_key: str, ex_label_key: str, demo_mode: bool
+) -> None:
     """Exemples 1-clic — selectbox."""
     key_prefix = _ia_key(ctx, "ex")
     pick_key = f"{key_prefix}_pick"
@@ -407,7 +417,7 @@ def _fetch_insights_cockpit(theme: str, message: str) -> tuple[str, list[dict], 
         return f"Erreur analyse locale : {e!s}"[:200], [], "error"
 
 
-def _render_insight_messages(messages: list[dict]) -> None:
+def _render_insight_messages(messages: list[dict], *, demo_mode: bool = False) -> None:
     if not messages:
         return
 
@@ -416,9 +426,7 @@ def _render_insight_messages(messages: list[dict]) -> None:
         role = msg.get("role", "assistant")
         if role == "user":
             content = html.escape(str(msg.get("content", ""))).replace("\n", "<br>")
-            parts.append(
-                f'<div class="ds-ia-bubble ds-ia-bubble-user">{content}</div>'
-            )
+            parts.append(f'<div class="ds-ia-bubble ds-ia-bubble-user">{content}</div>')
     parts.append("</div>")
     st.markdown("".join(parts), unsafe_allow_html=True)
 
@@ -438,9 +446,7 @@ def _render_insight_messages(messages: list[dict]) -> None:
             if content.startswith("Erreur") or content.startswith("Aucune"):
                 st.error(content)
             elif not demo_mode:
-                st.warning(
-                    "Ancienne réponse texte détectée. Cliquez **Effacer**, puis relancez."
-                )
+                st.warning("Ancienne réponse texte détectée. Cliquez **Effacer**, puis relancez.")
 
 
 def _render_insights_tab(
@@ -532,16 +538,14 @@ def _render_insights_tab(
                     st.session_state.ia_clear_insight_question = True
                     st.rerun()
 
-        _render_insight_messages(st.session_state.ia_chat_messages)
+        _render_insight_messages(st.session_state.ia_chat_messages, demo_mode=demo_mode)
 
         question = st.text_area(
             "Votre question",
             height=72,
             key=question_key,
             label_visibility="collapsed",
-            placeholder=(
-                example_q if demo_mode else "Posez votre question…"
-            ),
+            placeholder=(example_q if demo_mode else "Posez votre question…"),
         )
         send = st.button(
             "Envoyer",
@@ -567,9 +571,7 @@ def render(ctx: PageContext) -> None:
     api_base = os.getenv("API_BASE", f"http://localhost:{settings.fastapi_port}")
     api_v1 = f"{api_base}{settings.api_v1_prefix}"
     api_ok = ctx.backend_ok
-    api_warning = (
-        "API indisponible. Lancez l'API E2 (`python run_e2_api.py`) avant l'assistant."
-    )
+    api_warning = "API indisponible. Lancez l'API E2 (`python run_e2_api.py`) avant l'assistant."
     demo_mode = ctx.ux_mode == "Mode démo"
 
     ia_view = st.radio(
@@ -583,6 +585,4 @@ def render(ctx: PageContext) -> None:
     if ia_view == "Sentiment":
         _render_sentiment_tab(ctx, api_v1, api_ok, api_warning, demo_mode)
     else:
-        _render_insights_tab(
-            ctx, api_v1, api_ok, api_warning, demo_mode=demo_mode
-        )
+        _render_insights_tab(ctx, api_v1, api_ok, api_warning, demo_mode=demo_mode)

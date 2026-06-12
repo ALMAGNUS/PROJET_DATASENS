@@ -13,7 +13,9 @@ from src.config import get_settings, reset_settings
 from src.logging_config import setup_logging
 
 
-def _ensure_port_available(host: str, port: int, *, retries: int = 8, delay_sec: float = 1.0) -> None:
+def _ensure_port_available(
+    host: str, port: int, *, retries: int = 8, delay_sec: float = 1.0
+) -> None:
     """Refuse de démarrer si le port reste pris (même adresse que uvicorn)."""
     import time
 

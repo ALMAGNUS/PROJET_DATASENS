@@ -21,9 +21,7 @@ def render(ctx: PageContext) -> None:
     if not cockpit_tab_is_active(ctx, "⚙️ Pilotage"):
         return
     st.caption("Lancement des jobs, sauvegardes et monitoring infra (MongoDB, Prometheus).")
-    sub_actions, sub_health = st.tabs(
-        ["Actions (run, fusion, backup)", "Infra & MongoDB"]
-    )
+    sub_actions, sub_health = st.tabs(["Actions (run, fusion, backup)", "Infra & MongoDB"])
     with sub_actions:
         render_expert_breadcrumb("Pilotage", "Actions")
         page_pilotage.render(ctx)

@@ -16,6 +16,7 @@ def main():
     bucket = getattr(settings, "mongo_gridfs_bucket", "parquet_fs")
     try:
         from pymongo import MongoClient
+
         client = MongoClient(mongo_uri, serverSelectionTimeoutMS=3000)
         coll = client[mongo_db][f"{bucket}.files"]
         count = coll.count_documents({})
@@ -30,6 +31,7 @@ def main():
         print(f"Erreur: {e}")
         return 1
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

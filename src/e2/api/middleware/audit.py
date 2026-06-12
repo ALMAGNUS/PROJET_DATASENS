@@ -40,7 +40,14 @@ class AuditMiddleware(BaseHTTPMiddleware):
             Response HTTP
         """
         # Exclure certains endpoints (health, docs) ; login est logue dans la route auth apres succes
-        excluded_paths = ["/health", "/docs", "/redoc", "/openapi.json", "/api/v1/auth/login", "/metrics"]
+        excluded_paths = [
+            "/health",
+            "/docs",
+            "/redoc",
+            "/openapi.json",
+            "/api/v1/auth/login",
+            "/metrics",
+        ]
         if request.url.path in excluded_paths:
             return await call_next(request)
 

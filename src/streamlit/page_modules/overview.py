@@ -35,8 +35,6 @@ from src.streamlit._cockpit_helpers import (
 from src.streamlit._cockpit_helpers import (
     parquet_row_count_cached as _parquet_row_count_cached,
 )
-from src.streamlit.metrics import fmt_size as _fmt_size
-from src.streamlit.pipeline_proof import render_last_run_proof_compact
 from src.streamlit.cockpit_ux import (
     layer_sparkline_values,
     prefetch_backend_ok,
@@ -47,6 +45,8 @@ from src.streamlit.cockpit_ux import (
     render_warn_monitoring_link,
     status_color,
 )
+from src.streamlit.metrics import fmt_size as _fmt_size
+from src.streamlit.pipeline_proof import render_last_run_proof_compact
 
 
 def _resolve_db_path(project_root: Path) -> Path:
@@ -83,9 +83,12 @@ def _latest_silver(silver_dir: Path) -> tuple[int, str]:
         return 0, "—"
     sdir = silver_dirs[0]
     label = sdir.name.replace("date=", "").replace("v_", "")
-    cands = (
-        [sdir / "silver_articles.csv", sdir / "silver_articles.parquet", *list(sdir.rglob("*.csv")), *list(sdir.rglob("*.parquet"))]
-    )
+    cands = [
+        sdir / "silver_articles.csv",
+        sdir / "silver_articles.parquet",
+        *list(sdir.rglob("*.csv")),
+        *list(sdir.rglob("*.parquet")),
+    ]
     sfile = next((p for p in cands if p.exists()), None)
     if sfile is None:
         return 0, label
@@ -98,7 +101,11 @@ def _latest_gold(gold_dir: Path) -> tuple[int, str]:
     if not gold_dir.exists():
         return 0, "—"
     gold_dates = sorted(
-        [d.name.replace("date=", "") for d in gold_dir.iterdir() if d.is_dir() and d.name.startswith("date=")],
+        [
+            d.name.replace("date=", "")
+            for d in gold_dir.iterdir()
+            if d.is_dir() and d.name.startswith("date=")
+        ],
         reverse=True,
     )
     if not gold_dates:
@@ -131,16 +138,16 @@ def _render_api_health_panel(api_base: str, api_v1: str, api_ok: bool) -> None:
         else:
             err = health_probe["error"] or f"HTTP {health_probe['status_code']}"
             st.error(f"/health échec après {health_probe['elapsed_s']} s : {err[:220]}")
-            st.caption(
-                "Relancer : `.\\stop_full.bat` puis `start_full.bat`."
-            )
+            st.caption("Relancer : `.\\stop_full.bat` puis `start_full.bat`.")
 
     metrics_probe = st.session_state.get("overview_metrics_probe")
     if metrics_probe:
         if metrics_probe["ok"]:
             st.success(f"/metrics OK · {metrics_probe['elapsed_s']} s")
             st.code(summarize_prometheus_metrics(metrics_probe["text"]), language="text")
-            if st.checkbox("Afficher extrait brut Prometheus (debug)", key="overview_show_raw_metrics"):
+            if st.checkbox(
+                "Afficher extrait brut Prometheus (debug)", key="overview_show_raw_metrics"
+            ):
                 st.code(metrics_probe["text"][-1200:], language="text")
         else:
             err = metrics_probe["error"] or f"HTTP {metrics_probe['status_code']}"
@@ -174,9 +181,7 @@ def render(ctx: PageContext) -> None:
     # --- Bandeau d'identité -------------------------------------------------
     if ctx.show_advanced:
         render_expert_breadcrumb("Vue d'ensemble")
-        st.caption(
-            "État consolidé RAW → GoldAI, volumétrie par couche et activité du dernier run."
-        )
+        st.caption("État consolidé RAW → GoldAI, volumétrie par couche et activité du dernier run.")
     else:
         st.markdown("### DataSens — cockpit d'analyse de sentiment multi-source")
         st.caption(
@@ -199,9 +204,21 @@ def render(ctx: PageContext) -> None:
     goldai_path = goldai_dir / "merged_all_dates.parquet"
     goldai_rows = _parquet_row_count_cached(str(goldai_path)) if goldai_path.exists() else 0
 
-    ia_train = _parquet_row_count_cached(str(ia_dir / "train.parquet")) if (ia_dir / "train.parquet").exists() else 0
-    ia_val = _parquet_row_count_cached(str(ia_dir / "val.parquet")) if (ia_dir / "val.parquet").exists() else 0
-    ia_test = _parquet_row_count_cached(str(ia_dir / "test.parquet")) if (ia_dir / "test.parquet").exists() else 0
+    ia_train = (
+        _parquet_row_count_cached(str(ia_dir / "train.parquet"))
+        if (ia_dir / "train.parquet").exists()
+        else 0
+    )
+    ia_val = (
+        _parquet_row_count_cached(str(ia_dir / "val.parquet"))
+        if (ia_dir / "val.parquet").exists()
+        else 0
+    )
+    ia_test = (
+        _parquet_row_count_cached(str(ia_dir / "test.parquet"))
+        if (ia_dir / "test.parquet").exists()
+        else 0
+    )
 
     render_section_title("État du pipeline")
     spark_raw = layer_sparkline_values(project_root, "RAW")
@@ -323,7 +340,9 @@ def render(ctx: PageContext) -> None:
                 with st.spinner("Connexion MongoDB..."):
                     st.session_state.mongo_status_cache = _mongo_status(project_root)
                 st.rerun()
-            if b2.button("Copier commande Docker", key="overview_copy_docker", use_container_width=True):
+            if b2.button(
+                "Copier commande Docker", key="overview_copy_docker", use_container_width=True
+            ):
                 st.session_state["clipboard_hint"] = "docker compose up -d mongodb"
                 st.toast("Commande affichée ci-dessus — copiez depuis le bloc code.")
         else:
@@ -397,7 +416,8 @@ def render(ctx: PageContext) -> None:
 
     # --- Expander : Santé technique (fermé par défaut) ---------------------
     has_probe = bool(
-        st.session_state.get("overview_health_probe") or st.session_state.get("overview_metrics_probe")
+        st.session_state.get("overview_health_probe")
+        or st.session_state.get("overview_metrics_probe")
     )
     with st.expander("Santé technique (API, branches App/IA)", expanded=has_probe):
         api_base = ctx.api_base
@@ -422,25 +442,43 @@ def render(ctx: PageContext) -> None:
         app_input_path = goldai_dir / "app" / "gold_app_input.parquet"
         ia_labelled_path = ia_dir / "gold_ia_labelled.parquet"
         preds_root = goldai_dir / "predictions"
-        app_input_rows = _parquet_row_count_cached(str(app_input_path)) if app_input_path.exists() else 0
-        ia_labelled_rows = _parquet_row_count_cached(str(ia_labelled_path)) if ia_labelled_path.exists() else 0
+        app_input_rows = (
+            _parquet_row_count_cached(str(app_input_path)) if app_input_path.exists() else 0
+        )
+        ia_labelled_rows = (
+            _parquet_row_count_cached(str(ia_labelled_path)) if ia_labelled_path.exists() else 0
+        )
         pred_candidates = (
-            sorted(preds_root.glob("date=*/run=*/predictions.parquet"), key=lambda p: p.stat().st_mtime, reverse=True)
+            sorted(
+                preds_root.glob("date=*/run=*/predictions.parquet"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
             if preds_root.exists()
             else []
         )
         latest_pred = pred_candidates[0] if pred_candidates else None
-        latest_pred_rows = _parquet_row_count_cached(str(latest_pred)) if latest_pred and latest_pred.exists() else 0
+        latest_pred_rows = (
+            _parquet_row_count_cached(str(latest_pred))
+            if latest_pred and latest_pred.exists()
+            else 0
+        )
         latest_pred_label = (
             f"{latest_pred.parent.parent.name.replace('date=', '')} · {latest_pred.parent.name.replace('run=', '')}"
             if latest_pred
             else "—"
         )
 
-        st.markdown("**Branches App vs IA** — séparation des datasets d'inférence et d'entraînement.")
+        st.markdown(
+            "**Branches App vs IA** — séparation des datasets d'inférence et d'entraînement."
+        )
         b1, b2, b3 = st.columns(3)
-        b1.metric("APP_INPUT (inférence, sans label)", f"{app_input_rows:,}", delta=app_input_path.name)
-        b2.metric("IA_LABELLED (entraînement)", f"{ia_labelled_rows:,}", delta=ia_labelled_path.name)
+        b1.metric(
+            "APP_INPUT (inférence, sans label)", f"{app_input_rows:,}", delta=app_input_path.name
+        )
+        b2.metric(
+            "IA_LABELLED (entraînement)", f"{ia_labelled_rows:,}", delta=ia_labelled_path.name
+        )
         b3.metric("PREDICTIONS (dernier run)", f"{latest_pred_rows:,}", delta=latest_pred_label)
         st.caption(
             "App input (texte brut) → modèle → prédictions ; IA labelled → train/val/test pour fine-tuning."

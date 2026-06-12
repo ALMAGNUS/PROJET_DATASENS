@@ -20,6 +20,7 @@ def check_api_metrics() -> bool:
     """Vérifie que l'API expose /metrics (si elle tourne)."""
     try:
         import urllib.request
+
         req = urllib.request.Request("http://localhost:8001/health")
         with urllib.request.urlopen(req, timeout=3) as r:
             if r.status == 200:
@@ -33,6 +34,7 @@ def check_api_metrics_endpoint() -> bool:
     """Vérifie que /metrics retourne des données datasens_*."""
     try:
         import urllib.request
+
         req = urllib.request.Request("http://localhost:8001/metrics")
         with urllib.request.urlopen(req, timeout=3) as r:
             data = r.read().decode("utf-8")
@@ -92,7 +94,9 @@ def main() -> int:
         else:
             print("[--] API /metrics sans datasens_* (appeler drift-metrics pour alimenter)")
     else:
-        print("[--] API E2 non démarrée (python run_e2_api.py) — vérification /health et /metrics ignorée")
+        print(
+            "[--] API E2 non démarrée (python run_e2_api.py) — vérification /health et /metrics ignorée"
+        )
 
     print()
     print(f"Résultat: {ok_count}/{total} vérifications OK")

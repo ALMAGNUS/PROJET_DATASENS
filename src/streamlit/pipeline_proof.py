@@ -118,9 +118,7 @@ def compute_last_run_deltas(root: Path) -> LastRunProof | None:
         ),
         coherence_status=latest.get("coherence_checks", {}).get("status", "—"),
         latest_raw_max_id=int(latest.get("raw_data", {}).get("max_id", 0) or 0),
-        previous_raw_max_id=int(
-            (previous or {}).get("raw_data", {}).get("max_id", 0) or 0
-        ),
+        previous_raw_max_id=int((previous or {}).get("raw_data", {}).get("max_id", 0) or 0),
     )
 
     # Stage 1 - SQLite raw_data (compte buffer)
@@ -144,9 +142,7 @@ def compute_last_run_deltas(root: Path) -> LastRunProof | None:
     gold_date = latest.get("goldai_metadata", {}).get("last_date_merged", "") or ""
     proof.latest_gold_date = gold_date
     gold_file = root / "data" / "gold" / f"date={gold_date}" / "articles.parquet"
-    gold_rows_now = (
-        parquet_row_count_cached(str(gold_file)) if gold_file.exists() else 0
-    )
+    gold_rows_now = parquet_row_count_cached(str(gold_file)) if gold_file.exists() else 0
     raw_delta = latest_raw - prev_raw
     gold_before = max(0, gold_rows_now - raw_delta) if gold_rows_now else 0
     proof.stages.append(
@@ -164,12 +160,8 @@ def compute_last_run_deltas(root: Path) -> LastRunProof | None:
     )
 
     # Stage 3 - GoldAI fusion long terme
-    latest_goldai = int(
-        latest.get("goldai_metadata", {}).get("total_rows", 0) or 0
-    )
-    prev_goldai = int(
-        (previous or {}).get("goldai_metadata", {}).get("total_rows", 0) or 0
-    )
+    latest_goldai = int(latest.get("goldai_metadata", {}).get("total_rows", 0) or 0)
+    prev_goldai = int((previous or {}).get("goldai_metadata", {}).get("total_rows", 0) or 0)
     proof.stages.append(
         StageDelta(
             stage="3. GoldAI fusion long terme",
@@ -241,8 +233,7 @@ def compute_last_run_deltas(root: Path) -> LastRunProof | None:
 
     # Deltas par source (déjà calculés côté db_state_report.py)
     proof.source_deltas = list(
-        latest.get("run_progress", {}).get("source_deltas_since_previous_report", [])
-        or []
+        latest.get("run_progress", {}).get("source_deltas_since_previous_report", []) or []
     )
 
     return proof
@@ -278,9 +269,7 @@ def fetch_new_raw_rows(
         return None, f"Erreur SQLite : {type(exc).__name__} — {exc}"
 
 
-def fetch_gold_partition_rows(
-    root: Path, gold_date: str, limit: int = 50
-) -> pd.DataFrame | None:
+def fetch_gold_partition_rows(root: Path, gold_date: str, limit: int = 50) -> pd.DataFrame | None:
     """Retourne un échantillon de la partition GOLD du jour (les lignes enrichies)."""
     if not gold_date:
         return None
@@ -993,14 +982,15 @@ def render_last_run_proof_full(
     hdr1, hdr2, hdr3 = st.columns(3)
     hdr1.caption(f"**Rapport courant** : `{proof.latest_report_file}`")
     hdr1.caption(f"{proof.latest_generated_at}")
-    hdr2.caption(
-        f"**Rapport précédent** : `{proof.previous_report_file or 'aucun'}`"
-    )
+    hdr2.caption(f"**Rapport précédent** : `{proof.previous_report_file or 'aucun'}`")
     hdr2.caption(f"{proof.previous_generated_at or '—'}")
     status_emoji = (
-        "✅" if proof.coherence_status == "OK"
-        else "⚠️" if proof.coherence_status == "WARNING"
-        else "❌" if proof.coherence_status == "ERROR"
+        "✅"
+        if proof.coherence_status == "OK"
+        else "⚠️"
+        if proof.coherence_status == "WARNING"
+        else "❌"
+        if proof.coherence_status == "ERROR"
         else "•"
     )
     hdr3.caption(f"**Cohérence** : {status_emoji} {proof.coherence_status}")
@@ -1097,16 +1087,11 @@ def _render_proof_line_tabs(
                 f"(max_id {proof.previous_raw_max_id:,} → {proof.latest_raw_max_id:,})."
             )
         else:
-            df_new, err = fetch_new_raw_rows(
-                db_path, proof.previous_raw_max_id, limit=200
-            )
+            df_new, err = fetch_new_raw_rows(db_path, proof.previous_raw_max_id, limit=200)
             if err:
                 st.error(err)
             elif df_new is None or df_new.empty:
-                st.info(
-                    "Aucune ligne lue (raw_data_id > "
-                    f"{proof.previous_raw_max_id:,})."
-                )
+                st.info("Aucune ligne lue (raw_data_id > " f"{proof.previous_raw_max_id:,}).")
             else:
                 st.success(
                     f"**{len(df_new):,}** nouvelles lignes affichées "
@@ -1115,9 +1100,7 @@ def _render_proof_line_tabs(
                 st.dataframe(df_new, use_container_width=True, height=320)
 
     def _render_gold() -> None:
-        df_gold = fetch_gold_partition_rows(
-            root, proof.latest_gold_date, limit=200
-        )
+        df_gold = fetch_gold_partition_rows(root, proof.latest_gold_date, limit=200)
         if df_gold is None or df_gold.empty:
             st.info(
                 f"Partition GOLD introuvable ou vide : "
@@ -1241,7 +1224,12 @@ def _filter_demo_samples(samples: list[dict]) -> list[dict]:
     if not samples:
         return samples
     ranked = sorted(samples, key=_demo_sample_rank)
-    readable = [r for r in ranked if _is_readable_demo_text(str(r.get("title") or "")) or _is_readable_demo_text(str(r.get("content") or ""))]
+    readable = [
+        r
+        for r in ranked
+        if _is_readable_demo_text(str(r.get("title") or ""))
+        or _is_readable_demo_text(str(r.get("content") or ""))
+    ]
     return readable or ranked
 
 
@@ -1563,10 +1551,10 @@ def render_article_journey(ctx: PageContext, *, demo_mode: bool = False) -> None
 
     # Couleurs par étape (bandeau head)
     accents = {
-        "raw": "#546e7a",      # ardoise
-        "silver": "#7e57c2",   # violet
-        "gold": "#f9a825",     # doré
-        "goldai": "#26a69a",   # turquoise
+        "raw": "#546e7a",  # ardoise
+        "silver": "#7e57c2",  # violet
+        "gold": "#f9a825",  # doré
+        "goldai": "#26a69a",  # turquoise
     }
 
     # RAW card body
@@ -1574,9 +1562,7 @@ def render_article_journey(ctx: PageContext, *, demo_mode: bool = False) -> None
     if collected_short:
         raw_meta += f" · {collected_short}"
     raw_headline = _html_escape(title) if title else "<i>(sans titre)</i>"
-    raw_snippet = (
-        f"<div class='ds-snippet'>{_html_escape(snippet)}</div>" if snippet else ""
-    )
+    raw_snippet = f"<div class='ds-snippet'>{_html_escape(snippet)}</div>" if snippet else ""
     raw_link = (
         f"<div class='ds-link'><a href='{_html_escape(url)}' target='_blank' "
         f"rel='noopener'>Source ↗</a></div>"
@@ -1647,9 +1633,7 @@ def render_article_journey(ctx: PageContext, *, demo_mode: bool = False) -> None
 
     # GoldAI card body
     goldai_path = root / "data" / "goldai" / "merged_all_dates.parquet"
-    goldai_rows = (
-        parquet_row_count_cached(str(goldai_path)) if goldai_path.exists() else 0
-    )
+    goldai_rows = parquet_row_count_cached(str(goldai_path)) if goldai_path.exists() else 0
     goldai_body = (
         "<div class='ds-label'>Identifiant de conservation</div>"
         f"<div class='ds-headline'><code>id = {art_id}</code></div>"
@@ -1676,12 +1660,14 @@ def render_article_journey(ctx: PageContext, *, demo_mode: bool = False) -> None
         has_goldai_merged = "goldai_merged" in logicals_m
         gold_status_html = (
             "<span class='ds-badge' style='background:#dcfce7;color:#166534;border-color:#16a34a'>"
-            "présent</span>" if has_pick_gold
+            "présent</span>"
+            if has_pick_gold
             else "<span class='ds-badge ds-empty'>non sauvegardé</span>"
         )
         goldai_status_html = (
             "<span class='ds-badge' style='background:#dcfce7;color:#166534;border-color:#16a34a'>"
-            "présent</span>" if has_goldai_merged
+            "présent</span>"
+            if has_goldai_merged
             else "<span class='ds-badge ds-empty'>non sauvegardé</span>"
         )
         mongo_body = (
@@ -1697,7 +1683,8 @@ def render_article_journey(ctx: PageContext, *, demo_mode: bool = False) -> None
             "</div>"
         )
         mongo_footer = (
-            "Backup permanent immuable" if (has_pick_gold and has_goldai_merged)
+            "Backup permanent immuable"
+            if (has_pick_gold and has_goldai_merged)
             else "Backup partiel : relancer `scripts/backup_parquet_to_mongo.py`"
         )
         mongo_footer_muted = not (has_pick_gold and has_goldai_merged)
@@ -1725,8 +1712,9 @@ def render_article_journey(ctx: PageContext, *, demo_mode: bool = False) -> None
         mongo_footer_muted = True
 
     # Assemblage
-    def _card(step: str, name: str, accent: str, subhead: str, body: str,
-              footer: str, muted: bool = False) -> str:
+    def _card(
+        step: str, name: str, accent: str, subhead: str, body: str, footer: str, muted: bool = False
+    ) -> str:
         muted_cls = " ds-footer--muted" if muted else ""
         return (
             "<div class='ds-show-card'>"

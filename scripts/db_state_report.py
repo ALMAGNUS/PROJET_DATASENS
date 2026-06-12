@@ -340,7 +340,11 @@ def collect_state(db_file: Path) -> dict:
         app_dir = goldai_base / "app"
         pred_base = goldai_base / "predictions"
         pred_files = (
-            sorted(pred_base.glob("date=*/run=*/predictions.parquet"), key=lambda p: p.stat().st_mtime, reverse=True)
+            sorted(
+                pred_base.glob("date=*/run=*/predictions.parquet"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
             if pred_base.exists()
             else []
         )
@@ -348,7 +352,9 @@ def collect_state(db_file: Path) -> dict:
         state["ia_artifacts"] = {
             "goldai_app_input_rows": _parquet_rows(app_dir / "gold_app_input.parquet"),
             "goldai_ia_labelled_rows": _parquet_rows(ia_dir / "gold_ia_labelled.parquet"),
-            "goldai_ia_annotated_rows": _parquet_rows(ia_dir / "merged_all_dates_annotated.parquet"),
+            "goldai_ia_annotated_rows": _parquet_rows(
+                ia_dir / "merged_all_dates_annotated.parquet"
+            ),
             "goldai_ia_train_rows": _parquet_rows(ia_dir / "train.parquet"),
             "goldai_ia_val_rows": _parquet_rows(ia_dir / "val.parquet"),
             "goldai_ia_test_rows": _parquet_rows(ia_dir / "test.parquet"),
@@ -417,9 +423,9 @@ def collect_state(db_file: Path) -> dict:
             if without_id is None:
                 checks["goldai_gap_interpretation"] = "unverified_missing_linkage_metrics"
             elif isinstance(without_id, int) and without_id > 0:
-                checks["goldai_gap_interpretation"] = (
-                    "non_comparable_legacy_rows_without_raw_data_id"
-                )
+                checks[
+                    "goldai_gap_interpretation"
+                ] = "non_comparable_legacy_rows_without_raw_data_id"
             else:
                 reasons.append("GoldAI > DB (écart sur périmètre comparable)")
         if checks.get("exports_gold_csv_minus_raw_data", 0) != 0:
@@ -434,7 +440,10 @@ def collect_state(db_file: Path) -> dict:
         # Actions automatiques (pilotage opérationnel)
         recos: list[str] = []
         if checks.get("goldai_minus_raw_data", 0) > 0:
-            if checks.get("goldai_gap_interpretation") == "non_comparable_legacy_rows_without_raw_data_id":
+            if (
+                checks.get("goldai_gap_interpretation")
+                == "non_comparable_legacy_rows_without_raw_data_id"
+            ):
                 recos.append(
                     "Écart GoldAI vs buffer détecté mais non comparable (lignes legacy sans raw_data_id). "
                     "Comparer plutôt les lignes GoldAI avec raw_data_id renseigné."
@@ -493,7 +502,9 @@ def render_markdown(state: dict) -> str:
     lines.append("\n## Articles (`raw_data`)\n")
     lines.append(f"- Total : **{rd.get('total_rows', 0):,}**")
     lines.append(f"- `raw_data_id` min / max : {rd.get('min_id')} / {rd.get('max_id')}")
-    lines.append(f"- `collected_at` : `{rd.get('collected_at_min')}` → `{rd.get('collected_at_max')}`")
+    lines.append(
+        f"- `collected_at` : `{rd.get('collected_at_min')}` → `{rd.get('collected_at_max')}`"
+    )
 
     rp = state.get("run_progress", {})
     if rp:
@@ -560,15 +571,23 @@ def render_markdown(state: dict) -> str:
     en = state.get("enrichment", {})
     lines.append("\n## Enrichissement\n")
     lines.append(f"- Lignes `document_topic` : {en.get('document_topic_rows', 0):,}")
-    lines.append(f"- Articles avec au moins un topic : {en.get('articles_with_at_least_one_topic', 0):,}")
-    lines.append(f"- Lignes `model_output` (tous modèles) : {en.get('model_output_rows_total', 0):,}")
+    lines.append(
+        f"- Articles avec au moins un topic : {en.get('articles_with_at_least_one_topic', 0):,}"
+    )
+    lines.append(
+        f"- Lignes `model_output` (tous modèles) : {en.get('model_output_rows_total', 0):,}"
+    )
     lines.append(
         f"- Lignes sentiment `sentiment_keyword` : {en.get('model_output_sentiment_keyword_rows', 0):,}"
     )
-    lines.append(f"- Articles avec sentiment keyword : {en.get('articles_with_sentiment_keyword', 0):,}")
+    lines.append(
+        f"- Articles avec sentiment keyword : {en.get('articles_with_sentiment_keyword', 0):,}"
+    )
     dist = en.get("sentiment_keyword_distribution") or {}
     if dist:
-        lines.append("- Distribution sentiment : " + ", ".join(f"{k}={v}" for k, v in sorted(dist.items())))
+        lines.append(
+            "- Distribution sentiment : " + ", ".join(f"{k}={v}" for k, v in sorted(dist.items()))
+        )
 
     dq = state.get("data_quality", {})
     lines.append("\n## Qualité / cohérence technique\n")
@@ -617,8 +636,7 @@ def render_markdown(state: dict) -> str:
         )
         if ia.get("goldai_predictions_latest_path"):
             lines.append(
-                "- Dernier fichier de prédiction : "
-                f"`{ia['goldai_predictions_latest_path']}`"
+                "- Dernier fichier de prédiction : " f"`{ia['goldai_predictions_latest_path']}`"
             )
         if ia.get("flow_note"):
             lines.append(f"- Note flux : {ia['flow_note']}")
@@ -629,15 +647,25 @@ def render_markdown(state: dict) -> str:
     if gl:
         lines.append("\n## Liaison GoldAI ↔ SQLite (`raw_data_id`)\n")
         if gl.get("goldai_rows_total_parquet") is not None:
-            lines.append(f"- Lignes GoldAI (parquet) : **{int(gl['goldai_rows_total_parquet']):,}**")
+            lines.append(
+                f"- Lignes GoldAI (parquet) : **{int(gl['goldai_rows_total_parquet']):,}**"
+            )
         if gl.get("goldai_rows_with_raw_data_id") is not None:
-            lines.append(f"- GoldAI avec `raw_data_id` : **{int(gl['goldai_rows_with_raw_data_id']):,}**")
+            lines.append(
+                f"- GoldAI avec `raw_data_id` : **{int(gl['goldai_rows_with_raw_data_id']):,}**"
+            )
         if gl.get("goldai_rows_without_raw_data_id") is not None:
-            lines.append(f"- GoldAI sans `raw_data_id` : **{int(gl['goldai_rows_without_raw_data_id']):,}**")
+            lines.append(
+                f"- GoldAI sans `raw_data_id` : **{int(gl['goldai_rows_without_raw_data_id']):,}**"
+            )
         if gl.get("goldai_raw_id_in_db") is not None:
-            lines.append(f"- `raw_data_id` GoldAI présents en SQLite : **{int(gl['goldai_raw_id_in_db']):,}**")
+            lines.append(
+                f"- `raw_data_id` GoldAI présents en SQLite : **{int(gl['goldai_raw_id_in_db']):,}**"
+            )
         if gl.get("goldai_raw_id_not_in_db") is not None:
-            lines.append(f"- `raw_data_id` GoldAI absents de SQLite : **{int(gl['goldai_raw_id_not_in_db']):,}**")
+            lines.append(
+                f"- `raw_data_id` GoldAI absents de SQLite : **{int(gl['goldai_raw_id_not_in_db']):,}**"
+            )
 
     ex = state.get("exports_hint", {})
     if ex.get("exports_gold_csv_data_rows") is not None:
@@ -690,7 +718,9 @@ def main() -> int:
     json_path = base.with_suffix(".json")
     md_path = base.with_suffix(".md")
 
-    json_path.write_text(json.dumps(state, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(state, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
+    )
     md_path.write_text(render_markdown(state), encoding="utf-8")
 
     print(f"[OK] Rapport JSON : {json_path}")

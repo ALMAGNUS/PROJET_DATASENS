@@ -57,7 +57,10 @@ def login(api_base: str, email: str, password: str, *, quiet: bool = False) -> s
             timeout=TIMEOUT,
         )
     except requests.exceptions.ConnectionError:
-        _log(f"API E2 injoignable ({api_base}) — gauges drift non rafraîchies (best-effort)", quiet=quiet)
+        _log(
+            f"API E2 injoignable ({api_base}) — gauges drift non rafraîchies (best-effort)",
+            quiet=quiet,
+        )
         return None
     except requests.exceptions.Timeout:
         _log(f"API E2 timeout après {TIMEOUT}s — abandon", quiet=quiet)
@@ -67,7 +70,10 @@ def login(api_base: str, email: str, password: str, *, quiet: bool = False) -> s
         return None
 
     if r.status_code != 200:
-        _log(f"Login refusé ({r.status_code}). Vérifier DRIFT_REFRESH_EMAIL/DRIFT_REFRESH_PASSWORD dans .env.", quiet=quiet)
+        _log(
+            f"Login refusé ({r.status_code}). Vérifier DRIFT_REFRESH_EMAIL/DRIFT_REFRESH_PASSWORD dans .env.",
+            quiet=quiet,
+        )
         return None
 
     token = r.json().get("access_token")
@@ -77,7 +83,9 @@ def login(api_base: str, email: str, password: str, *, quiet: bool = False) -> s
     return token
 
 
-def refresh_drift(api_base: str, token: str, target_date: str | None, *, quiet: bool = False) -> int:
+def refresh_drift(
+    api_base: str, token: str, target_date: str | None, *, quiet: bool = False
+) -> int:
     """Appelle /drift-metrics. Retourne 0 si succès, 1 sinon."""
     url = f"{api_base}/api/v1/analytics/drift-metrics"
     params = {"target_date": target_date} if target_date else {}
@@ -114,7 +122,9 @@ def refresh_drift(api_base: str, token: str, target_date: str | None, *, quiet: 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Rafraîchit les gauges Prometheus de drift.")
-    parser.add_argument("--api-base", default=DEFAULT_API_BASE, help=f"URL API E2 (défaut: {DEFAULT_API_BASE})")
+    parser.add_argument(
+        "--api-base", default=DEFAULT_API_BASE, help=f"URL API E2 (défaut: {DEFAULT_API_BASE})"
+    )
     parser.add_argument("--email", default=DEFAULT_EMAIL, help="Compte de service")
     parser.add_argument("--password", default=DEFAULT_PASSWORD, help="Mot de passe (préférer .env)")
     parser.add_argument(

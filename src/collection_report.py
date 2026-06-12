@@ -33,8 +33,7 @@ class CollectionReport:
             with open(cfg, encoding="utf-8") as f:
                 data = json.load(f)
             return {
-                s["source_name"]: s.get("acquisition_type", "")
-                for s in data.get("sources", [])
+                s["source_name"]: s.get("acquisition_type", "") for s in data.get("sources", [])
             }
         except Exception:
             return {}

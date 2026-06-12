@@ -18,12 +18,12 @@ PRED_DIR = ROOT / "data" / "goldai" / "predictions"
 
 # Seuils de décision
 THRESHOLDS = {
-    "confidence_mean_min":    0.60,   # confiance moyenne acceptable
-    "confidence_low_max_pct": 0.20,   # max 20% d'articles sous 0.55
-    "dominant_class_max_pct": 0.85,   # alerte si une classe > 85%
-    "neutral_min_pct":        0.03,   # alerte si neutre < 3%
-    "latency_p90_ms":         260,    # p90 latence cible
-    "latency_p99_ms":         500,    # p99 latence cible
+    "confidence_mean_min": 0.60,  # confiance moyenne acceptable
+    "confidence_low_max_pct": 0.20,  # max 20% d'articles sous 0.55
+    "dominant_class_max_pct": 0.85,  # alerte si une classe > 85%
+    "neutral_min_pct": 0.03,  # alerte si neutre < 3%
+    "latency_p90_ms": 260,  # p90 latence cible
+    "latency_p99_ms": 500,  # p99 latence cible
 }
 
 
@@ -56,15 +56,25 @@ def check_distribution(df: pd.DataFrame) -> list[tuple[str, str, str]]:
     dominant_pct = dist.iloc[0] if len(dist) > 0 else 0
     dominant_label = dist.index[0] if len(dist) > 0 else "?"
     if dominant_pct > THRESHOLDS["dominant_class_max_pct"]:
-        results.append(("⚠ ALERTE", f"Dominance {dominant_label} à {dominant_pct:.1%}",
-                         "Biais corpus ou biais modèle → vérifier"))
+        results.append(
+            (
+                "⚠ ALERTE",
+                f"Dominance {dominant_label} à {dominant_pct:.1%}",
+                "Biais corpus ou biais modèle → vérifier",
+            )
+        )
     else:
         results.append(("✅ OK", "Distribution équilibrée", f"Dominance max = {dominant_pct:.1%}"))
 
     neutral_pct = dist.get("neutre", dist.get("neutral", 0))
     if neutral_pct < THRESHOLDS["neutral_min_pct"]:
-        results.append(("⚠ ALERTE", f"Classe neutre sous-représentée ({neutral_pct:.1%})",
-                         "Modèle mal calibré sur les articles neutres"))
+        results.append(
+            (
+                "⚠ ALERTE",
+                f"Classe neutre sous-représentée ({neutral_pct:.1%})",
+                "Modèle mal calibré sur les articles neutres",
+            )
+        )
     return results
 
 
@@ -81,14 +91,24 @@ def check_confidence(df: pd.DataFrame) -> list[tuple[str, str, str]]:
     results.append(("Confiance", "% > 0.75 (sûr)", f"{pct_high:.1%}"))
 
     if mean_conf < THRESHOLDS["confidence_mean_min"]:
-        results.append(("⚠ ALERTE", f"Confiance moyenne trop basse ({mean_conf:.3f})",
-                         f"Seuil cible >= {THRESHOLDS['confidence_mean_min']}"))
+        results.append(
+            (
+                "⚠ ALERTE",
+                f"Confiance moyenne trop basse ({mean_conf:.3f})",
+                f"Seuil cible >= {THRESHOLDS['confidence_mean_min']}",
+            )
+        )
     else:
         results.append(("✅ OK", f"Confiance moyenne acceptable ({mean_conf:.3f})", ""))
 
     if pct_low > THRESHOLDS["confidence_low_max_pct"]:
-        results.append(("⚠ ALERTE", f"{pct_low:.1%} d'articles sous 0.55",
-                         "Trop d'articles ambigus → enrichir le dataset d'entraînement"))
+        results.append(
+            (
+                "⚠ ALERTE",
+                f"{pct_low:.1%} d'articles sous 0.55",
+                "Trop d'articles ambigus → enrichir le dataset d'entraînement",
+            )
+        )
     else:
         results.append(("✅ OK", f"Taux d'articles ambigus acceptable ({pct_low:.1%})", ""))
 
@@ -113,8 +133,13 @@ def check_latency(df: pd.DataFrame) -> list[tuple[str, str, str]]:
     results.append(("Latence", "% sous 300ms (SLA API)", f"{(lat <= 300).mean():.1%}"))
 
     if p90 > THRESHOLDS["latency_p90_ms"]:
-        results.append(("⚠ ALERTE", f"p90 latence = {p90:.0f}ms > seuil {THRESHOLDS['latency_p90_ms']}ms",
-                         "Modèle trop lent pour production API"))
+        results.append(
+            (
+                "⚠ ALERTE",
+                f"p90 latence = {p90:.0f}ms > seuil {THRESHOLDS['latency_p90_ms']}ms",
+                "Modèle trop lent pour production API",
+            )
+        )
     else:
         results.append(("✅ OK", f"Latence p90 dans les clous ({p90:.0f}ms)", ""))
 
@@ -134,8 +159,7 @@ def check_topic_coherence(df: pd.DataFrame) -> list[tuple[str, str, str]]:
         dist = sub["predicted_sentiment"].value_counts(normalize=True)
         dominant = dist.index[0] if len(dist) > 0 else "?"
         dominant_pct = dist.iloc[0] if len(dist) > 0 else 0
-        results.append(("Topic", f"{topic} (n={len(sub):,})",
-                         f"→ {dominant} à {dominant_pct:.0%}"))
+        results.append(("Topic", f"{topic} (n={len(sub):,})", f"→ {dominant} à {dominant_pct:.0%}"))
     return results
 
 
@@ -159,7 +183,9 @@ def main() -> None:
 
     df = pd.read_parquet(latest)
     print(f"Articles analysés : {len(df):,}")
-    print(f"Modèle            : {df['model_version'].iloc[0] if 'model_version' in df.columns else '?'}")
+    print(
+        f"Modèle            : {df['model_version'].iloc[0] if 'model_version' in df.columns else '?'}"
+    )
     print("─" * 60)
 
     all_checks: list[tuple[str, str, str]] = []

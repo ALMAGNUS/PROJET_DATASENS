@@ -98,12 +98,7 @@ def _parse_prometheus_samples(body: str) -> list[tuple[str, dict[str, str], floa
         name = match.group("name")
         if name.endswith("_created") or name.endswith("_bucket"):
             continue
-        labels = {
-            key: val
-            for key, val in (
-                (m.group(1), m.group(2)) for m in _LABEL_RE.finditer(match.group("labels") or "")
-            )
-        }
+        labels = {m.group(1): m.group(2) for m in _LABEL_RE.finditer(match.group("labels") or "")}
         try:
             value = float(match.group("value"))
         except ValueError:
@@ -193,7 +188,10 @@ def summarize_prometheus_metrics(body: str, *, max_request_lines: int = 8) -> st
         rows = by_name.get(gauge, [])
         val = rows[0][1] if rows else 0.0
         lines.append(f"  {label:28} : {_fmt_int(val)}")
-    if not by_name.get("datasens_e2_api_active_users") or by_name["datasens_e2_api_active_users"][0][1] == 0:
+    if (
+        not by_name.get("datasens_e2_api_active_users")
+        or by_name["datasens_e2_api_active_users"][0][1] == 0
+    ):
         lines.append("  (login cockpit seul : refaire login ou appeler une route API authentifiee)")
     lines.append("")
 
@@ -214,7 +212,9 @@ def summarize_prometheus_metrics(body: str, *, max_request_lines: int = 8) -> st
             else:
                 lines.append(f"  {drift_map[key]:28} : {val:.4f}")
         if drift_rows and by_name.get("datasens_drift_articles_total", [[None, 0]])[0][1] == 0:
-            lines.append("  (drift a 0 : Modèles > Rafraichir drift ou GET /api/v1/analytics/drift-metrics)")
+            lines.append(
+                "  (drift a 0 : Modèles > Rafraichir drift ou GET /api/v1/analytics/drift-metrics)"
+            )
         lines.append("")
 
     if len(lines) <= 2:
@@ -1191,6 +1191,7 @@ def _build_mongo_uri_from_env(default_uri: str) -> str:
     port = os.getenv("MONGO_PORT", "27017").strip() or "27017"
     auth_source = os.getenv("MONGO_AUTH_SOURCE", "admin").strip() or "admin"
     from urllib.parse import quote_plus
+
     return (
         f"mongodb://{quote_plus(user)}:{quote_plus(pwd)}"
         f"@{host}:{port}/?authSource={auth_source}"
@@ -1199,7 +1200,14 @@ def _build_mongo_uri_from_env(default_uri: str) -> str:
 
 def mongo_status(root: Path) -> dict:
     """Teste la connexion MongoDB et retourne le statut + liste des fichiers GridFS."""
-    result: dict = {"connected": False, "error": None, "files": [], "total_size": 0, "db_name": "", "bucket": ""}
+    result: dict = {
+        "connected": False,
+        "error": None,
+        "files": [],
+        "total_size": 0,
+        "db_name": "",
+        "bucket": "",
+    }
     try:
         import sys as _sys
 
@@ -1222,7 +1230,9 @@ def mongo_status(root: Path) -> dict:
         coll = client[mongo_db][f"{bucket}.files"]
         files = []
         total_size = 0
-        for f in coll.find({}, {"filename": 1, "metadata": 1, "length": 1, "uploadDate": 1}).sort("uploadDate", -1):
+        for f in coll.find({}, {"filename": 1, "metadata": 1, "length": 1, "uploadDate": 1}).sort(
+            "uploadDate", -1
+        ):
             size = f.get("length", 0)
             total_size += size
             meta = f.get("metadata", {})
@@ -1602,8 +1612,7 @@ def render_last_report(panel_key: str) -> None:
     status = "OK" if report.get("ok") else "KO"
     duration_s = float(report.get("duration_s", 0.0) or 0.0)
     st.caption(
-        f"Dernière exécution: {report.get('label', 'Commande')} "
-        f"({status}, {duration_s:.2f}s)"
+        f"Dernière exécution: {report.get('label', 'Commande')} " f"({status}, {duration_s:.2f}s)"
     )
     with st.expander("📋 Rapport d'exécution détaillé", expanded=False):
         st.code(report.get("command", "Commande inconnue"), language="bash")

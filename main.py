@@ -82,7 +82,9 @@ if __name__ == "__main__":
         except Exception as e:
             logger.warning(f"Drift refresh exception : {type(e).__name__}: {e}")
     else:
-        logger.debug("DRIFT_REFRESH_PASSWORD absent : drift gauges non rafraîchies (cf. RUNBOOK § 11.4)")
+        logger.debug(
+            "DRIFT_REFRESH_PASSWORD absent : drift gauges non rafraîchies (cf. RUNBOOK § 11.4)"
+        )
 
     if args.keep_metrics or os.getenv("METRICS_KEEP_ALIVE") == "1":
         port = int(os.getenv("METRICS_PORT", "8000"))

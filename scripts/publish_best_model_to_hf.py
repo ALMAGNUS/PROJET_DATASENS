@@ -79,11 +79,19 @@ def select_best(candidates: list[Candidate]) -> Candidate | None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Publish best fine-tuned model to Hugging Face Hub")
-    parser.add_argument("--repo-id", required=True, help="Hugging Face repo id, e.g. username/datasens-sentiment-fr")
-    parser.add_argument("--token-env", default="HF_TOKEN", help="Environment variable containing HF token")
+    parser = argparse.ArgumentParser(
+        description="Publish best fine-tuned model to Hugging Face Hub"
+    )
+    parser.add_argument(
+        "--repo-id", required=True, help="Hugging Face repo id, e.g. username/datasens-sentiment-fr"
+    )
+    parser.add_argument(
+        "--token-env", default="HF_TOKEN", help="Environment variable containing HF token"
+    )
     parser.add_argument("--private", action="store_true", help="Create private model repo")
-    parser.add_argument("--dry-run", action="store_true", help="Only print best candidate, do not push")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Only print best candidate, do not push"
+    )
     parser.add_argument(
         "--revision-tag",
         default="",
@@ -170,4 +178,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

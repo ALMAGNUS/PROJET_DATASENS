@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import streamlit as st
 
@@ -198,7 +199,9 @@ def render_expert_breadcrumb(*parts: str) -> None:
     """Fil d'Ariane Expert (#1)."""
     if not parts:
         return
-    trail = " › ".join(f"<strong>{p}</strong>" if i == len(parts) - 1 else p for i, p in enumerate(parts))
+    trail = " › ".join(
+        f"<strong>{p}</strong>" if i == len(parts) - 1 else p for i, p in enumerate(parts)
+    )
     st.markdown(f'<div class="ds-breadcrumb">Expert › {trail}</div>', unsafe_allow_html=True)
 
 
@@ -510,7 +513,7 @@ def layer_sparkline_values(root: Path, layer: str, days: int = 7) -> list[int]:
             kpi = item.get("kpis", {}) if isinstance(item, dict) else {}
             by_day[day] = by_day.get(day, 0) + int(float(kpi.get("loaded", 0) or 0))
         vals = [by_day[d] for d in sorted(by_day.keys())][-days:]
-        return vals if len(vals) >= 2 else vals + [vals[-1]] if vals else []
+        return vals if len(vals) >= 2 else [*vals, vals[-1]] if vals else []
 
     rows = growth_timeline_cached(str(root))
     if not rows:
@@ -548,7 +551,9 @@ def render_layer_tile(
 # ---------------------------------------------------------------------------
 
 
-def lazy_panel(session_key: str, loader: Callable[[], None], *, label: str = "Charger le contenu") -> None:
+def lazy_panel(
+    session_key: str, loader: Callable[[], None], *, label: str = "Charger le contenu"
+) -> None:
     """Charge un bloc lourd uniquement après action utilisateur (#5)."""
     if st.session_state.get(session_key):
         loader()
@@ -615,7 +620,9 @@ def render_warn_monitoring_link(ctx: PageContext) -> None:
         st.rerun()
     hint = st.session_state.get("expert_goto_hint")
     if hint and st.session_state.get("monitoring_filter_date"):
-        st.info(f"→ Allez dans **{hint}** (filtre `{st.session_state['monitoring_filter_date']}` actif).")
+        st.info(
+            f"→ Allez dans **{hint}** (filtre `{st.session_state['monitoring_filter_date']}` actif)."
+        )
 
 
 def render_monitoring_date_filter() -> str | None:

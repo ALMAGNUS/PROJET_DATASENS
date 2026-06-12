@@ -78,7 +78,11 @@ def scan_sport_signals(df: pd.DataFrame, limit_titles: int = 2) -> list[dict]:
     if not out:
         dist = sentiment_distribution(sport_df)
         dom = max(dist.items(), key=lambda x: x[1]["count"])[0] if dist else "—"
-        titles = sport_df["title"].astype(str).head(limit_titles).tolist() if "title" in sport_df.columns else []
+        titles = (
+            sport_df["title"].astype(str).head(limit_titles).tolist()
+            if "title" in sport_df.columns
+            else []
+        )
         out.append(
             {
                 "theme": "Sport (topic)",
@@ -169,8 +173,7 @@ def narrate_sport(sport_signals: list[dict], theme: str) -> str:
         )
     total = sum(s["count"] for s in sport_signals)
     chunks = [
-        f"{s['theme']} ({s['count']:,} art., {s['dominant_sentiment']})"
-        for s in sport_signals[:3]
+        f"{s['theme']} ({s['count']:,} art., {s['dominant_sentiment']})" for s in sport_signals[:3]
     ]
     lead = sport_signals[0]
     sample = lead["sample_titles"][0][:65] if lead.get("sample_titles") else ""
@@ -242,7 +245,9 @@ def narrate_economy(
     elif theme == "financier":
         text += "Isoler inflation, taux et emploi pour repérer les secteurs sous pression réelle."
     else:
-        text += "À recouper avec le sport (événements) et la météo (canicule) pour le ressenti terrain."
+        text += (
+            "À recouper avec le sport (événements) et la météo (canicule) pour le ressenti terrain."
+        )
     return text
 
 

@@ -36,4 +36,3 @@ def test_build_gold_app_input_removes_target_columns() -> None:
 def test_build_gold_ia_labelled_requires_sentiment_source() -> None:
     with pytest.raises(ValueError, match="Missing sentiment columns"):
         build_gold_ia_labelled(pd.DataFrame({"id": [1], "title": ["a"]}))
-

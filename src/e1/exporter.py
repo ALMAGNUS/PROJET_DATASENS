@@ -33,7 +33,12 @@ class GoldExporter:
             df.to_parquet(parquet_path, index=False, engine="pyarrow")
             df.to_csv(csv_partitioned, index=False, encoding="utf-8")
 
-        return {"parquet": parquet_path, "csv": csv_partitioned, "rows": len(df), "columns": list(df.columns)}
+        return {
+            "parquet": parquet_path,
+            "csv": csv_partitioned,
+            "rows": len(df),
+            "columns": list(df.columns),
+        }
 
     def export_all(self, df: pd.DataFrame, partition_date: date | None = None) -> dict:
         """Export GOLD: SILVER + sentiment (Parquet + CSV) avec partitionnement par date et source"""

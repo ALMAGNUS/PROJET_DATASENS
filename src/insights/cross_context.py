@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import re
-
 import pandas as pd
 
 from src.insights.goldai_data import (
@@ -19,7 +17,14 @@ from src.insights.goldai_data import (
 _CRISIS_PATTERNS: dict[str, list[str]] = {
     "Intempéries (inondations, crues)": ["inond", "crue", "submers", "débord", "inondation"],
     "Canicule / sécheresse": ["canicule", "sécheresse", "vague de chaleur", "chaleur extrême"],
-    "Épidémies / santé publique": ["épidém", "epidem", "hantavirus", "pandém", "contamination", "virus"],
+    "Épidémies / santé publique": [
+        "épidém",
+        "epidem",
+        "hantavirus",
+        "pandém",
+        "contamination",
+        "virus",
+    ],
     "Sécurité / insécurité": ["insécurité", "casse", "violence urbaine", "attentat"],
     "Environnement": ["pollution", "biodivers", "climat", "réchauffement"],
 }
@@ -51,7 +56,9 @@ def scan_crisis_signals(df: pd.DataFrame, limit_titles: int = 3) -> list[dict]:
         sub = df[mask]
         if len(sub) == 0:
             continue
-        titles = sub["title"].astype(str).head(limit_titles).tolist() if "title" in sub.columns else []
+        titles = (
+            sub["title"].astype(str).head(limit_titles).tolist() if "title" in sub.columns else []
+        )
         sc = mean_score(sub)
         dist = sentiment_distribution(sub)
         dom = max(dist.items(), key=lambda x: x[1]["count"])[0] if dist else "—"
@@ -99,7 +106,15 @@ def build_cross_context_block(
         lines.append(f"Score moyen continu {theme_label} : {ms:+.3f}")
 
     for card in cards:
-        if card.get("type") in ("weather", "economy", "trend", "risk", "crisis", "sport", "sentiment"):
+        if card.get("type") in (
+            "weather",
+            "economy",
+            "trend",
+            "risk",
+            "crisis",
+            "sport",
+            "sentiment",
+        ):
             lines.append(f"[{card['title']}] {card['summary']}")
 
     weather = latest_weather_rows(df_full, limit=6)
@@ -128,7 +143,9 @@ def build_cross_context_block(
                 f"Ex. titres : {titles}"
             )
     else:
-        lines.append("Signaux crise : aucun mot-clé inondation/épidémie/canicule dominant dans les titres.")
+        lines.append(
+            "Signaux crise : aucun mot-clé inondation/épidémie/canicule dominant dans les titres."
+        )
 
     sport_signals = sport_signals if sport_signals is not None else []
     if sport_signals:
@@ -152,7 +169,9 @@ def build_cross_context_block(
     if len(eco) > 0:
         ed = sentiment_distribution(eco)
         eco_dom = max(ed.items(), key=lambda x: x[1]["count"])[0] if ed else "—"
-        lines.append(f"Flux économique (Yahoo/INSEE) : {len(eco):,} articles, sentiment dominant {eco_dom}")
+        lines.append(
+            f"Flux économique (Yahoo/INSEE) : {len(eco):,} articles, sentiment dominant {eco_dom}"
+        )
 
     df_pol = filter_theme_df(df_full, "politique")
     df_fin = filter_theme_df(df_full, "financier")

@@ -123,7 +123,9 @@ class E1Pipeline:
         except Exception as e:
             logger.warning("Metrics server failed: {}", e)
 
-    def load_sources(self, inject_csv_path: str | None = None, inject_source_name: str = "csv_inject") -> list:
+    def load_sources(
+        self, inject_csv_path: str | None = None, inject_source_name: str = "csv_inject"
+    ) -> list:
         """Load sources from JSON config + source CSV injectée si --inject-csv"""
         config_path = Path(__file__).parent.parent.parent / "sources_config.json"
         sources = []
@@ -134,10 +136,17 @@ class E1Pipeline:
         if inject_csv_path:
             p = Path(inject_csv_path)
             if p.exists():
-                sources.insert(0, Source(source_name=inject_source_name, acquisition_type="csv", url=str(p.resolve())))
+                sources.insert(
+                    0,
+                    Source(
+                        source_name=inject_source_name, acquisition_type="csv", url=str(p.resolve())
+                    ),
+                )
         return sources
 
-    def extract(self, inject_csv_path: str | None = None, inject_source_name: str = "csv_inject") -> list:
+    def extract(
+        self, inject_csv_path: str | None = None, inject_source_name: str = "csv_inject"
+    ) -> list:
         """Extract from all sources"""
         console_write = self.console.write
         self.source_run_stats = {}
@@ -146,7 +155,9 @@ class E1Pipeline:
         console_write(UiMessages.extraction_title()[2])
         logger.info("Extraction start: all sources")
 
-        sources = self.load_sources(inject_csv_path=inject_csv_path, inject_source_name=inject_source_name)
+        sources = self.load_sources(
+            inject_csv_path=inject_csv_path, inject_source_name=inject_source_name
+        )
         articles = []
 
         total_sources = sum(1 for s in sources if s.active)
@@ -602,7 +613,10 @@ class E1Pipeline:
             reasons.append(
                 f"loaded sous seuil ({self.stats['loaded']} < MIN_LOADED_THRESHOLD={min_loaded})"
             )
-        if self.stats["tagged"] < self.stats["loaded"] or self.stats["analyzed"] < self.stats["loaded"]:
+        if (
+            self.stats["tagged"] < self.stats["loaded"]
+            or self.stats["analyzed"] < self.stats["loaded"]
+        ):
             reasons.append("Couverture enrichissement incomplète")
         run_duration_sec = (datetime.now() - self.run_started_at).total_seconds()
         enriched_ratio = 0.0
@@ -610,7 +624,9 @@ class E1Pipeline:
         if self.stats["extracted"] > 0:
             clean_ratio = self.stats["cleaned"] / self.stats["extracted"]
         if self.stats["loaded"] > 0:
-            enriched_ratio = min(self.stats["tagged"], self.stats["analyzed"]) / self.stats["loaded"]
+            enriched_ratio = (
+                min(self.stats["tagged"], self.stats["analyzed"]) / self.stats["loaded"]
+            )
         if clean_ratio < min_clean_ratio:
             reasons.append(
                 f"clean_ratio sous seuil ({clean_ratio * 100:.1f}% < MIN_CLEAN_RATIO={min_clean_ratio * 100:.1f}%)"
@@ -701,8 +717,12 @@ class E1Pipeline:
                 # SILVER (incrémental: seulement les nouveaux raw_data_id)
                 df_silver = aggregator.aggregate_silver(incremental=True)
                 r_silver = exporter.export_silver(df_silver)
-                silver_label = "incrémental" if df_silver.empty else f"{r_silver['rows']} nouvelles lignes"
-                console_write(f"   OK SILVER: {r_silver.get('parquet', r_silver['csv'])} ({silver_label})")
+                silver_label = (
+                    "incrémental" if df_silver.empty else f"{r_silver['rows']} nouvelles lignes"
+                )
+                console_write(
+                    f"   OK SILVER: {r_silver.get('parquet', r_silver['csv'])} ({silver_label})"
+                )
 
                 # GOLD
                 df_gold = aggregator.aggregate()
