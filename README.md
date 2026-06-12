@@ -258,14 +258,13 @@ src/                    # 17 600 lignes Python
   shared/               #   interfaces (frontières E1/E2/E3)
 
 data/                   # RAW · SILVER · GOLD · goldai · datasens.db (gitignored)
-reports/                # db_state · run_summary · pipeline_proof (versionnés)
+reports/                # db_state · run_summary (versionnés)
 models/                 # checkpoints fine-tunés + trainer_state (gitignored)
 notebooks/              # E1 pédagogique + Colab fine-tuning
 scripts/                # 46 utilitaires actifs (post-audit) + scripts/_archive/
 tests/                  # 16 fichiers, 65 tests verts (+ 1 skipped)
 docs/                   # E1-E5 + dev/ (LOGGING, DOCKER_RUNTIME, FLOW_DONNEES)
 monitoring/             # config Prometheus + Grafana + provisioning
-archive/legacy_docs/    # docs obsolètes archivées (audit code)
 ```
 
 Arbre détaillé et conventions : [`CONTRIBUTING.md`](CONTRIBUTING.md).

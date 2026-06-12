@@ -1,6 +1,0 @@
-stage,before,after,delta,path_hint,detail
-1. SQLite raw_data (buffer),53795,53961,166,datasens.db · table raw_data,Ingestion + dédup fingerprint. Source de vérité buffer.
-"2. GOLD partition (jour, export enrichi)",53795,53961,166,data/gold/date=2026-05-22/articles.parquet,Export parquet régénéré (sentiment_keyword + topics). Delta = nouvelles lignes raw_data enrichies ce run (+166).
-3. GoldAI fusion long terme,89958,90124,166,data/goldai/merged_all_dates.parquet,Stock long terme dédupliqué par id.
-4. IA splits (train+val+test),21527,21657,130,"data/goldai/ia/{train,val,test}.parquet","train=17,325 · val=2,165 · test=2,167"
-5. MongoDB (transferts),0,2814,2814,"MongoDB · sync_log (rows_synced, status=OK)",26 synchronisations OK entre les deux rapports (depuis 2026-05-21T06:46:13.325433+00:00).

@@ -164,7 +164,7 @@ PROJET_DATASENS/
 ├── tests/                          # Tests unitaires (pytest)
 ├── notebooks/                      # Notebooks pédagogiques E1 + référence
 ├── scripts/                        # Scripts utilitaires (manage_parquet, db_state_report, …)
-├── docs/                           # Documentation complète (E1 → E5 + annexes + _archive)
+├── docs/                           # Documentation complète (E1 → E5 + annexes)
 ├── reports/                        # Rapports quotidiens db_state_*.{md,json}
 ├── monitoring/                     # Prometheus + Grafana (provisioning)
 ├── models/                         # Modèles fine-tunés (ignorés par Git)
