@@ -1,11 +1,11 @@
 """
 Page cockpit : onglet Vue d'ensemble.
 
-Refonte UX : 3 sections uniquement
-  1. Bandeau court (une ligne d'identité + statut du run)
-  2. État du pipeline : 4 tuiles, une par couche (RAW / SILVER / GOLD / GoldAI)
-  3. Activité du dernier run : preuve d'enrichissement compacte
-  Expander fermé : Santé technique (API, branches App/IA)
+Vue d'ensemble (Expert) :
+  1. Bandeau KPI run (même style que la strip Expert)
+  2. Quatre tuiles volumes par couche
+  3. Dernier run — enrichissement prouvé
+  Expanders fermés : persistance MongoDB, santé technique API
 
 Le flow "Sources -> RAW -> ... -> Copie IA" a été retiré (redondant avec la
 sidebar et l'onglet Pipeline). Les tests /health et /metrics vivent dans
@@ -36,13 +36,14 @@ from src.streamlit._cockpit_helpers import (
     parquet_row_count_cached as _parquet_row_count_cached,
 )
 from src.streamlit.cockpit_ux import (
+    latest_run_summary_cached,
     layer_sparkline_values,
     prefetch_backend_ok,
-    render_active_model_card,
     render_expert_breadcrumb,
     render_layer_tile,
     render_section_title,
     render_warn_monitoring_link,
+    status_chip_class,
     status_color,
 )
 from src.streamlit.metrics import fmt_size as _fmt_size
@@ -168,110 +169,16 @@ def _render_api_health_panel(api_base: str, api_v1: str, api_ok: bool) -> None:
         )
 
 
-def render(ctx: PageContext) -> None:
-    if not cockpit_tab_is_active(ctx, "🏠 Vue d'ensemble"):
-        return
-    project_root = ctx.project_root
-    settings = ctx.settings
-    silver_dir = ctx.silver_dir
-    gold_dir = ctx.gold_dir
-    goldai_dir = ctx.goldai_dir
-    ia_dir = ctx.ia_dir
-
-    # --- Bandeau d'identité -------------------------------------------------
-    if ctx.show_advanced:
-        render_expert_breadcrumb("Vue d'ensemble")
-        st.caption("État consolidé RAW → GoldAI, volumétrie par couche et activité du dernier run.")
-    else:
-        st.markdown("### DataSens — cockpit d'analyse de sentiment multi-source")
-        st.caption(
-            "Collecte multi-sources → normalisation → enrichissement "
-            "(topics + sentiments) → jeu d'entraînement IA."
-        )
-    st.divider()
-
-    if ctx.show_advanced:
-        render_active_model_card(project_root)
-        render_warn_monitoring_link(ctx)
-        st.divider()
-
-    # --- Section 1 : État du pipeline (4 tuiles, 1 par couche) -------------
-    db_path = _resolve_db_path(project_root)
-    raw_total = _count_raw_sqlite(db_path)
-    silver_rows, silver_label = _latest_silver(silver_dir)
-    gold_rows, gold_label = _latest_gold(gold_dir)
-
-    goldai_path = goldai_dir / "merged_all_dates.parquet"
-    goldai_rows = _parquet_row_count_cached(str(goldai_path)) if goldai_path.exists() else 0
-
-    ia_train = (
-        _parquet_row_count_cached(str(ia_dir / "train.parquet"))
-        if (ia_dir / "train.parquet").exists()
-        else 0
-    )
-    ia_val = (
-        _parquet_row_count_cached(str(ia_dir / "val.parquet"))
-        if (ia_dir / "val.parquet").exists()
-        else 0
-    )
-    ia_test = (
-        _parquet_row_count_cached(str(ia_dir / "test.parquet"))
-        if (ia_dir / "test.parquet").exists()
-        else 0
-    )
-
-    render_section_title("État du pipeline")
-    spark_raw = layer_sparkline_values(project_root, "RAW")
-    spark_silver = layer_sparkline_values(project_root, "SILVER")
-    spark_gold = layer_sparkline_values(project_root, "GOLD")
-    spark_goldai = layer_sparkline_values(project_root, "GoldAI")
-
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        render_layer_tile(
-            "RAW",
-            f"{raw_total:,}",
-            "Buffer SQLite cumulé",
-            spark_raw,
-            color=status_color("PASS"),
-        )
-    with c2:
-        render_layer_tile(
-            "SILVER",
-            f"{silver_rows:,}",
-            f"Partition {silver_label}",
-            spark_silver,
-            color="#60a5fa",
-        )
-    with c3:
-        render_layer_tile(
-            "GOLD",
-            f"{gold_rows:,}",
-            f"Partition {gold_label}",
-            spark_gold,
-            color="#a78bfa",
-        )
-    with c4:
-        render_layer_tile(
-            "GoldAI",
-            f"{goldai_rows:,}",
-            f"splits IA {ia_train + ia_val + ia_test:,}",
-            spark_goldai,
-            color="#34d399",
-        )
-    st.caption(
-        f"Splits IA : train {ia_train:,} · val {ia_val:,} · test {ia_test:,}. "
-        "Lecture : une ligne = un article, une couche = une étape d'enrichissement."
-    )
-    st.divider()
-
-    # --- Section 2 : Lineage de la donnée (SQLite -> Parquet -> GoldAI -> Mongo) ---
-    render_section_title("Lineage de la donnée")
-    st.caption(
-        "Chaîne de persistance multi-couche, du stockage opérationnel au stockage long terme. "
-        "Quatre étapes, contrôle de cohérence end-to-end."
-    )
-
+def _render_persistence_lineage(
+    *,
+    project_root: Path,
+    db_path: Path,
+    raw_total: int,
+    gold_rows: int,
+    gold_label: str,
+    goldai_rows: int,
+) -> None:
+    """Lineage SQLite → Parquet → GoldAI → MongoDB (détail repliable)."""
     mongo_cache = st.session_state.get("mongo_status_cache")
     mongo_was_checked = isinstance(mongo_cache, dict)
     mongo_connected = mongo_was_checked and bool(mongo_cache.get("connected"))
@@ -329,11 +236,7 @@ def render(ctx: PageContext) -> None:
                 help=f"Volume total : {mongo_total_size}",
             )
         elif mongo_was_checked:
-            st.metric(
-                label=" ",
-                value="hors ligne",
-                label_visibility="collapsed",
-            )
+            st.metric(label=" ", value="hors ligne", label_visibility="collapsed")
             st.code("docker compose up -d mongodb", language="powershell")
             b1, b2 = st.columns(2)
             if b1.button("Réessayer", key="overview_check_mongo_retry", use_container_width=True):
@@ -346,11 +249,7 @@ def render(ctx: PageContext) -> None:
                 st.session_state["clipboard_hint"] = "docker compose up -d mongodb"
                 st.toast("Commande affichée ci-dessus — copiez depuis le bloc code.")
         else:
-            st.metric(
-                label=" ",
-                value="non vérifié",
-                label_visibility="collapsed",
-            )
+            st.metric(label=" ", value="non vérifié", label_visibility="collapsed")
             if st.button("Vérifier MongoDB", key="overview_check_mongo", use_container_width=True):
                 with st.spinner("Connexion MongoDB..."):
                     st.session_state.mongo_status_cache = _mongo_status(project_root)
@@ -366,9 +265,8 @@ def render(ctx: PageContext) -> None:
         )
         if chain_ok:
             st.success(
-                f"Chaîne de persistance cohérente : SQLite ({raw_total:,}) → "
-                f"GOLD {gold_label} ({gold_rows:,}) → "
-                f"GoldAI ({goldai_rows:,}) → GridFS (snapshot + consolidé archivés)."
+                f"Chaîne cohérente : SQLite ({raw_total:,}) → GOLD {gold_label} ({gold_rows:,}) → "
+                f"GoldAI ({goldai_rows:,}) → GridFS archivé."
             )
         else:
             missing = []
@@ -382,31 +280,151 @@ def render(ctx: PageContext) -> None:
                 missing.append(f"backup GridFS `gold_articles_{gold_label}` manquant")
             if not has_goldai_merged_mongo:
                 missing.append("backup GridFS `goldai_merged` manquant")
-            st.warning("Chaîne de persistance incomplète : " + " · ".join(missing))
+            st.warning("Chaîne incomplète : " + " · ".join(missing))
     elif mongo_was_checked:
-        st.error(
-            "MongoDB hors ligne — la sauvegarde long terme ne peut pas être validée pour l'instant."
-        )
+        st.error("MongoDB hors ligne — sauvegarde long terme non validée.")
         if mongo_error:
-            short_err = str(mongo_error).split(":")[0][:80]
-            st.caption(f"Détail : {short_err}…")
-        with st.expander("Comment relancer MongoDB ?", expanded=True):
-            st.markdown(
-                """
-                MongoDB est déployé via Docker. Si Docker Desktop tourne mais que le conteneur est arrêté :
-
-                ```powershell
-                docker compose up -d mongodb
-                ```
-
-                Si Docker Desktop lui-même est éteint, le démarrer puis relancer la commande ci-dessus.
-                Une fois Mongo en ligne, cliquez **Réessayer** dans la 4e carte.
-                """
-            )
+            st.caption(f"Détail : {str(mongo_error).split(':')[0][:80]}…")
     else:
+        st.caption("Cliquez **Vérifier MongoDB** pour valider la sauvegarde GridFS.")
+
+
+def render(ctx: PageContext) -> None:
+    if not cockpit_tab_is_active(ctx, "🏠 Vue d'ensemble"):
+        return
+    project_root = ctx.project_root
+    settings = ctx.settings
+    silver_dir = ctx.silver_dir
+    gold_dir = ctx.gold_dir
+    goldai_dir = ctx.goldai_dir
+    ia_dir = ctx.ia_dir
+
+    if ctx.show_advanced:
+        render_expert_breadcrumb("Vue d'ensemble")
+
+    latest_run = latest_run_summary_cached(str(project_root))
+    run_status = str(latest_run.get("status", "—") or "—") if latest_run else "—"
+    run_day = str(latest_run.get("generated_at_utc", ""))[:10] if latest_run else "—"
+    run_kpi = latest_run.get("kpis", {}) if isinstance(latest_run, dict) else {}
+    run_extracted = int(float(run_kpi.get("extracted", 0) or 0))
+    run_loaded = int(float(run_kpi.get("loaded", 0) or 0))
+    chip_cls = status_chip_class(run_status)
+    run_day_display = run_day if run_day != "—" else "Aucun run"
+    ext_display = f"{run_extracted:,}".replace(",", "\u202f")
+    loaded_display = f"{run_loaded:,}".replace(",", "\u202f")
+
+    render_section_title("Dernier run pipeline")
+    st.caption("Quality gate et volumes du dernier `run_summary` (collecte → chargement SILVER).")
+    render_warn_monitoring_link(ctx)
+
+    st.markdown(
+        f"""
+<div class="ds-kpi-strip" style="position:static;margin-bottom:0.85rem;">
+  <div class="ds-kpi-item" style="flex:1.1 1 160px;">
+    <div class="ds-kpi-label">Run du jour</div>
+    <div class="ds-kpi-value">
+      <span class="ds-mode-chip {chip_cls}">{run_status}</span>
+      <span style="color:#94a8d8;font-weight:500;margin-left:0.35rem;">{run_day_display}</span>
+    </div>
+  </div>
+  <div class="ds-kpi-item">
+    <div class="ds-kpi-label">Extraits (RAW)</div>
+    <div class="ds-kpi-value">{ext_display}</div>
+  </div>
+  <div class="ds-kpi-item">
+    <div class="ds-kpi-label">Chargés (SILVER)</div>
+    <div class="ds-kpi-value">{loaded_display}</div>
+  </div>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.divider()
+
+    # --- Volumes par couche (4 tuiles) -------------------------------------
+    db_path = _resolve_db_path(project_root)
+    raw_total = _count_raw_sqlite(db_path)
+    silver_rows, silver_label = _latest_silver(silver_dir)
+    gold_rows, gold_label = _latest_gold(gold_dir)
+
+    goldai_path = goldai_dir / "merged_all_dates.parquet"
+    goldai_rows = _parquet_row_count_cached(str(goldai_path)) if goldai_path.exists() else 0
+
+    ia_train = (
+        _parquet_row_count_cached(str(ia_dir / "train.parquet"))
+        if (ia_dir / "train.parquet").exists()
+        else 0
+    )
+    ia_val = (
+        _parquet_row_count_cached(str(ia_dir / "val.parquet"))
+        if (ia_dir / "val.parquet").exists()
+        else 0
+    )
+    ia_test = (
+        _parquet_row_count_cached(str(ia_dir / "test.parquet"))
+        if (ia_dir / "test.parquet").exists()
+        else 0
+    )
+
+    render_section_title("Volumes par couche")
+    st.caption(
+        "RAW = stock SQLite cumulé · SILVER/GOLD = partition du jour · "
+        "GoldAI = historique ML consolidé. "
+        "Courbes partitions : **Pilotage → Infra & MongoDB → Chronologie**."
+    )
+    spark_raw = layer_sparkline_values(project_root, "RAW")
+    spark_silver = layer_sparkline_values(project_root, "SILVER")
+    spark_gold = layer_sparkline_values(project_root, "GOLD")
+    spark_goldai = layer_sparkline_values(project_root, "GoldAI")
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        render_layer_tile(
+            "RAW",
+            f"{raw_total:,}",
+            "Buffer SQLite cumulé",
+            spark_raw,
+            color=status_color("PASS"),
+        )
+    with c2:
+        render_layer_tile(
+            "SILVER",
+            f"{silver_rows:,}",
+            f"Partition {silver_label}",
+            spark_silver,
+            color="#60a5fa",
+        )
+    with c3:
+        render_layer_tile(
+            "GOLD",
+            f"{gold_rows:,}",
+            f"Partition {gold_label}",
+            spark_gold,
+            color="#a78bfa",
+        )
+    with c4:
+        render_layer_tile(
+            "GoldAI",
+            f"{goldai_rows:,}",
+            f"splits IA {ia_train + ia_val + ia_test:,}",
+            spark_goldai,
+            color="#34d399",
+        )
+    st.caption(f"Splits IA : train {ia_train:,} · val {ia_val:,} · test {ia_test:,}")
+    st.divider()
+
+    with st.expander("Persistance long terme — lineage & MongoDB", expanded=False):
         st.caption(
-            "Étapes 1 à 3 lues en local. Cliquez **Vérifier MongoDB** dans la 4e carte "
-            "pour valider la chaîne complète."
+            "Détail technique : SQLite → Parquet → GoldAI → GridFS. "
+            "Optionnel pour la démo ; requis pour valider la sauvegarde E5."
+        )
+        _render_persistence_lineage(
+            project_root=project_root,
+            db_path=db_path,
+            raw_total=raw_total,
+            gold_rows=gold_rows,
+            gold_label=gold_label,
+            goldai_rows=goldai_rows,
         )
     st.divider()
 

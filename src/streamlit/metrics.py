@@ -161,6 +161,91 @@ def chrono_data(root: Path) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def chrono_pivot(root: Path) -> pd.DataFrame:
+    """Pivot date × stage (count) pour le graphique Chronologie du cockpit."""
+    df = chrono_data(root)
+    if df.empty:
+        return pd.DataFrame()
+    pivot = df.sort_values("date").pivot(index="date", columns="stage", values="count").fillna(0)
+    return pivot.sort_index()
+
+
+_CHRONO_STAGE_ORDER = ("GOLD", "GoldAI", "SILVER")
+_CHRONO_STAGE_COLORS = {"GOLD": "#29b5e8", "GoldAI": "#1d4ed8", "SILVER": "#f472b6"}
+
+
+def chrono_window_pivot(pivot: pd.DataFrame, window_days: int | None) -> pd.DataFrame:
+    """Applique une fenêtre glissante (derniers N jours) ou renvoie l'historique complet."""
+    if pivot.empty or window_days is None:
+        return pivot
+    return pivot.tail(max(1, int(window_days)))
+
+
+def chrono_plotly_figure(pivot: pd.DataFrame, *, window_days: int | None = None):
+    """Figure Plotly : courbes complètes, axe X étendu à droite (dernier jour visible, sans date fictive)."""
+    import plotly.graph_objects as go
+
+    view = chrono_window_pivot(pivot, window_days)
+    if view.empty:
+        return None
+
+    cols = [c for c in _CHRONO_STAGE_ORDER if c in view.columns]
+    melted = view[cols].reset_index().melt(id_vars="date", var_name="stage", value_name="count")
+    melted["date"] = pd.to_datetime(melted["date"])
+    melted = melted.sort_values(["stage", "date"])
+
+    fig = go.Figure()
+    for stage in cols:
+        series = melted[melted["stage"] == stage]
+        fig.add_trace(
+            go.Scatter(
+                x=series["date"],
+                y=series["count"],
+                mode="lines+markers",
+                name=stage,
+                line={"color": _CHRONO_STAGE_COLORS.get(stage, "#94a3b8"), "width": 2},
+                marker={"size": 5},
+                hovertemplate="%{x|%Y-%m-%d}<br>%{fullData.name}: %{y:.0f}<extra></extra>",
+            )
+        )
+
+    dmin, dmax = melted["date"].min(), melted["date"].max()
+    y_max = max(3.0, float(melted["count"].max()) + 0.5)
+    n_days = max(1, melted["date"].nunique())
+    nticks = min(18, max(6, n_days // 4))
+    fig.update_xaxes(
+        range=[dmin - pd.Timedelta(hours=12), dmax + pd.Timedelta(hours=36)],
+        type="date",
+        tickformat="%Y-%m-%d",
+        tickangle=-90,
+        tickmode="auto",
+        nticks=nticks,
+        autorange=False,
+        gridcolor="#334155",
+        linecolor="#475569",
+    )
+    fig.update_yaxes(
+        range=[-0.1, y_max],
+        dtick=1,
+        gridcolor="#334155",
+        linecolor="#475569",
+    )
+    rev = f"{window_days or 'all'}-{dmax.strftime('%Y-%m-%d')}"
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        height=320,
+        margin={"l": 48, "r": 28, "t": 16, "b": 110},
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "x": 0},
+        xaxis_title="Date",
+        yaxis_title="Fichiers parquet / partition",
+        hovermode="x unified",
+        uirevision=rev,
+    )
+    return fig
+
+
 def _canon_sentiment(value: object) -> str:
     """Normalise une valeur de sentiment brute vers une des 3 classes canoniques."""
     s = str(value or "").strip().lower()

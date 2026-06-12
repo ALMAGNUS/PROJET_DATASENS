@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import sqlite3
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -46,7 +47,13 @@ from src.streamlit.cockpit_ux import (
     run_summary_history_cached,
 )
 from src.streamlit.metrics import (
-    chrono_data as _chrono_data,
+    chrono_pivot as _chrono_pivot,
+)
+from src.streamlit.metrics import (
+    chrono_plotly_figure as _chrono_plotly_figure,
+)
+from src.streamlit.metrics import (
+    chrono_window_pivot as _chrono_window_pivot,
 )
 from src.streamlit.metrics import (
     fmt_size as _fmt_size,
@@ -61,6 +68,47 @@ from src.streamlit.metrics import (
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 _OPTIONAL_MLOPS_SERVICES = frozenset({"Prometheus", "Grafana", "Uptime Kuma"})
+_CHRONO_REFRESH_SEC = 30
+_CHRONO_WINDOWS: dict[str, int | None] = {
+    "60 jours (glissant)": 60,
+    "90 jours (glissant)": 90,
+    "120 jours (glissant)": 120,
+    "Tout l'historique": None,
+}
+
+
+@st.fragment(run_every=timedelta(seconds=_CHRONO_REFRESH_SEC))
+def _render_chronologie(project_root: Path) -> None:
+    render_section_title("Chronologie")
+    window_label = st.select_slider(
+        "Fenêtre glissante",
+        options=list(_CHRONO_WINDOWS.keys()),
+        value="90 jours (glissant)",
+        key="chrono_window_slider",
+    )
+    window_days = _CHRONO_WINDOWS[window_label]
+
+    pivot = _chrono_pivot(project_root)
+    if pivot.empty:
+        st.caption("Aucune donnée par date")
+        return
+
+    view = _chrono_window_pivot(pivot, window_days)
+    last_date = str(pivot.index.max())
+    first_date = str(view.index.min())
+    fig = _chrono_plotly_figure(pivot, window_days=window_days)
+    if fig is not None:
+        st.plotly_chart(
+            fig,
+            use_container_width=True,
+            config={"displayModeBar": False},
+            key=f"chrono_plot_{window_days or 'all'}_{last_date}",
+        )
+    window_txt = f"{window_days} derniers jours" if window_days else "historique complet"
+    st.caption(
+        f"Dernière partition : **{last_date}** · fenêtre : {first_date} → {last_date} ({window_txt}) · "
+        f"actualisation auto {_CHRONO_REFRESH_SEC}s"
+    )
 
 
 def _render_user_audit_journal(ctx: PageContext) -> None:
@@ -350,15 +398,7 @@ def render(ctx: PageContext) -> None:
         st.caption("Détails techniques masqués (mode Expert requis).")
 
     st.divider()
-    render_section_title("Chronologie")
-    df_chrono = _chrono_data(PROJECT_ROOT)
-    if not df_chrono.empty:
-        df_chrono = df_chrono.sort_values("date")
-        pivot_c = df_chrono.pivot(index="date", columns="stage", values="count").fillna(0)
-        if not pivot_c.empty:
-            st.line_chart(pivot_c)
-    else:
-        st.caption("Aucune donnée par date")
+    _render_chronologie(PROJECT_ROOT)
 
     st.divider()
     render_section_title("Stockage long terme — MongoDB GridFS")
