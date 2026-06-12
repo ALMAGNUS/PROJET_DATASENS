@@ -1,6 +1,6 @@
 @echo off
 REM Recree le .venv proprement (evite WinError 5 / Acces refuse)
-REM Fermer Cursor, terminaux Python, Jupyter avant de lancer.
+REM Fermer l'IDE, terminaux Python, Jupyter avant de lancer.
 
 cd /d "%~dp0\.."
 
@@ -8,7 +8,7 @@ echo [1/4] Suppression de l'ancien .venv...
 if exist .venv (
     rmdir /s /q .venv
     if exist .venv (
-        echo ERREUR: Impossible de supprimer .venv. Fermez Cursor et tous les terminaux.
+        echo ERREUR: Impossible de supprimer .venv. Fermez l'IDE et tous les terminaux.
         pause
         exit /b 1
     )

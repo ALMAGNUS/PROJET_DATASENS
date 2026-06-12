@@ -166,7 +166,7 @@ python main.py --keep-metrics
 
 Si vous voyez *"A module that was compiled using NumPy 1.x cannot be run in NumPy 2.2"* :
 
-1. **Recréer le venv** (fermer Cursor et terminaux avant) :
+1. **Recréer le venv** (fermer l'IDE et terminaux avant) :
    ```bat
    scripts\fix_venv.bat
    ```

@@ -270,7 +270,7 @@ Document généré pour étude : liste **exhaustive des fichiers suivis par Git*
 - `docs/e2/ANNEXE_C6_VEILLE_2026-04-10.md`
 - `docs/e2/ANNEXE_C6_VEILLE_2026-04-11.json`
 - `docs/e2/ANNEXE_C6_VEILLE_2026-04-11.md`
-- `docs/e2/E2_SOUTENANCE_QA.md`
+- `docs/e2/E2_FAQ.md`
 - `docs/e2/GUIDE_BENCHMARK_FINETUNING.md`
 - `docs/e2/HF_MODEL_DEPLOY_RUNBOOK.md`
 - `docs/e2/HF_MODEL_PUBLISH.json`
