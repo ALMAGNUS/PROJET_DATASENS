@@ -143,8 +143,7 @@ validation_report.json
 backups/
 
 # ============================================================
-# Notes personnelles de préparation (NE PAS versionner)
+# Dossiers locaux (hors dépôt)
 # ============================================================
-docs/soutenance/
-docs/soutenance_code_extraits/
+_local/
 
