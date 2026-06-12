@@ -108,8 +108,8 @@ Voir `.github/workflows/test.yml`
 
 ## 📚 Documentation
 
-- **Stratégie isolation** : `docs/E1_ISOLATION_STRATEGY.md`
-- **Plan d'action** : `docs/PLAN_ACTION_E1_E2_E3.md`
+- **Isolation E1/E2** : `docs/e2/E2_FAQ.md`, `src/e2/api/routes/silver.py` (HTTP 501 par design)
+- **Tests** : `tests/test_e1_isolation.py`
 
 ---
 

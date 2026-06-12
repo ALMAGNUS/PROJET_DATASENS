@@ -40,11 +40,10 @@
 
 ### 📦 Archivés (`scripts/_archive/`)
 
-One-shot terminés (migrations, démos, smoke tests). Restent exécutables mais ne sont plus référencés dans le pipeline runtime. Voir `docs/AUDIT_CODE_NETTOYAGE.md` pour le détail.
+One-shot terminés (migrations, démos, smoke tests). Restent exécutables mais ne sont plus référencés dans le pipeline runtime.
 
 ## 📖 Documentation
 
 - `scripts/SCRIPTS_LIST.md` — fiche par script avec rôle et usage.
-- `docs/AUDIT_CODE_NETTOYAGE.md` — audit code et plan de nettoyage.
-- `docs/DASHBOARD_GUIDE.md` — détails d'utilisation du dashboard.
+- `CHANGELOG.md` — historique des nettoyages et évolutions.
 

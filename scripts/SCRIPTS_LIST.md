@@ -1,6 +1,6 @@
 # 📋 Liste des Scripts Fonctionnels - DataSens E1
 
-> **Note (2026-05-08)** : audit code étape 4. Les scripts marqués `(archivé)` ont été déplacés dans `scripts/_archive/` (one-shot terminés, démos, tests ad-hoc). Ils restent exécutables (`python scripts/_archive/<nom>.py`) mais ne sont plus référencés dans le pipeline runtime. Voir `docs/AUDIT_CODE_NETTOYAGE.md`.
+> **Note (2026-05-08)** : audit code étape 4. Les scripts marqués `(archivé)` ont été déplacés dans `scripts/_archive/` (one-shot terminés, démos, tests ad-hoc). Ils restent exécutables (`python scripts/_archive/<nom>.py`) mais ne sont plus référencés dans le pipeline runtime.
 
 ## 🚀 Pipeline Principal
 

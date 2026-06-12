@@ -421,7 +421,7 @@ Docker, MongoDB, ni le monitoring. Idéal pour démonstration locale.
 | Email | Rôle | Origine | Sort |
 |---|---|---|---|
 | `admin@datasens.fr` | `admin` | Créé manuellement via `scripts/create_user.py` | **ton compte d'usage** |
-| `reader@datasens.test` | `reader` | Démo RBAC documentée dans `docs/README_E2_API.md` | optionnel, gardé pour démo |
+| `reader@datasens.test` | `reader` | Démo RBAC documentée dans `docs/e2/E2_FAQ.md` | optionnel, gardé pour démo |
 | `test@example.com` | `reader` | **Recréé à chaque run pytest** par `tests/test_e2_api.py` | **NE PAS SUPPRIMER** (sinon CI rouge) |
 
 ### 6.2 Lister les comptes
@@ -922,7 +922,7 @@ DELETE FROM profils WHERE email='user@example.com';
 -- (CASCADE supprime user_action_log lié)
 ```
 
-Procédure complète : [`docs/AUDIT_E4_ECART.md`](docs/AUDIT_E4_ECART.md).
+Procédure complète : [`docs/PROCEDURE_TRI_DONNEES_PERSONNELLES.md`](docs/PROCEDURE_TRI_DONNEES_PERSONNELLES.md).
 
 ---
 
@@ -1119,8 +1119,8 @@ Préparer dans l’explorateur ou l’IDE trois favoris : **`data/goldai`**, **`
 - [`docs/dev/LOGGING.md`](docs/dev/LOGGING.md) — `loguru` et tables d'audit.
 - [`docs/dev/FLOW_DONNEES.md`](docs/dev/FLOW_DONNEES.md) — flux RAW → SILVER → GOLD → GoldAI.
 - [`docs/dev/DOCKER_RUNTIME.md`](docs/dev/DOCKER_RUNTIME.md) — build, healthcheck, volumes.
-- [`docs/e5/PROCEDURE_INSTALLATION_MONITORING.md`](docs/e5/PROCEDURE_INSTALLATION_MONITORING.md) — procédure monitoring détaillée.
-- [`docs/AUDIT_CODE_NETTOYAGE.md`](docs/AUDIT_CODE_NETTOYAGE.md) — audit code 7 étapes (référence interne).
+- [`docs/MONITORING_E2_API.md`](docs/MONITORING_E2_API.md) — métriques API et monitoring E2.
+- [`monitoring/README_GRAFANA.md`](monitoring/README_GRAFANA.md) — dashboards Grafana.
 
 ### Scripts critiques par usage
 

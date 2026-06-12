@@ -3,7 +3,7 @@ SILVER Routes - Lecture seule (isolation E1)
 ============================================
 - GET : actifs (reader, writer, deleter, admin)
 - POST/PUT/DELETE : exposés pour cohérence API → retournent 501 par conception.
-  E2 ne modifie jamais les données E1. Voir docs/README_E2_API.md.
+  E2 ne modifie jamais les données E1. Voir docs/e2/E2_FAQ.md.
 """
 
 
@@ -107,7 +107,7 @@ async def create_silver_article(
     Crée un article dans la zone SILVER.
 
     **Retourne toujours 501** — par conception (isolation E1). E2 = reader uniquement.
-    Endpoint exposé pour cohérence API. Voir docs/README_E2_API.md.
+    Endpoint exposé pour cohérence API. Voir docs/e2/E2_FAQ.md.
     """
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
@@ -130,7 +130,7 @@ async def update_silver_article(
     """
     Met à jour un article dans la zone SILVER.
 
-    **Retourne toujours 501** — par conception (isolation E1). Voir docs/README_E2_API.md.
+    **Retourne toujours 501** — par conception (isolation E1). Voir docs/e2/E2_FAQ.md.
     """
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
@@ -151,7 +151,7 @@ async def delete_silver_article(article_id: int, current_user: UserInDB = Depend
     """
     Supprime un article de la zone SILVER.
 
-    **Retourne toujours 501** — par conception (isolation E1). Voir docs/README_E2_API.md.
+    **Retourne toujours 501** — par conception (isolation E1). Voir docs/e2/E2_FAQ.md.
     """
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,

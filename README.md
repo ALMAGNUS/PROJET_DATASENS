@@ -298,7 +298,7 @@ Arbre détaillé et conventions : [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - [`CHANGELOG.md`](CHANGELOG.md) — historique technique détaillé.
 - [`DEPLOY.md`](DEPLOY.md) — déploiement.
 - [`docs/dev/`](docs/dev/) — `LOGGING.md`, `DOCKER_RUNTIME.md`, `FLOW_DONNEES.md`.
-- [`docs/AUDIT_CODE_NETTOYAGE.md`](docs/AUDIT_CODE_NETTOYAGE.md) — audit récent (7 étapes, ~2 000 lignes mortes retirées).
+- [`CHANGELOG.md`](CHANGELOG.md) — historique des évolutions et nettoyages successifs.
 - [`reports/`](reports/) — état de la base, pour chaque run, archivé.
 
 ---

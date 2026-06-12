@@ -149,8 +149,6 @@ def main() -> None:
     stamp = datetime.now().strftime("%Y-%m-%d")
     output_path_md = output_dir / f"veille_{stamp}.md"
     output_path_json = output_dir / f"veille_{stamp}.json"
-    annex_path_json = annex_dir / f"ANNEXE_C6_VEILLE_{stamp}.json"
-    annex_path_md = annex_dir / f"ANNEXE_C6_VEILLE_{stamp}.md"
     annex_catalog_md = annex_dir / "ANNEXE_C6_SOURCES_MOTS_CLES.md"
     annex_catalog_json = annex_dir / "ANNEXE_C6_SOURCES_MOTS_CLES.json"
 
@@ -163,16 +161,12 @@ def main() -> None:
     snapshot_json = json.dumps(snapshot, ensure_ascii=False, indent=2)
     config_json = json.dumps(config, ensure_ascii=False, indent=2)
     output_path_json.write_text(snapshot_json, encoding="utf-8")
-    annex_path_json.write_text(snapshot_json, encoding="utf-8")
-    annex_path_md.write_text(digest, encoding="utf-8")
     annex_catalog_md.write_text(catalog_md, encoding="utf-8")
     annex_catalog_json.write_text(config_json, encoding="utf-8")
-    print(f"OK Veille générée (MD): {output_path_md}")
-    print(f"OK Veille générée (JSON): {output_path_json}")
-    print(f"OK Copie annexe dossier (MD): {annex_path_md}")
-    print(f"OK Copie annexe dossier (JSON): {annex_path_json}")
-    print(f"OK Annexe sources+mots-clés (MD): {annex_catalog_md}")
-    print(f"OK Annexe sources+mots-clés (JSON): {annex_catalog_json}")
+    print(f"OK Veille generee (MD): {output_path_md}")
+    print(f"OK Veille generee (JSON): {output_path_json}")
+    print(f"OK Annexe sources+mots-cles (MD): {annex_catalog_md}")
+    print(f"OK Annexe sources+mots-cles (JSON): {annex_catalog_json}")
 
 
 if __name__ == "__main__":

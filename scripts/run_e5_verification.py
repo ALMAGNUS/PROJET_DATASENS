@@ -51,7 +51,8 @@ def check_files() -> tuple[bool, list[str]]:
         ("src/logging_config.py", "Configuration journalisation"),
         ("docs/METRIQUES_SEUILS_ALERTES.md", "Documentation métriques"),
         ("docs/PROCEDURE_INCIDENTS.md", "Procédure incidents"),
-        ("docs/e5/PROCEDURE_INSTALLATION_MONITORING.md", "Procédure installation"),
+        ("docs/MONITORING_E2_API.md", "Documentation monitoring E2"),
+        ("monitoring/README_GRAFANA.md", "Guide Grafana"),
     ]
     missing = []
     for rel_path, desc in required:
