@@ -1,0 +1,61 @@
+id,text,label_expected
+P01,"Le service a été rapide, clair et très professionnel.",positive
+P02,"Je suis très satisfait du résultat, la solution répond parfaitement au besoin.",positive
+P03,"L'expérience utilisateur est fluide et agréable.",positive
+P04,"Les données sont bien structurées et faciles à exploiter.",positive
+P05,"Le dashboard permet de comprendre rapidement les tendances importantes.",positive
+P06,"L'équipe a été réactive, compétente et à l'écoute.",positive
+P07,"Le projet avance dans la bonne direction avec une vraie cohérence technique.",positive
+P08,"Les performances du modèle sont encourageantes et montrent un réel potentiel.",positive
+P09,"Cette amélioration apporte une vraie valeur métier.",positive
+P10,"La documentation est claire, complète et facile à suivre.",positive
+N01,"Le service est lent, confus et peu fiable.",negative
+N02,"Je suis déçu du résultat, la solution ne répond pas au besoin.",negative
+N03,"L'interface est difficile à utiliser et manque de clarté.",negative
+N04,"Les données sont incohérentes et impossibles à exploiter correctement.",negative
+N05,"Le dashboard est illisible et ne permet pas de prendre de décision.",negative
+N06,"L'équipe n'a pas été réactive et la communication a été mauvaise.",negative
+N07,"Le projet manque de structure et donne une impression d'improvisation.",negative
+N08,"Les performances du modèle sont faibles et les résultats peu fiables.",negative
+N09,"Cette évolution complique le processus sans apporter de valeur.",negative
+N10,"La documentation est incomplète, confuse et difficile à utiliser.",negative
+NE01,"Le rapport présente les résultats du traitement des données.",neutral
+NE02,"Le modèle classe les textes en trois catégories de sentiment.",neutral
+NE03,"Les données ont été collectées puis stockées dans une base relationnelle.",neutral
+NE04,"Le dashboard affiche plusieurs indicateurs de suivi.",neutral
+NE05,"L'utilisateur peut consulter les résultats depuis une interface web.",neutral
+NE06,"Le pipeline comprend une étape de collecte, de nettoyage et d'agrégation.",neutral
+NE07,"Le projet utilise Python, FastAPI, Streamlit et une base de données.",neutral
+NE08,"Les métriques sont mises à jour quotidiennement.",neutral
+NE09,"Le système génère un fichier de sortie après chaque traitement.",neutral
+NE10,"Le modèle a été testé sur un échantillon de textes courts.",neutral
+A01,"Le résultat est correct, mais il reste plusieurs points à améliorer.",neutral
+A02,"Ce n'est pas parfait, mais l'ensemble fonctionne plutôt bien.",positive
+A03,"L'outil est intéressant, même si son utilisation demande encore des efforts.",neutral
+A04,"Le modèle donne parfois de bons résultats, mais il manque de stabilité.",negative
+A05,"La solution est simple, mais elle ne couvre pas tous les cas attendus.",neutral
+A06,"Le dashboard est joli, mais les indicateurs ne sont pas assez exploitables.",negative
+A07,"Le projet est prometteur, mais il n'est pas encore prêt pour une utilisation réelle.",neutral
+A08,"L'approche technique est pertinente, malgré quelques limites de performance.",positive
+A09,"Les premiers résultats sont acceptables sans être vraiment convaincants.",neutral
+A10,"L'interface est moderne, mais certains parcours restent confus.",neutral
+I01,"Génial, encore un outil qui plante au moment où on en a besoin.",negative
+I02,"Super, les données sont encore incohérentes.",negative
+I03,"Formidable, le modèle se trompe une fois sur deux.",negative
+I04,"C'est exactement ce qu'il fallait éviter.",negative
+I05,"Quelle réussite : trois erreurs critiques en moins de dix minutes.",negative
+I06,"Pas mal du tout, je m'attendais à pire.",positive
+I07,"Ce n'est pas catastrophique, mais ce n'est clairement pas satisfaisant.",negative
+I08,"On peut difficilement faire plus confus.",negative
+I09,"Au moins, cette fois, le système démarre.",neutral
+I10,"Le résultat est presque exploitable, ce qui est déjà un progrès.",neutral
+D01,"DataSens permet de transformer des sources hétérogènes en indicateurs exploitables.",positive
+D02,"Le pipeline RAW, SILVER et GOLD apporte une vraie lisibilité au traitement des données.",positive
+D03,"Les résultats du modèle de sentiment sont stockés avec les métadonnées associées.",neutral
+D04,"Le modèle CamemBERT identifie les sentiments positifs, neutres et négatifs.",neutral
+D05,"La qualité des données d'entrée limite fortement la fiabilité des résultats.",negative
+D06,"Les scores de confiance sont trop faibles pour automatiser une décision métier.",negative
+D07,"Le système de monitoring améliore la traçabilité et la supervision du projet.",positive
+D08,"Les données collectées doivent être nettoyées avant d'être utilisées par le modèle.",neutral
+D09,"Le modèle détecte correctement les tendances émotionnelles dominantes.",positive
+D10,"Les erreurs de classification rendent l'analyse difficilement exploitable.",negative

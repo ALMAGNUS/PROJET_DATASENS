@@ -1,7 +1,7 @@
 # Évaluation classification — DataSens E2
 Date : 2026-06-09 11:16
 
-Dataset de test : `C:/Users/Utilisateur/Desktop/PROJET_DATASENS/data/goldai/ia/test.parquet`
+Dataset de test : `data/goldai/ia/test.parquet`
 
 Problème **multiclasse** (négatif / neutre / positif). Specificity, FPR, ROC-AUC et courbes ROC calculés en **one-vs-rest** puis moyennés (macro). ROC-AUC utilise les probabilités prédites (softmax).
 

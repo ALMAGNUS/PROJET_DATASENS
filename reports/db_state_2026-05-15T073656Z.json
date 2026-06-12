@@ -1,7 +1,7 @@
 {
   "meta": {
     "generated_at_utc": "2026-05-15T07:36:54.351051+00:00",
-    "db_path": "C:\\Users\\Utilisateur\\datasens_project\\datasens.db",
+    "db_path": "~/datasens_project/datasens.db",
     "db_size_bytes": 97583104
   },
   "raw_data": {
@@ -417,7 +417,7 @@
   },
   "exports_hint": {},
   "run_progress": {
-    "previous_report": "C:\\Users\\Utilisateur\\Desktop\\PROJET_DATASENS\\reports\\db_state_2026-05-14T172303Z.json",
+    "previous_report": "reports/db_state_2026-05-14T172303Z.json",
     "raw_data_delta_since_previous_report": 124,
     "source_deltas_since_previous_report": [
       {

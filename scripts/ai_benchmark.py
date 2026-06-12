@@ -12,6 +12,33 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def display_path(path: Path | str, root: Path | None = None) -> str:
+    """Chemin relatif au dépôt (ou ~/) pour la doc versionnée Git."""
+    root = root or PROJECT_ROOT
+    p = Path(path).resolve()
+    try:
+        return p.relative_to(root.resolve()).as_posix()
+    except ValueError:
+        home = Path.home().resolve()
+        try:
+            return "~/" + p.relative_to(home).as_posix()
+        except ValueError:
+            return p.as_posix()
+
+
+def display_model_ref(model_ref: str, root: Path | None = None) -> str:
+    root = root or PROJECT_ROOT
+    if "/" in model_ref and not Path(model_ref).is_absolute() and ":" not in model_ref[:3]:
+        return model_ref
+    p = Path(model_ref)
+    if p.is_absolute() or (len(model_ref) > 1 and model_ref[1] == ":"):
+        return display_path(p, root)
+    return model_ref.replace("\\", "/")
+
+
 BASE_MODELS = {
     # BERT multilingue 5★ (1-2→neg, 3→neu, 4-5→pos) — PyTorch, pas CamemBERT
     "bert_multilingual": "nlptown/bert-base-multilingual-uncased-sentiment",
@@ -217,7 +244,7 @@ def write_report(docs_dir: Path, results: dict, dataset_path: Path, class_counts
         f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         "",
         "## Méthode",
-        f"Dataset de référence: `{dataset_path.as_posix()}`",
+        f"Dataset de référence: `{display_path(dataset_path)}`",
         "Métriques: Accuracy, F1 macro, F1 pondéré, confiance moyenne, latence moyenne (ms).",
         f"Répartition des classes évaluées: neg={class_counts.get('neg', 0)}, neu={class_counts.get('neu', 0)}, pos={class_counts.get('pos', 0)}.",
         "",
@@ -262,7 +289,14 @@ def write_report(docs_dir: Path, results: dict, dataset_path: Path, class_counts
 
     bench_path.write_text("\n".join(bench), encoding="utf-8")
     reqs_path.write_text("\n".join(reqs), encoding="utf-8")
-    raw_json_path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+    public_results = {
+        key: {
+            **metrics,
+            "model_name": display_model_ref(metrics.get("model_name", "")),
+        }
+        for key, metrics in results.items()
+    }
+    raw_json_path.write_text(json.dumps(public_results, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"OK Benchmark: {bench_path}")
     print(f"OK Exigences: {reqs_path}")
     print(f"OK Résultats bruts: {raw_json_path}")

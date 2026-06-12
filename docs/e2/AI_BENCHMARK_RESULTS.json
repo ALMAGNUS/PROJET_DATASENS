@@ -113,6 +113,6 @@
       }
     },
     "samples": 360,
-    "model_name": "C:\\Users\\Utilisateur\\Desktop\\PROJET_DATASENS\\models\\sentiment_fr-sentiment-finetuned"
+    "model_name": "models/sentiment_fr-sentiment-finetuned"
   }
 }

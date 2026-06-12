@@ -1,7 +1,7 @@
 {
   "meta": {
     "generated_at_utc": "2026-03-30T09:50:34.186053+00:00",
-    "db_path": "C:\\Users\\Utilisateur\\datasens_project\\datasens.db",
+    "db_path": "~/datasens_project/datasens.db",
     "db_size_bytes": 76677120
   },
   "raw_data": {

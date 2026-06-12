@@ -34,12 +34,12 @@ PROJET_DATASENS/
 │   └── test_init.py         # Test initialisation pipeline
 │
 ├── docs/                     # Documentation
-│   ├── README.md            # Index documentation
 │   ├── dev/FLOW_DONNEES.md # Flux médaillon RAW → GoldAI
 │   ├── PROJECT_STRUCTURE.md # Ce fichier
 │   ├── CHEMIN_DONNEE.md    # Chemin de la donnée (détails)
 │   ├── ER_DIAGRAM_ALL_TABLES.md # Schéma BDD
-│   └── PROJECT_ANALYSIS.md # Analyse du projet
+│   ├── e2/                  # API, métriques IA, veille C6
+│   └── veille/              # Snapshots récents de veille
 │
 ├── data/                     # Données (ignorées par Git)
 │   ├── raw/                 # Zone RAW
@@ -95,7 +95,6 @@ python scripts/enrich_all_articles.py
 
 ### `docs/` - Documentation
 
-- **README.md** : Index de la documentation
 - **dev/FLOW_DONNEES.md** : Flux médaillon et couches Parquet
 - **CHEMIN_DONNEE.md** : Chemin de la donnée détaillé
 - **ER_DIAGRAM_ALL_TABLES.md** : Schéma relationnel SQLite

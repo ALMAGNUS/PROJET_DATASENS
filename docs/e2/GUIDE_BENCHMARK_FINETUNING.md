@@ -12,7 +12,6 @@ Les figures dans `docs/e2/figures/` sont générées à partir des **fichiers JS
 |---|---|
 | `docs/e2/AI_BENCHMARK_RESULTS.json` | Résultats du dernier benchmark (accuracy, F1, latence, per_class) |
 | `docs/e2/TRAINING_RESULTS.json` | Résultats du dernier entraînement (quick ou full) — écrit par `finetune_sentiment.py` |
-| `docs/e2/TRAINING_RESULTS_QUICK.json` | Legacy — utilisé en fallback si TRAINING_RESULTS.json absent |
 
 **Commande de régénération :**
 ```bash

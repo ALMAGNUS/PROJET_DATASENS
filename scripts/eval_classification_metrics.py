@@ -297,7 +297,7 @@ def _write_markdown(results: dict, dataset_path: Path) -> None:
         "# Évaluation classification — DataSens E2",
         f"Date : {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         "",
-        f"Dataset de test : `{dataset_path.as_posix()}`",
+        f"Dataset de test : `{ai_benchmark.display_path(dataset_path)}`",
         "",
         "Problème **multiclasse** (négatif / neutre / positif). Specificity, FPR, ROC-AUC et "
         "courbes ROC calculés en **one-vs-rest** puis moyennés (macro). ROC-AUC utilise les "
@@ -381,7 +381,7 @@ def main() -> int:
         _plot_roc(key, metrics)
         _plot_metrics_table(key, metrics)
         metrics_public = {k: v for k, v in metrics.items() if k != "_roc_curves"}
-        metrics_public["model_name"] = model_name
+        metrics_public["model_name"] = ai_benchmark.display_model_ref(model_name)
         results[key] = metrics_public
 
     if not results:

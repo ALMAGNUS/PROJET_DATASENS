@@ -179,7 +179,7 @@ scripts\publish_reports_git.bat
 
 **Planificateur de tâches Windows** (ex. tous les jours à 07:00) :
 
-1. Action : `C:\Users\Utilisateur\Desktop\PROJET_DATASENS\scripts\daily_pipeline_and_publish.bat`
+1. Action : `scripts\daily_pipeline_and_publish.bat` (chemin relatif depuis la racine du projet)
 2. Démarrer dans : racine du projet
 3. Compte avec accès Git (credentials GitHub déjà configurés : `git push` sans mot de passe interactif)
 

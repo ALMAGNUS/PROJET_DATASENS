@@ -6,7 +6,7 @@
 
 **Chemin par défaut (Windows):**
 ```
-C:\Users\Utilisateur\datasens_project\datasens.db
+~/datasens_project/datasens.db
 ```
 
 **Chemin par défaut (Linux/Mac):**

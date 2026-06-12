@@ -13,7 +13,9 @@ env/
 ENV/
 
 # Data (excluded from version control - too large for git)
-data/
+data/*
+!data/tests/
+!data/tests/sentiment_benchmark_corpus.csv
 exports/
 visualizations/
 *.db
@@ -68,9 +70,6 @@ htmlcov/
 *.tmp
 *.bak
 *.swp
-
-# Data files
-data/
 
 # ZZDB LAB IA - Dataset synthétique
 zzdb/

@@ -29,6 +29,18 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 REPORTS_DIR = PROJECT_ROOT / "reports"
 
 
+def _display_path(path: Path | str) -> str:
+    p = Path(path).resolve()
+    try:
+        return p.relative_to(PROJECT_ROOT.resolve()).as_posix()
+    except ValueError:
+        home = Path.home().resolve()
+        try:
+            return "~/" + p.relative_to(home).as_posix()
+        except ValueError:
+            return p.as_posix()
+
+
 def _db_path() -> Path:
     p = os.getenv("DB_PATH", str(Path.home() / "datasens_project" / "datasens.db"))
     return Path(p).resolve()
@@ -177,7 +189,7 @@ def collect_state(db_file: Path) -> dict:
         return {
             "meta": {
                 "generated_at_utc": generated,
-                "db_path": str(db_file),
+                "db_path": _display_path(db_file),
                 "error": "fichier introuvable",
             }
         }
@@ -188,7 +200,7 @@ def collect_state(db_file: Path) -> dict:
         state: dict = {
             "meta": {
                 "generated_at_utc": generated,
-                "db_path": str(db_file),
+                "db_path": _display_path(db_file),
                 "db_size_bytes": db_file.stat().st_size,
             },
             "raw_data": {},
@@ -365,7 +377,7 @@ def collect_state(db_file: Path) -> dict:
             prev_path, prev_state = prev
             prev_total = int(prev_state.get("raw_data", {}).get("total_rows", 0) or 0)
             curr_total = int(state.get("raw_data", {}).get("total_rows", 0) or 0)
-            state["run_progress"]["previous_report"] = str(prev_path)
+            state["run_progress"]["previous_report"] = _display_path(prev_path)
             state["run_progress"]["raw_data_delta_since_previous_report"] = curr_total - prev_total
 
             curr_by = _by_source_map(state.get("by_source", []))

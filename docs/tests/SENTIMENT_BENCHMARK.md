@@ -27,7 +27,7 @@ Le sous-ensemble **30 phrases** (P + NE + N) correspond au mini jeu équilibré 
 ## Lancer l'évaluation
 
 ```powershell
-cd C:\Users\Utilisateur\Desktop\PROJET_DATASENS
+cd <racine-du-projet>
 .\.venv\Scripts\Activate.ps1
 python scripts/run_sentiment_benchmark_corpus.py
 ```

@@ -2,7 +2,7 @@
 Date: 2026-04-04 16:32
 
 ## Méthode
-Dataset de référence: `C:/Users/Utilisateur/Desktop/PROJET_DATASENS/data/goldai/ia/test.parquet`
+Dataset de référence: `data/goldai/ia/test.parquet`
 Métriques: Accuracy, F1 macro, F1 pondéré, confiance moyenne, latence moyenne (ms).
 Répartition des classes évaluées: neg=120, neu=120, pos=120.
 

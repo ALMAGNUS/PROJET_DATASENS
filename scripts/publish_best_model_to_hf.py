@@ -20,6 +20,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MODELS_DIR = PROJECT_ROOT / "models"
 
 
+def _display_path(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(PROJECT_ROOT.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
 @dataclass
 class Candidate:
     model_name: str
@@ -146,7 +153,7 @@ def main() -> int:
     summary = {
         "repo_id": args.repo_id,
         "model_name": best.model_name,
-        "checkpoint_dir": str(best.checkpoint_dir),
+        "checkpoint_dir": _display_path(best.checkpoint_dir),
         "eval_accuracy": best.eval_accuracy,
         "eval_f1_macro": best.eval_f1_macro,
         "step": best.step,

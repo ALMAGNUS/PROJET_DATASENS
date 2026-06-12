@@ -29,9 +29,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DOC_E2 = ROOT / "docs" / "e2"
 FIG_DIR = DOC_E2 / "figures"
 BENCH_PATH = DOC_E2 / "AI_BENCHMARK_RESULTS.json"
-# Priorité : TRAINING_RESULTS.json (écrit par finetune_sentiment.py) > TRAINING_RESULTS_QUICK.json (legacy)
 TRAIN_PATH = DOC_E2 / "TRAINING_RESULTS.json"
-TRAIN_PATH_LEGACY = DOC_E2 / "TRAINING_RESULTS_QUICK.json"
 
 # Noms affichés lisibles métier (sans codes techniques opaques)
 MODEL_LABELS = {
@@ -109,12 +107,6 @@ def _load_training_results() -> dict | None:
                 "train_samples_per_second": float(state.get("train_samples_per_second", 0)),
                 "train_steps_per_second": float(state.get("train_steps_per_second", 0)),
             }
-    # Dernier recours : TRAINING_RESULTS_QUICK.json (legacy)
-    if TRAIN_PATH_LEGACY.exists():
-        with TRAIN_PATH_LEGACY.open("r", encoding="utf-8") as f:
-            tr = json.load(f)
-        tr.setdefault("mode", "quick")
-        return tr
     return None
 
 

@@ -1,21 +1,20 @@
-# Dossier `docs/veille` - A quoi il sert
+# Dossier `docs/veille`
 
-Ce dossier contient les syntheses de veille E2 generees automatiquement.
+Synthèses quotidiennes de veille technologique (compétence C6), générées par `scripts/veille_digest.py`.
 
-## Origine des fichiers
+## Fichiers
 
-- Script : `scripts/veille_digest.py`
-- Configuration des flux : `scripts/veille_sources.json`
-- Sortie : `docs/veille/veille_YYYY-MM-DD.md`
+| Fichier | Rôle |
+|---------|------|
+| `veille_YYYY-MM-DD.md` / `.json` | Snapshot du jour (sources RSS filtrées) |
+| `../e2/ANNEXE_C6_SOURCES_MOTS_CLES.md` | Catalogue des sources et mots-clés (mis à jour à chaque run) |
 
-## Pourquoi c'est utile
+Chaque run quotidien (`run_daily.bat` / pipeline) alimente ce dossier. L'historique complet est **volontairement versionné** : c'est la preuve C6 d'une veille continue sur la durée du projet (pas seulement une démo du dernier mois).
 
-- tracer la veille techno/reglementaire dans le temps,
-- relier les decisions E2 a des sources explicites,
-- disposer d'une preuve concrete de la veille dans le dossier projet.
-
-## Regeneration
+## Régénération
 
 ```bash
 python scripts/veille_digest.py
 ```
+
+Configuration des flux : `scripts/veille_sources.json`.
