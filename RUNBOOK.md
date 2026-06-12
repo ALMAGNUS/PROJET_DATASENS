@@ -1083,7 +1083,7 @@ chemins : montrer **5 dossiers** suffit si chacun a une phrase claire.
 | `src/ml/inference/` | Inférence locale HF (`LocalHFService`). |
 | `monitoring/` | Prometheus, Grafana, règles d’alerte (MCO). |
 | `reports/` | `run_summary_*.json` (contrat de run E1), `db_state_*` (cohérence). |
-| `docs/` | Dossiers E2–E5, annexes, veille versionnée, schémas (`ARCHITECTURE`, `FLOW_DONNEES`). |
+| `docs/` | Dossiers E2–E5, annexes, veille versionnée, schémas (`FLOW_DONNEES`, `ER_DIAGRAM`). |
 | `.github/workflows/` | CI : tests, quality gate, build image. |
 | `notebooks/` | Notebook Colab fine-tuning (`colab_finetune_sentiment.ipynb`). |
 | `presentations/` | Supports de présentation au format Marp (sources `.md`). |
@@ -1114,7 +1114,8 @@ Préparer dans l’explorateur ou l’IDE trois favoris : **`data/goldai`**, **`
 - [`CHANGELOG.md`](CHANGELOG.md) — historique versions.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — standards code et conventions.
 - [`DEPLOY.md`](DEPLOY.md) — déploiement.
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — architecture détaillée.
+- [`docs/dev/FLOW_DONNEES.md`](docs/dev/FLOW_DONNEES.md) — flux médaillon RAW → GoldAI.
+- [`docs/ER_DIAGRAM_ALL_TABLES.md`](docs/ER_DIAGRAM_ALL_TABLES.md) — schéma relationnel SQLite.
 - [`docs/dev/LOGGING.md`](docs/dev/LOGGING.md) — `loguru` et tables d'audit.
 - [`docs/dev/FLOW_DONNEES.md`](docs/dev/FLOW_DONNEES.md) — flux RAW → SILVER → GOLD → GoldAI.
 - [`docs/dev/DOCKER_RUNTIME.md`](docs/dev/DOCKER_RUNTIME.md) — build, healthcheck, volumes.

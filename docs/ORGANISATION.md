@@ -36,7 +36,8 @@ PROJET_DATASENS/
 │   └── test_init.py
 │
 ├── docs/                     # Documentation (organisée)
-│   ├── DATA_FLOW.md
+│   ├── dev/FLOW_DONNEES.md
+│   ├── CHEMIN_DONNEE.md
 │   ├── DASHBOARD_GUIDE.md
 │   ├── PROJECT_STRUCTURE.md
 │   ├── CHEMIN_DONNEE.md
@@ -110,6 +111,6 @@ python scripts/enrich_all_articles.py
 
 - **Structure complète** : `docs/PROJECT_STRUCTURE.md`
 - **Guide dashboard** : `docs/DASHBOARD_GUIDE.md`
-- **Chemin de la donnée** : `docs/DATA_FLOW.md`
+- **Chemin de la donnée** : `docs/dev/FLOW_DONNEES.md`, `docs/CHEMIN_DONNEE.md`
 - **Scripts** : `scripts/README.md`
 

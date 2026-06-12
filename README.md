@@ -85,7 +85,7 @@ Le rapport `db_state_*.{md,json}` est versionné dans [`reports/`](reports/) à 
 - Quality gates `.env` — `MIN_LOADED_THRESHOLD`, `MIN_CLEAN_RATIO`, `MIN_ENRICHED_RATIO`, `SOURCE_DROP_WARN_PCT`. Un run produit `PASS / WARN / FAIL` consigné dans `reports/run_summary_*.json`.
 - ASCII-fold des labels (`gold_branches.normalize_sentiment_label`) : encoding-agnostic. Absorbe les corruptions Windows / Spark / CSV (`négatif`, `n�gatif`, `n\xefegatif`) → `negatif`.
 
-Détail complet : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/dev/FLOW_DONNEES.md`](docs/dev/FLOW_DONNEES.md).
+Détail complet : [`docs/dev/FLOW_DONNEES.md`](docs/dev/FLOW_DONNEES.md), [`docs/CHEMIN_DONNEE.md`](docs/CHEMIN_DONNEE.md), [`RUNBOOK.md`](RUNBOOK.md) §1.
 
 ---
 
@@ -226,7 +226,7 @@ Sources `active: false` (Kaggle stopwords, lexicons, ifop annuel, zzdb_synthetic
 
 | Bloc | Périmètre | Entrées dossier |
 |---|---|---|
-| **E1** | Extraction · transformation · stockage | [`main.py`](main.py), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/DATA_FLOW.md`](docs/DATA_FLOW.md), [`reports/`](reports/) |
+| **E1** | Extraction · transformation · stockage | [`main.py`](main.py), [`docs/dev/FLOW_DONNEES.md`](docs/dev/FLOW_DONNEES.md), [`docs/CHEMIN_DONNEE.md`](docs/CHEMIN_DONNEE.md), [`reports/`](reports/) |
 | **E2** | API REST · sécurité · MLOps fine-tuning | [`docs/e2/`](docs/e2/), [`docs/e2/E2_FAQ.md`](docs/e2/E2_FAQ.md), [`docs/FASTAPI_RBAC_IMPLEMENTATION.md`](docs/FASTAPI_RBAC_IMPLEMENTATION.md) |
 | **E3** | Distribué · orchestration IA Mistral | [`src/spark/`](src/spark/), [`src/e3/mistral/service.py`](src/e3/mistral/service.py), [`docs/MISTRAL_IA_INSIGHTS.md`](docs/MISTRAL_IA_INSIGHTS.md) |
 | **E4** | Gouvernance · RGPD · éthique | [`docs/REGISTRE_TRAITEMENTS_RGPD.md`](docs/REGISTRE_TRAITEMENTS_RGPD.md), [`docs/PROCEDURE_TRI_DONNEES_PERSONNELLES.md`](docs/PROCEDURE_TRI_DONNEES_PERSONNELLES.md) |

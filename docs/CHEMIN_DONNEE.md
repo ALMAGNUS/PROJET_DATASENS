@@ -237,5 +237,5 @@ Ligne CSV:
 
 ---
 
-**Voir**: `docs/DATA_FLOW.md` pour détails complets
+**Voir** : [`docs/dev/FLOW_DONNEES.md`](dev/FLOW_DONNEES.md) pour le flux médaillon complet
 

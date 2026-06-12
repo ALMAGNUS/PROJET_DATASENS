@@ -35,11 +35,11 @@ PROJET_DATASENS/
 │
 ├── docs/                     # Documentation
 │   ├── README.md            # Index documentation
-│   ├── DATA_FLOW.md        # Chemin de la donnée
+│   ├── dev/FLOW_DONNEES.md # Flux médaillon RAW → GoldAI
 │   ├── DASHBOARD_GUIDE.md  # Guide dashboard
-│   ├── ARCHITECTURE.md     # Architecture technique
 │   ├── PROJECT_STRUCTURE.md # Ce fichier
 │   ├── CHEMIN_DONNEE.md    # Chemin de la donnée (détails)
+│   ├── ER_DIAGRAM_ALL_TABLES.md # Schéma BDD
 │   └── PROJECT_ANALYSIS.md # Analyse du projet
 │
 ├── data/                     # Données (ignorées par Git)
@@ -97,9 +97,10 @@ python scripts/enrich_all_articles.py
 ### `docs/` - Documentation
 
 - **README.md** : Index de la documentation
-- **DATA_FLOW.md** : Chemin de la donnée détaillé
+- **dev/FLOW_DONNEES.md** : Flux médaillon et couches Parquet
+- **CHEMIN_DONNEE.md** : Chemin de la donnée détaillé
 - **DASHBOARD_GUIDE.md** : Guide d'utilisation du dashboard
-- **ARCHITECTURE.md** : Architecture technique complète
+- **ER_DIAGRAM_ALL_TABLES.md** : Schéma relationnel SQLite
 - **PROJECT_STRUCTURE.md** : Ce fichier (structure du projet)
 
 ### `data/` - Données (ignorées par Git)
