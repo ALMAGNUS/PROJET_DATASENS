@@ -1,0 +1,87 @@
+{
+  "generated_at_utc": "2026-06-03T06:03:55Z",
+  "status": "WARN",
+  "reasons": [
+    "source insee_indicators: volume nul (prev=1, now=0)",
+    "source openweather_api: volume nul (prev=5, now=0)"
+  ],
+  "kpis": {
+    "extracted": 1375.0,
+    "cleaned": 1375.0,
+    "loaded": 128.0,
+    "deduplicated": 1247.0,
+    "clean_ratio": 1.0,
+    "enriched_ratio": 1.0,
+    "run_duration_sec": 50.807345,
+    "min_loaded_threshold": 20.0,
+    "min_clean_ratio": 0.9,
+    "min_enriched_ratio": 0.95
+  },
+  "source_traceability": {
+    "rss_french_news": {
+      "extracted": 24,
+      "duration_sec": 0.188,
+      "status": "OK"
+    },
+    "reddit_france": {
+      "extracted": 25,
+      "duration_sec": 3.219,
+      "status": "OK"
+    },
+    "trustpilot_reviews": {
+      "extracted": 0,
+      "duration_sec": 1.204,
+      "status": "OK"
+    },
+    "openweather_api": {
+      "extracted": 0,
+      "duration_sec": 0.04,
+      "status": "OK"
+    },
+    "insee_indicators": {
+      "extracted": 0,
+      "duration_sec": 3.847,
+      "status": "OK"
+    },
+    "datagouv_datasets": {
+      "extracted": 29,
+      "duration_sec": 0.506,
+      "status": "OK"
+    },
+    "google_news_rss": {
+      "extracted": 38,
+      "duration_sec": 0.218,
+      "status": "OK"
+    },
+    "yahoo_finance": {
+      "extracted": 41,
+      "duration_sec": 0.155,
+      "status": "OK"
+    },
+    "monavis_citoyen": {
+      "extracted": 8,
+      "duration_sec": 0.114,
+      "status": "OK"
+    },
+    "agora_consultations": {
+      "extracted": 19,
+      "duration_sec": 0.363,
+      "status": "OK"
+    },
+    "GDELT_Last15_English": {
+      "extracted": 1,
+      "duration_sec": 1.805,
+      "status": "OK"
+    },
+    "GDELT_Master_List": {
+      "extracted": 1,
+      "duration_sec": 1.147,
+      "status": "OK"
+    },
+    "zzdb_csv": {
+      "extracted": 1189,
+      "duration_sec": 0.171,
+      "status": "OK"
+    }
+  }
+}

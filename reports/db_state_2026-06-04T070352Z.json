@@ -1,0 +1,522 @@
+{
+  "meta": {
+    "generated_at_utc": "2026-06-04T07:03:52.073772+00:00",
+    "db_path": "C:\\Users\\Utilisateur\\datasens_project\\datasens.db",
+    "db_size_bytes": 100773888
+  },
+  "raw_data": {
+    "total_rows": 55730,
+    "min_id": 1,
+    "max_id": 55730,
+    "collected_at_min": "2026-02-12T14:39:22.578351",
+    "collected_at_max": "2026-06-04T09:01:13.947656"
+  },
+  "by_source": [
+    {
+      "source": "kaggle_french_opinions",
+      "articles": 38327
+    },
+    {
+      "source": "yahoo_finance",
+      "articles": 4645
+    },
+    {
+      "source": "google_news_rss",
+      "articles": 4379
+    },
+    {
+      "source": "rss_french_news",
+      "articles": 2241
+    },
+    {
+      "source": "reddit_france",
+      "articles": 2134
+    },
+    {
+      "source": "datagouv_datasets",
+      "articles": 1121
+    },
+    {
+      "source": "zzdb_csv",
+      "articles": 980
+    },
+    {
+      "source": "trustpilot_reviews",
+      "articles": 974
+    },
+    {
+      "source": "openweather_api",
+      "articles": 612
+    },
+    {
+      "source": "GDELT_Last15_English",
+      "articles": 231
+    },
+    {
+      "source": "insee_indicators",
+      "articles": 36
+    },
+    {
+      "source": "monavis_citoyen",
+      "articles": 30
+    },
+    {
+      "source": "agora_consultations",
+      "articles": 19
+    },
+    {
+      "source": "gdelt_events",
+      "articles": 1
+    },
+    {
+      "source": "GDELT_Master_List",
+      "articles": 0
+    },
+    {
+      "source": "Kaggle_FrenchFinNews",
+      "articles": 0
+    },
+    {
+      "source": "Kaggle_FrenchTweets",
+      "articles": 0
+    },
+    {
+      "source": "Kaggle_InsuranceReviews",
+      "articles": 0
+    },
+    {
+      "source": "Kaggle_SentimentLexicons",
+      "articles": 0
+    },
+    {
+      "source": "Kaggle_StopWords",
+      "articles": 0
+    },
+    {
+      "source": "Kaggle_StopWords_28Lang",
+      "articles": 0
+    },
+    {
+      "source": "ifop_barometers",
+      "articles": 0
+    },
+    {
+      "source": "zzdb_synthetic",
+      "articles": 0
+    }
+  ],
+  "enrichment": {
+    "document_topic_rows": 97419,
+    "articles_with_at_least_one_topic": 55730,
+    "model_output_rows_total": 109362,
+    "model_output_sentiment_keyword_rows": 55726,
+    "articles_with_sentiment_keyword": 55726,
+    "sentiment_keyword_distribution": {
+      "neutre": 30209,
+      "négatif": 18949,
+      "positif": 6568
+    }
+  },
+  "data_quality": {
+    "raw_data_ids_with_duplicate_sentiment_keyword": 0,
+    "note": "Si > 0, la jointure GOLD peut gonfler les lignes (corrigé côté aggregator par MAX(output_id))."
+  },
+  "sync_log_recent": [
+    {
+      "source": "zzdb_csv",
+      "sync_date": "2026-06-04T09:01:07.559118",
+      "rows_synced": 1189,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "GDELT_Master_List",
+      "sync_date": "2026-06-04T09:01:07.025249",
+      "rows_synced": 3,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "GDELT_Last15_English",
+      "sync_date": "2026-06-04T09:01:05.733284",
+      "rows_synced": 3,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "agora_consultations",
+      "sync_date": "2026-06-04T09:01:04.261120",
+      "rows_synced": 19,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "monavis_citoyen",
+      "sync_date": "2026-06-04T09:01:03.862429",
+      "rows_synced": 8,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "yahoo_finance",
+      "sync_date": "2026-06-04T09:01:03.571064",
+      "rows_synced": 43,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "google_news_rss",
+      "sync_date": "2026-06-04T09:01:03.388761",
+      "rows_synced": 38,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "datagouv_datasets",
+      "sync_date": "2026-06-04T09:01:03.060448",
+      "rows_synced": 30,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "insee_indicators",
+      "sync_date": "2026-06-04T09:01:02.457448",
+      "rows_synced": 1,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "openweather_api",
+      "sync_date": "2026-06-04T09:01:02.088419",
+      "rows_synced": 5,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "trustpilot_reviews",
+      "sync_date": "2026-06-04T09:01:01.425384",
+      "rows_synced": 0,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "reddit_france",
+      "sync_date": "2026-06-04T09:01:01.371380",
+      "rows_synced": 50,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "rss_french_news",
+      "sync_date": "2026-06-04T09:00:57.044954",
+      "rows_synced": 24,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "zzdb_csv",
+      "sync_date": "2026-06-03T08:03:18.742078",
+      "rows_synced": 1189,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "GDELT_Master_List",
+      "sync_date": "2026-06-03T08:03:18.531401",
+      "rows_synced": 1,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "GDELT_Last15_English",
+      "sync_date": "2026-06-03T08:03:17.343816",
+      "rows_synced": 1,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "agora_consultations",
+      "sync_date": "2026-06-03T08:03:15.501605",
+      "rows_synced": 19,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "monavis_citoyen",
+      "sync_date": "2026-06-03T08:03:15.100661",
+      "rows_synced": 8,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "yahoo_finance",
+      "sync_date": "2026-06-03T08:03:14.949536",
+      "rows_synced": 41,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "google_news_rss",
+      "sync_date": "2026-06-03T08:03:14.787540",
+      "rows_synced": 38,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "datagouv_datasets",
+      "sync_date": "2026-06-03T08:03:14.560756",
+      "rows_synced": 29,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "insee_indicators",
+      "sync_date": "2026-06-03T08:03:14.045881",
+      "rows_synced": 0,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "openweather_api",
+      "sync_date": "2026-06-03T08:03:10.189377",
+      "rows_synced": 0,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "trustpilot_reviews",
+      "sync_date": "2026-06-03T08:03:10.133520",
+      "rows_synced": 0,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "reddit_france",
+      "sync_date": "2026-06-03T08:03:08.922576",
+      "rows_synced": 25,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "rss_french_news",
+      "sync_date": "2026-06-03T08:03:05.492455",
+      "rows_synced": 24,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "zzdb_csv",
+      "sync_date": "2026-06-02T09:03:53.945940",
+      "rows_synced": 1189,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "GDELT_Master_List",
+      "sync_date": "2026-06-02T09:03:53.863850",
+      "rows_synced": 0,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "GDELT_Last15_English",
+      "sync_date": "2026-06-02T09:03:53.024376",
+      "rows_synced": 0,
+      "status": "OK",
+      "error_preview": ""
+    },
+    {
+      "source": "agora_consultations",
+      "sync_date": "2026-06-02T09:03:51.180994",
+      "rows_synced": 19,
+      "status": "OK",
+      "error_preview": ""
+    }
+  ],
+  "goldai_metadata": {
+    "dates_included": [
+      "2025-12-16",
+      "2025-12-18",
+      "2025-12-19",
+      "2025-12-20",
+      "2026-02-12",
+      "2026-02-13",
+      "2026-02-16",
+      "2026-02-17",
+      "2026-02-18",
+      "2026-02-19",
+      "2026-02-20",
+      "2026-02-23",
+      "2026-02-24",
+      "2026-02-25",
+      "2026-03-09",
+      "2026-03-10",
+      "2026-03-11",
+      "2026-03-12",
+      "2026-03-13",
+      "2026-03-16",
+      "2026-03-17",
+      "2026-03-18",
+      "2026-03-19",
+      "2026-03-20",
+      "2026-03-21",
+      "2026-03-22",
+      "2026-03-23",
+      "2026-03-24",
+      "2026-03-25",
+      "2026-03-26",
+      "2026-03-30",
+      "2026-03-31",
+      "2026-04-01",
+      "2026-04-02",
+      "2026-04-03",
+      "2026-04-04",
+      "2026-04-05",
+      "2026-04-06",
+      "2026-04-07",
+      "2026-04-08",
+      "2026-04-09",
+      "2026-04-10",
+      "2026-04-11",
+      "2026-04-12",
+      "2026-04-13",
+      "2026-04-14",
+      "2026-04-15",
+      "2026-04-16",
+      "2026-04-17",
+      "2026-04-18",
+      "2026-04-19",
+      "2026-04-20",
+      "2026-04-21",
+      "2026-04-22",
+      "2026-04-23",
+      "2026-04-24",
+      "2026-04-28",
+      "2026-04-29",
+      "2026-04-30",
+      "2026-05-01",
+      "2026-05-02",
+      "2026-05-03",
+      "2026-05-04",
+      "2026-05-05",
+      "2026-05-06",
+      "2026-05-07",
+      "2026-05-08",
+      "2026-05-09",
+      "2026-05-10",
+      "2026-05-11",
+      "2026-05-12",
+      "2026-05-13",
+      "2026-05-14",
+      "2026-05-15",
+      "2026-05-16",
+      "2026-05-17",
+      "2026-05-18",
+      "2026-05-19",
+      "2026-05-20",
+      "2026-05-21",
+      "2026-05-22",
+      "2026-05-23",
+      "2026-05-24",
+      "2026-05-25",
+      "2026-05-26",
+      "2026-05-27",
+      "2026-05-28",
+      "2026-05-29",
+      "2026-06-01",
+      "2026-06-02",
+      "2026-06-03",
+      "2026-06-04"
+    ],
+    "total_rows": 91892,
+    "last_merge": "2026-06-04T09:03:06.801161",
+    "version": 83,
+    "last_date_merged": "2026-06-04"
+  },
+  "exports_hint": {},
+  "run_progress": {
+    "previous_report": "C:\\Users\\Utilisateur\\Desktop\\PROJET_DATASENS\\reports\\db_state_2026-06-03T060618Z.json",
+    "raw_data_delta_since_previous_report": 157,
+    "source_deltas_since_previous_report": [
+      {
+        "source": "yahoo_finance",
+        "delta": 43,
+        "current": 4645
+      },
+      {
+        "source": "google_news_rss",
+        "delta": 38,
+        "current": 4379
+      },
+      {
+        "source": "datagouv_datasets",
+        "delta": 28,
+        "current": 1121
+      },
+      {
+        "source": "rss_french_news",
+        "delta": 24,
+        "current": 2241
+      },
+      {
+        "source": "reddit_france",
+        "delta": 16,
+        "current": 2134
+      },
+      {
+        "source": "openweather_api",
+        "delta": 5,
+        "current": 612
+      },
+      {
+        "source": "GDELT_Last15_English",
+        "delta": 3,
+        "current": 231
+      }
+    ]
+  },
+  "coherence_checks": {
+    "goldai_minus_raw_data": 36162,
+    "sentiment_keyword_duplicate_ids": 0,
+    "status": "OK",
+    "goldai_gap_interpretation": "non_comparable_legacy_rows_without_raw_data_id"
+  },
+  "ia_artifacts": {
+    "goldai_app_input_rows": 91892,
+    "goldai_ia_labelled_rows": 91892,
+    "goldai_ia_annotated_rows": 23114,
+    "goldai_ia_train_rows": 18491,
+    "goldai_ia_val_rows": 2311,
+    "goldai_ia_test_rows": 2312,
+    "goldai_predictions_runs_count": 10,
+    "goldai_predictions_latest_rows": 53766,
+    "goldai_predictions_latest_path": "data/goldai/predictions/date=2026-04-04/run=20260404_105936/predictions.parquet",
+    "flow_note": "Flux classique: sources -> SQLite(raw_data) -> exports GOLD parquet -> GoldAI. Les fichiers IA (gold_ia_labelled, splits train/val/test, app_input, predictions) sont des artefacts parquet dérivés de GoldAI.",
+    "mongo_transfer_note": "Transfert long terme MongoDB via scripts/backup_parquet_to_mongo.py (inclut GOLD quotidiens, GoldAI, IA training et IA predictions)."
+  },
+  "recommendations": [
+    "Écart GoldAI vs buffer détecté mais non comparable (lignes legacy sans raw_data_id). Comparer plutôt les lignes GoldAI avec raw_data_id renseigné."
+  ],
+  "goldai_linkage": {
+    "goldai_rows_total_parquet": 91892,
+    "goldai_rows_with_raw_data_id": 130,
+    "goldai_rows_without_raw_data_id": 91762,
+    "goldai_raw_id_in_db": 130,
+    "goldai_raw_id_not_in_db": 0,
+    "goldai_raw_link_coverage": 0.001415
+  },
+  "sentiment_drift": {
+    "status": "OK",
+    "alerts": [],
+    "current_pct": {
+      "neutre": 54.21,
+      "négatif": 34.0,
+      "positif": 11.79
+    },
+    "previous_pct": {
+      "neutre": 54.14,
+      "négatif": 34.05,
+      "positif": 11.8
+    }
+  }
+}
